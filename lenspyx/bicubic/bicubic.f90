@@ -65,7 +65,7 @@ subroutine deflect(output, ftl_map, fx, fy, nx, ny, npts)
     double precision, intent(out) :: output(0:npts-1)
     double precision, external :: eval
     integer, intent(in) :: nx, ny, npts
-    integer i, j
+    integer i
     do i = 0, npts - 1
         output(i) = eval(ftl_map, fx(i), fy(i), nx, ny)
     end do
