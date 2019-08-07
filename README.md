@@ -2,11 +2,14 @@
 
 [![alt text](https://readthedocs.org/projects/lenspyx/badge/?version=latest)](https://lenspyx.readthedocs.io/en/latest)[![Build Status](https://travis-ci.com/carronj/lenspyx.svg?branch=master)](https://travis-ci.com/carronj/lenspyx)
 
-Curved-sky python lensed CMB maps simulation package.
+Curved-sky python lensed CMB maps simulation package by Julien Carron.
 
 This allows one to build very easily (if familiar with healpy) lensed CMB simulations.
 
 The package basically provides two methods. Check the [doc](https://lenspyx.readthedocs.io/).
+
+(This implementation is independent from the similar-sounding [lenspix](the https://cosmologist.info/lenspix/) package by A.Lewis)
+
 ### Installation
 
 After cloning the repository, build an editable installation with
