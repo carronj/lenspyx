@@ -8,7 +8,7 @@ This allows one to build very easily (if familiar with healpy) lensed CMB simula
 
 The package basically provides two methods. Check the ![doc](https://lenspyx.readthedocs.io/).
 
-(This implementation is independent from the similar-sounding ![lenspix](https://cosmologist.info/lenspix/) package by A.Lewis)
+(NB: This implementation is independent from the similar-sounding lenspix package by A.Lewis)
 
 ### Installation
 
