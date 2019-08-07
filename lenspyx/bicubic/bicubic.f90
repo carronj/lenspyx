@@ -27,16 +27,16 @@ double precision function eval(ftl_map, fx, fy, nx, ny)
     ! nx : second dimension of array
     ! ny : first dimension of array
     implicit none
-    double precision, intent(in) :: ftl_map(0:ny-1, 0:nx-1)
+    double precision, intent(in) :: ftl_map(0:ny-1, 0:nx-1), fx, fy
     integer, intent(in) :: nx, ny
     double precision, external :: cubicfilter, tex2d
-    double precision fx, fy
+    double precision gx, gy
     integer px, py
 
     px = floor(fx)
     py = floor(fy)
-    fx = fx - px
-    fy = fy - py
+    gx = fx - px
+    gy = fy - py
     eval = cubicfilter(fy, &
               cubicfilter(fx, tex2d(ftl_map, px-1, py-1,nx, ny), tex2d(ftl_map, px, py-1,nx, ny), &
                         tex2d(ftl_map, px+1, py-1,nx, ny), tex2d(ftl_map, px+2,py-1,nx, ny)), &
