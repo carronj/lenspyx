@@ -5,6 +5,9 @@ import healpy as hp
 try :
     from lenspyx.shts import shts
     from lenspyx.bicubic import bicubic
+except:
+    print('Could not load fortran modules')
+    pass
 from lenspyx import utils
 from lenspyx import angles
 
