@@ -141,7 +141,7 @@ def _lens_gcband_sym(spin, glm, th1, th2, nt, nphi, thtpn, phipn, thtps, phips, 
     if spin == 0:
         vtm = shts.glm2vtm_sym(0, utils.thgrid.th2colat(tgrid), glm)
     else:
-        vtm = shts.vlm2vtm_sym(spin, utils.thgrid.th2colat(tgrid), shts.util.alm2vlm(glm, clm=clm))
+        vtm = shts.vlm2vtm_sym(spin, utils.thgrid.th2colat(tgrid), utils.alm2vlm(glm, clm=clm))
     times.add('vtm')
 
     # Band on north hemisphere
