@@ -1,263 +1,168 @@
 from __future__ import print_function
 
 import numpy as np
-import time
-import os, sys
 import healpy as hp
 from lenspyx.shts import shts
-from lenspyx import bicubic
+from lenspyx.bicubic import bicubic
+from lenspyx import utils
+from lenspyx import angles
 
-class timer():
-    def __init__(self, verbose, prefix='', suffix=''):
-        self.t0 = time.time()
-        self.ti = np.copy(self.t0)
-        self.verbose = verbose
-        self.prefix = prefix
-        self.suffix = suffix
+def alm2lenmap(alm, dlm, nside, dclm=None, facres=-1, nband=8, verbose=True):
+    """Computes a deflected spin-0 Healpix map from its alm and deflection field alm.
 
-    def checkpoint(self, msg):
-        dt = time.time() - self.t0
-        self.t0 = time.time()
+        Args:
+            alm: undeflected map healpy alm array
+            dlm: deflection field healpy alm array, gradient part. This is :math:`\sqrt{L(L+1)}\phi_{LM}`
+            nside: desired Healpix resolution of the deflected map
+            dclm(optional): deflection field healpy alm array, curl part.
+            facres(optional): the deflected map is constructed by interpolation of the undeflected map,
+                              built at target res. ~ 0.7amin * 2 ** facres.
+            nband(optional): To avoid dealing with too many large maps in memory, the operations is split in bands.
+            verbose(optional): If set, prints a bunch of timing and other info. Defaults to true.
 
-        if self.verbose:
-            dh = np.floor(dt / 3600.)
-            dm = np.floor(np.mod(dt, 3600.) / 60.)
-            ds = np.floor(np.mod(dt, 60))
-            dhi = np.floor((self.t0 - self.ti) / 3600.)
-            dmi = np.floor(np.mod((self.t0 - self.ti), 3600.) / 60.)
-            dsi = np.floor(np.mod((self.t0 - self.ti), 60))
-            sys.stdout.write("\r  %s   [" % self.prefix + ('%02d:%02d:%02d' % (dh, dm, ds)) + "] "
-                             + " (total [" + (
-                                 '%02d:%02d:%02d' % (dhi, dmi, dsi)) + "]) " + msg + ' %s \n' % self.suffix)
+        Returns:
+            Deflected healpy map at resolution nside.
 
-def vtm2filtmap(spin, vtm, nphi, threads=None, phiflip=()):
-    return shts.vtm2map(spin, vtm, nphi, pfftwthreads=threads, bicubic_prefilt=True, phiflip=phiflip)
-
-def _sind_d_m1(d, deriv=False):
-    """Approximation to sind / d  - 1.
-
-      If deriv, this returns (sind /d )' / d
-    """
-    assert np.max(d) <= 0.01, (np.max(d), 'CMB Lensing deflections should never be that big')
-    d2 = d * d
-    if not deriv:
-        return np.poly1d([0., -1 / 6., 1. / 120., -1. / 5040.][::-1])(d2)
-    else:
-        return - 1 / 3. * (1. -  d2 / 10. * ( 1.  - d2 / 28.))
-
-def resolve_phi_poles(Red, Imd, cost, sint, cap, verbose=False):
-    d = np.sqrt(Red ** 2 + Imd ** 2)
-    sind_d = (1. + _sind_d_m1(d))
-    costp = np.cos(d) * cost - Red *  sind_d * sint
-    sintp = np.sqrt(1. - costp ** 2)
-    sign_0 = np.sign(Imd)
-    sign_1 = np.sign(Imd * np.cos(d) / sintp + Imd * sind_d / sintp ** 3 * costp * (-np.sin(d) * cost * d - Red * np.cos(d) * sint))
-    criticals = np.where(sign_0 != sign_1)[0]
-    if verbose:
-        print("resolve_poles: I have flipped %s signs out of %s investigated pixels on %s pole"%(len(criticals), len(Red), cap))
-    #: sol is dphi = pi - asin(Im / sintp * sind /d) instead of asin
-    return criticals
-
-def d2ang(Red, Imd, cost, phi, cap, increments_only=False, verbose=True):
-    """Builds deflected positions according to deflection field Red, Imd and undeflected coord. cost and phi.
-
-    Very close to the poles, the relation sin(p' - p) = Im[d] / sint' (sin d / d) can be ambiguous.
-    We resolve this through the *resolve_phi_poles* function for a number of candidate pixels.
-
-    Returns:
-        deflected cost and phi coordinates
 
     """
-    assert cap in ['north', 'south']
+    if dclm is not None: assert hp.Alm.getlmax(dclm) == hp.Alm.getlmax(dlm)
+    return _lens_gclm_sym_timed(0, dlm, -alm, nside, dclm=dclm, nband=nband, facres=facres, verbose=verbose)
 
-    sint = np.sqrt(1. - cost ** 2)
-    d = np.sqrt(Red ** 2 + Imd ** 2)
-    sind_d = _sind_d_m1(d) + 1.
-    cosd = np.cos(d)
-    costp = cost * cosd - Red * sind_d * sint
-    dphip = np.arcsin(Imd / np.sqrt(1. - costp ** 2) * sind_d)
-    if cap == 'north':
-        crit_phipts = np.where((cosd <=  cost) & (Red <= 0.))[0]
-    elif cap == 'south':
-        crit_phipts = np.where((cosd <= -cost) & (Red >= 0.))[0]
-    else:
-        assert 0
-    #: candidates for ambiguous relation sin dphi = Imd / sintp sind / d.
-    #: This is either arcsin(...) or pi - arcsin(...) (if > 0) or -(pi - |arcsin|) (if < 0)
-    if len(crit_phipts) > 0:
-        if np.isscalar(cost) and np.isscalar(sint): #for ring-only calc.
-            criticals = resolve_phi_poles(Red[crit_phipts], Imd[crit_phipts], cost, sint, cap, verbose=verbose)
-        else:
-            criticals = resolve_phi_poles(Red[crit_phipts], Imd[crit_phipts], cost[crit_phipts], sint[crit_phipts], cap,
-                                      verbose=verbose)
+def gclm2lenmap(gclm, dlm, nside, spin, dclm=None, nband=8, facres=-1, verbose=True):
+    """Computes a deflected spin-weight Healpix map from its gradient and curl modes and deflection field alm.
 
-        sgn = np.sign(dphip[crit_phipts[criticals]])
-        dphip[crit_phipts[criticals]] = sgn * (np.pi - np.abs(dphip[crit_phipts[criticals]]))
-    return (costp, phi + dphip) if not increments_only else (costp - cost, dphip)
+        Args:
+            gclm: list with undeflected map healpy gradient and curl array (e.g. polarization Elm and Blm).
+            dlm: deflection field healpy alm array, gradient part.
+                 This is related to the usual lensing potential by :math:`\sqrt{L(L+1)}\phi_{LM}`
+            nside: desired Healpix resolution of the deflected map
+            spin: spin of the array to deflect.
+            dclm(optional): deflection field healpy alm array, curl part.
+            facres(optional): the deflected map is constructed by interpolation of the undeflected map,
+                              built at target res. ~ 0.7amin * 2 ** facres.
+            nband(optional): To avoid dealing with too many large maps in memory, the operations is split in bands.
+            verbose(optional): If set, prints a bunch of timing and other info. Defaults to true.
 
-def _buildangles( tht_phi, Red,Imd):
+        Returns:
+            Deflected healpy map at resolution nside.
+
+
     """
-    e.g.
-        Redtot, Imdtot = hp.alm2map_spin([dlm, np.zeros_like(dlm)], nside, 1, hp.Alm.getlmax(dlm.size))
-        pix = hp.query_strip(nside, th1, np.max(tht_patch), inclusive=True)
-        costnew,phinew = buildangles(hp.pix2ang(nside, pix),Redtot[pix],Imdtot[pix])
-    """
-    costnew = np.cos(tht_phi[0])
-    phinew = tht_phi[1].copy()
-    norm = np.sqrt(Red ** 2 + Imd ** 2)
-    ii = np.where(norm > 0.)
-    costnew[ii] = np.cos(norm[ii]) * costnew[ii] - np.sin(norm[ii]) * np.sin(tht_phi[0][ii]) * (Red[ii] / norm[ii])
-    ii = np.where( (norm > 0.) & (costnew ** 2 < 1.))
-    phinew[ii] += np.arcsin((Imd[ii] / norm[ii]) * np.sin(norm[ii]) / (np.sqrt(1. - costnew[ii] ** 2)))
-    return np.arccos(costnew),phinew
+    assert len(gclm) == 2
+    if dclm is not None: assert hp.Alm.getlmax(dclm) == hp.Alm.getlmax(dlm)
+    return _lens_gclm_sym_timed(spin, dlm, gclm[0], nside,
+                                clm=gclm[1], dclm=dclm, nband=nband, facres=facres, verbose=verbose)
 
-def get_nphi(th1, th2, facres=0, target_amin=0.745):
-    """ Calculates a phi sampling density at co-latitude theta """
-    # 0.66 corresponds to 2 ** 15 = 32768
-    sint = max(np.sin(th1), np.sin(th2))
-    for res in np.arange(15, 3, -1):
-        if 2. * np.pi / (2 ** (res-1)) * 180. * 60 /np.pi * sint >= target_amin : return 2 ** (res + facres)
-    assert 0
+def _lens_gclm_sym_timed(spin, dlm, glm, nside, nband=8, facres=0, clm=None, dclm=None, verbose=True):
+    """Performs the deflection by splitting the full latitude range into distinct bands which are done one at a time.
 
+        See *_lens_gcband_sym* for the single band (north and south hemispheres) lensing.
 
-class thgrid:
-    def __init__(self, th1, th2):
-        """
-        Co-latitudes th1 and th2 between 0 (N. pole) and pi (S. Pole).
-        negative theta values are reflected across the north pole.
-        (this allows simple padding to take care of the non periodicty of the pine in theta direction.)
-        Same for south pole.
-        """
-        self.th1 = th1
-        self.th2 = th2
-
-    def mktgrid(self, nt):
-        return self.th1 + np.arange(nt) * ( (self.th2- self.th1) / (nt-1))
-
-    def togridunits(self, tht, nt):
-        return (tht - self.th1) / ((self.th2- self.th1) / (nt-1))
-
-
-def _th2colat(th):
-    ret = np.abs(th)
-    ret[np.where(th > np.pi)] = 2 * np.pi - th[np.where(th > np.pi)]
-    return ret
-
-
-def tlm2lenmap(nside, tlm, dlm, verbose=True, nband=8, facres=0):
-    return lens_glm_sym_timed(0, dlm, -tlm, nside,nband=nband, facres=facres)
-
-
-def lens_glm_sym_timed(spin, dlm, glm, nside, nband=8, facres=0, clm=None, rotpol=True):
-    """
-    Same as lens_alm but lens simultnously a North and South colatitude band,
-    to make profit of the symmetries of the spherical harmonics.
     """
     assert spin >= 0,spin
-    t = timer(True, suffix=' ' + __name__)
-    target_nt = 3 ** 1 * 2 ** (11 + facres) # on one hemisphere
-    times = {}
+    times = utils.timer(verbose, suffix=' ' + __name__)
+    target_nt = 2 ** (13 + facres) # on one hemisphere
 
     #co-latitudes
     th1s = np.arange(nband) * (np.pi * 0.5 / nband)
     th2s = np.concatenate((th1s[1:],[np.pi * 0.5]))
-    ret = np.zeros(hp.nside2npix(nside),dtype = float if spin == 0 else complex)
-    Nt_perband = int(target_nt / nband)
-    t0 = time.time()
-    Redtot, Imdtot = hp.alm2map_spin([dlm, np.zeros_like(dlm)], nside, 1, hp.Alm.getlmax(dlm.size))
-    times['dx,dy (full sky)'] = time.time() - t0
-    times['dx,dy band split'] = 0.
-    times['pol. rot.'] = 0.
-    t.checkpoint('healpy Spin 1 transform for displacement (full %s map)' % nside)
-    _Npix = 0 # Total number of pixels used for interpolation
-    def coadd_times(tim):
-        for _k in tim.keys():
-            if _k not in times :
-                times[_k] = tim[_k]
-            else : times[_k] += tim[_k]
-
+    nt_perband = int(target_nt / nband)
+    redtot, imdtot = hp.alm2map_spin([dlm, np.zeros_like(dlm) if dclm is None else dclm], nside, 1, hp.Alm.getlmax(dlm.size))
+    times.add('defl. spin 1 transform')
+    interp_pix = 0
+    ret = np.empty(hp.nside2npix(nside),dtype = float if spin == 0 else complex)
     for ib, th1, th2 in zip(range(nband), th1s, th2s):
-        print("BAND %s in %s :"%(ib, nband))
-        t0 = time.time()
-        pixN = hp.query_strip(nside, th1, th2, inclusive=True)
-        pixS = hp.query_strip(nside, np.pi- th2,np.pi - th1, inclusive=True)
-        tnewN, phinewN = _buildangles(hp.pix2ang(nside, pixN), Redtot[pixN], Imdtot[pixN])
-        tnewS, phinewS = _buildangles(hp.pix2ang(nside, pixS), Redtot[pixS], Imdtot[pixS])
+        if verbose: print("BAND %s in %s :"%(ib, nband))
+        pixn = hp.query_strip(nside, th1, th2, inclusive=True)
+        pixs = hp.query_strip(nside, np.pi- th2,np.pi - th1, inclusive=True)
+        thtp, phipn = angles.get_angles(nside, pixn, redtot[pixn], imdtot[pixn], 'north')
+        thtps, phips = angles.get_angles(nside, pixs, redtot[pixs], imdtot[pixs], 'south')
 
         # Adding a 10 pixels buffer for new angles to be safely inside interval.
         # th1,th2 is mapped onto pi - th2,pi -th1 so we need to make sure to cover both buffers
-        matnewN = np.max(tnewN)
-        mitnewN = np.min(tnewN)
-        matnewS = np.max(tnewS)
-        mitnewS = np.min(tnewS)
-        buffN = 10 * (matnewN - mitnewN) / (Nt_perband - 1) / (1. - 2. * 10. / (Nt_perband - 1))
-        buffS = 10 * (matnewS - mitnewS) / (Nt_perband - 1) / (1. - 2. * 10. / (Nt_perband - 1))
-        _thup = min(np.pi - (matnewS + buffS),mitnewN - buffN)
-        _thdown = max(np.pi - (mitnewS - buffS),matnewN + buffN)
+        mathtp = np.max(thtp); mithtp = np.min(thtp)
+        mathtps = np.max(thtps); mithtps = np.min(thtps)
+        buffN = 10 * (mathtp - mithtp) / (nt_perband - 1) / (1. - 2. * 10. / (nt_perband - 1))
+        buffS = 10 * (mathtps - mithtps) / (nt_perband - 1) / (1. - 2. * 10. / (nt_perband - 1))
+        th1 = min(np.pi - (mathtps + buffS),mithtp - buffN)
+        th2 = max(np.pi - (mithtps - buffS),mathtp + buffN)
 
-        #print "min max tnew (degrees) in the band %.3f %.3f "%(_th1 /np.pi * 180.,_th2 /np.pi * 180.)
         #==== these are the theta and limits. It is ok to go negative or > 180
-        print('input t1,t2 %.3f %.3f in degrees'%(_thup /np.pi * 180,_thdown/np.pi * 180.))
-        print('North %.3f and South %.3f buffers in amin'%(buffN /np.pi * 180 * 60,buffS/np.pi * 180. * 60.))
-        nphi = get_nphi(_thup, _thdown, facres=facres)
-        dphi_patch = (2. * np.pi) / nphi * max(np.sin(_thup),np.sin(_thdown))
-        dth_patch = (_thdown - _thup) / (Nt_perband -1)
-        print("cell (theta,phi) in amin (%.3f,%.3f)" % (dth_patch / np.pi * 60. * 180, dphi_patch / np.pi * 60. * 180))
-        times['dx,dy band split'] += time.time() - t0
+        if verbose: print('input t1,t2 %.3f %.3f in degrees'%(th1 /np.pi * 180,th2/np.pi * 180.))
+        if verbose: print('North %.3f and South %.3f buffers in amin'%(buffN /np.pi * 180 * 60,buffS/np.pi * 180. * 60.))
+        nphi = utils.get_nphi(th1, th2, facres=facres)
+        dphi_patch = (2. * np.pi) / nphi * max(np.sin(th1),np.sin(th2))
+        dth_patch = (th2 - th1) / (nt_perband -1)
+        if verbose: print("cell (theta,phi) in amin (%.3f,%.3f)" % (dth_patch / np.pi * 60. * 180, dphi_patch / np.pi * 60. * 180))
+        times.add('defl. angles calc.')
+        len_nr, len_ni, len_sr, len_si = _lens_gcband_sym(spin, glm, th1, th2, nt_perband, nphi, thtp, phipn, thtps, phips,
+                                                         clm=clm, times=times)
         if spin == 0:
-            lenN,lenS,tim = lens_band_sym_timed(glm,_thup,_thdown,Nt_perband, tnewN,phinewN, tnewS,phinewS,nphi=nphi)
-            ret[pixN] = lenN
-            ret[pixS] = lenS
+            ret[pixn] = len_nr
+            ret[pixs] = len_sr
         else :
-            lenNR,lenNI,lenSR,lenSI,tim = gclm2lensmap_symband_timed(spin, glm, _thup, _thdown, Nt_perband,
-                                                            (tnewN, phinewN), (tnewS, phinewS), nphi=nphi, clm = clm)
-            ret[pixN] = lenNR + 1j * lenNI
-            ret[pixS] = lenSR + 1j * lenSI
-            t0 = time.time()
-            if rotpol and spin > 0 :
-                ret[pixN] *= polrot(spin,ret[pixN], hp.pix2ang(nside, pixN)[0],Redtot[pixN],Imdtot[pixN])
-                ret[pixS] *= polrot(spin,ret[pixS], hp.pix2ang(nside, pixS)[0],Redtot[pixS],Imdtot[pixS])
-                times['pol. rot.'] += time.time() -t0
-        coadd_times(tim)
-
-        #coadd_times(tim)
-        _Npix += 2 * Nt_perband * nphi
-    t.checkpoint('Total exec. time')
-
-    print("STATS for lmax tlm %s lmax dlm %s"%(hp.Alm.getlmax(glm.size),hp.Alm.getlmax(dlm.size)))
-    tot= 0.
-    for _k in times.keys() :
-        print('%20s: %.2f'%(_k, times[_k]))
-        tot += times[_k]
-    print("%20s: %2.f sec."%('tot',tot))
-    print("%20s: %2.f sec."%('excl. defl. angle calc.',tot - times['dx,dy (full sky)']-times['dx,dy band split']))
-    print('%20s: %s = %.1f^2'%('Tot. int. pix.',int(_Npix),np.sqrt(_Npix * 1.)))
-
+            ret[pixn] = angles.rotation(nside, spin, pixn, redtot[pixn], imdtot[pixn]) * (len_nr + 1j * len_ni)
+            ret[pixs] = angles.rotation(nside, spin, pixs, redtot[pixs], imdtot[pixs]) * (len_sr + 1j * len_si)
+            times.add(r'pol. //-transport rot.')
+        interp_pix += nphi * nt_perband * 2
+    if verbose: print(times)
+    if verbose: print(r"Number of interpolating pixels: %s ~ %s^2 "%(interp_pix, int(np.sqrt(interp_pix))))
     return ret
 
 
-def lens_band_sym_timed(glm, th1, th2, nt, tnewN, phinewN, tnewS, phinewS, nphi=2 ** 14):
-    """
-    Same as lens_band_sym with some more timing info.
-    """
-    assert len(tnewN) == len(phinewN) and len(tnewS) == len(phinewS)
+def _lens_gcband_sym(spin, glm, th1, th2, nt, nphi, thtpn, phipn, thtps, phips, clm=None, times=None):
+    r"""Returns deflected maps between a co-latitude range in the North Hemisphere and its South hemisphere counterpart.
 
-    tgrid = thgrid(th1, th2).mktgrid(nt)
-    times = {}
-    t0 = time.time()
-    vtm = shts.glm2vtm_sym(0, _th2colat(tgrid), glm)
-    times['vtm'] = time.time() - t0
-    t0 = time.time()
-    filtmapN = vtm2filtmap(0, vtm[0:nt], nphi, phiflip=np.where((tgrid < 0))[0])
-    filtmapS = vtm2filtmap(0, vtm[slice(2 * nt - 1, nt - 1, -1)], nphi, phiflip=np.where((np.pi - tgrid) > np.pi)[0])
-    times['vtm2filtmap'] = time.time() - t0
-    del vtm
-    t0 = time.time()
-    lenmaps = []
-    for N, filtmap, (tnew, phinew) in zip([1, 0], [filtmapN, filtmapS],
-                                                  [(tnewN, phinewN), (tnewS, phinewS)]):
-        tnew = thgrid(th1, th2).togridunits(tnew, nt) if N else thgrid(np.pi - th2, np.pi - th1).togridunits(tnew, nt)
-        phinew /= ((2. * np.pi) / nphi)
-        lenmaps.append(bicubic.deflect(filtmap, tnew, phinew))
-    times['interp'] = time.time() - t0
-    return lenmaps[0], lenmaps[1], times
+        This routine performs the deflection only, and not the rotation sourced by the local axes //-transport.
+
+        Args:
+            spin: spin of the field to deflect described by gradient glm and curl clm mode.
+            glm:  gradient lm components of the field, in healpy format.
+            th1:  input co-latitude range is (th1,th2) on North hemisphere and (pi - th2,pi -th1) on south hemisphere.
+            th2:  input co-latitude range is (th1,th2) on North hemisphere and (pi - th2,pi -th1) on south hemisphere.
+            nt:  Number of tht point to use for the interpolation.
+            nphi : Number of phi points to use for the interpolation.
+            thtpn: deflected colatitude on north hemisphere sector.
+            phipn: deflected longitude on north hemisphere sector.
+            thtps: deflected colatitude on south hemisphere sector.
+            phips: deflected longitude on south hemisphere sector.
+
+            clm(optional) : curl lm components of the field to deflect, in healpy ordering.
+
+        Returns:
+            real and imaginary parts of the north and south bands (re-n, im-n, re-s, im-s)
+
+    """
+    assert spin >= 0
+    assert len(thtpn) == len(phipn) and len(thtps) == len(phips)
+    if times is None: times = utils.timer(True)
+
+    tgrid = utils.thgrid(th1, th2).mktgrid(nt)
+    if spin == 0:
+        vtm = shts.glm2vtm_sym(0, utils.thgrid.th2colat(tgrid), glm)
+    else:
+        vtm = shts.vlm2vtm_sym(spin, utils.thgrid.th2colat(tgrid), shts.util.alm2vlm(glm, clm=clm))
+    times.add('vtm')
+
+    # Band on north hemisphere
+    filtmap = vtm2filtmap(spin, vtm[0:nt], nphi, phiflip=np.where((tgrid < 0))[0])
+    t_grid = utils.thgrid(th1, th2).togridunits(thtpn, nt)
+    p_grid = phipn / ((2. * np.pi) / nphi)
+    times.add('vtm2filtmap')
+    lenmapnr = bicubic.deflect(np.require(filtmap.real, float, requirements='F'), t_grid, p_grid)
+    lenmapni = bicubic.deflect(np.require(filtmap.imag, float, requirements='F'), t_grid, p_grid) if spin > 0 else None
+    times.add('interp')
+
+    # Symmetric band on south hemisphere
+    filtmap = vtm2filtmap(spin, vtm[slice(2 * nt - 1, nt - 1, -1)], nphi, phiflip=np.where((np.pi - tgrid) > np.pi)[0])
+    t_grid = utils.thgrid(np.pi - th2, np.pi - th1).togridunits(thtps, nt)
+    p_grid = phips / ((2. * np.pi) / nphi)
+    times.add('vtm2filtmap')
+    lenmapsr = bicubic.deflect(np.require(filtmap.real, float, requirements='F'), t_grid, p_grid)
+    lenmapsi = bicubic.deflect(np.require(filtmap.imag, float, requirements='F'), t_grid, p_grid) if spin > 0 else None
+    times.add('interp')
+    return lenmapnr, lenmapni, lenmapsr, lenmapsi
+
+def vtm2filtmap(spin, vtm, nphi, threads=None, phiflip=()):
+    return shts.vtm2map(spin, vtm, nphi, pfftwthreads=threads, bicubic_prefilt=True, phiflip=phiflip)
+
