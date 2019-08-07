@@ -7,16 +7,25 @@ from lenspyx.bicubic import bicubic
 from lenspyx import utils
 from lenspyx import angles
 
-def alm2lenmap(alm, dlm, nside, dclm=None, facres=-1, nband=8, verbose=True):
-    """Computes a deflected spin-0 Healpix map from its alm and deflection field alm.
+def alm2lenmap(alm, dlms, nside, facres=0, nband=8, verbose=True):
+    r"""Computes a deflected spin-0 healpix map from its alm and deflection field alm.
 
         Args:
             alm: undeflected map healpy alm array
-            dlm: deflection field healpy alm array, gradient part. This is :math:`\sqrt{L(L+1)}\phi_{LM}`
-            nside: desired Healpix resolution of the deflected map
-            dclm(optional): deflection field healpy alm array, curl part.
+            dlms: The spin-1 deflection, in the form either a list of two healpy alm arrays or a list two healpix maps.
+
+                    In the former case the two arrays are the gradient and curl deflection healpy alms.
+                    (e.g. :math:`\sqrt{L(L+1)}\phi_{LM}` with :math:`\phi` the lensing potential)
+                    The curl can be set to None if irrelevant.
+
+                    In the latter case the two arrays are the real and imag. part of the precomputed spin-1 deflection.
+                    (e.g. :math:`-\sum_{LM}\sqrt{L(L+1)}\phi_{LM} \:_{1}Y_{LM}(\hat n))`
+                    This saves some computation time as this operation must be performed anyways.
+                    In this case, their healpix resolution must match the argument *nside*.
+
+            nside: desired healpix resolution of the deflected map
             facres(optional): the deflected map is constructed by interpolation of the undeflected map,
-                              built at target res. ~ 0.7amin * 2 ** facres.
+                              built at target res. ~ :math:`0.7 * 2^{\rm facres}.`
             nband(optional): To avoid dealing with too many large maps in memory, the operations is split in bands.
             verbose(optional): If set, prints a bunch of timing and other info. Defaults to true.
 
@@ -25,33 +34,43 @@ def alm2lenmap(alm, dlm, nside, dclm=None, facres=-1, nband=8, verbose=True):
 
 
     """
-    if dclm is not None: assert hp.Alm.getlmax(dclm) == hp.Alm.getlmax(dlm)
-    return _lens_gclm_sym_timed(0, dlm, -alm, nside, dclm=dclm, nband=nband, facres=facres, verbose=verbose)
+    assert len(dlms) == 2
+    if not np.iscomplexobj(dlms[0]): assert dlms[0].size == dlms[1].size and dlms[0].size == hp.nside2npix(nside)
+    return _lens_gclm_sym_timed(0, dlms[0], -alm, nside, dclm=dlms[1], nband=nband, facres=facres, verbose=verbose)
 
-def gclm2lenmap(gclm, dlm, nside, spin, dclm=None, nband=8, facres=-1, verbose=True):
-    """Computes a deflected spin-weight Healpix map from its gradient and curl modes and deflection field alm.
+def alm2lenmap_spin(gclm, dlms, nside, spin, nband=8, facres=-1, verbose=True):
+    r"""Computes a deflected spin-weight Healpix map from its gradient and curl modes and deflection field alm.
 
         Args:
             gclm: list with undeflected map healpy gradient and curl array (e.g. polarization Elm and Blm).
-            dlm: deflection field healpy alm array, gradient part.
-                 This is related to the usual lensing potential by :math:`\sqrt{L(L+1)}\phi_{LM}`
-            nside: desired Healpix resolution of the deflected map
-            spin: spin of the array to deflect.
-            dclm(optional): deflection field healpy alm array, curl part.
+            dlms: The spin-1 deflection, in the form either a list of two healpy alm arrays or a list two healpix maps.
+
+                    In the former case the two arrays are the gradient and curl deflection healpy alms.
+                    (e.g. :math:`\sqrt{L(L+1)}\phi_{LM}` with :math:`\phi` the lensing potential)
+                    The curl can be set to None if irrelevant.
+
+                    In the latter case the two arrays are the real and imag. part of the precomputed spin-1 deflection.
+                    (e.g. :math:`-\sum_{LM}\sqrt{L(L+1)}\phi_{LM} \:_{1}Y_{LM}(\hat n))`
+                    This saves some computation time as this operation must be performed anyways.
+                    In this case, their healpix resolution must match the argument *nside*.
+
+            nside: desired healpix resolution of the deflected map
+            spin: spin-weight of the maps to deflect (2 for polarization).
             facres(optional): the deflected map is constructed by interpolation of the undeflected map,
-                              built at target res. ~ 0.7amin * 2 ** facres.
+                              built at target res. ~ :math:`0.7 * 2^{\rm facres}.`
             nband(optional): To avoid dealing with too many large maps in memory, the operations is split in bands.
             verbose(optional): If set, prints a bunch of timing and other info. Defaults to true.
 
         Returns:
-            Deflected healpy map at resolution nside.
+            Deflected healpy maps at resolution nside (real and imaginary parts).
 
 
     """
     assert len(gclm) == 2
-    if dclm is not None: assert hp.Alm.getlmax(dclm) == hp.Alm.getlmax(dlm)
-    return _lens_gclm_sym_timed(spin, dlm, gclm[0], nside,
-                                clm=gclm[1], dclm=dclm, nband=nband, facres=facres, verbose=verbose)
+    assert len(dlms) == 2
+    if not np.iscomplexobj(dlms[0]): assert dlms[0].size == dlms[1].size and dlms[0].size == hp.nside2npix(nside)
+    return _lens_gclm_sym_timed(spin, dlms[0], gclm[0], nside,
+                                clm=gclm[1], dclm=dlms[1], nband=nband, facres=facres, verbose=verbose)
 
 def _lens_gclm_sym_timed(spin, dlm, glm, nside, nband=8, facres=0, clm=None, dclm=None, verbose=True):
     """Performs the deflection by splitting the full latitude range into distinct bands which are done one at a time.
@@ -67,7 +86,13 @@ def _lens_gclm_sym_timed(spin, dlm, glm, nside, nband=8, facres=0, clm=None, dcl
     th1s = np.arange(nband) * (np.pi * 0.5 / nband)
     th2s = np.concatenate((th1s[1:],[np.pi * 0.5]))
     nt_perband = int(target_nt / nband)
-    redtot, imdtot = hp.alm2map_spin([dlm, np.zeros_like(dlm) if dclm is None else dclm], nside, 1, hp.Alm.getlmax(dlm.size))
+    if np.iscomplexobj(dlm): # inputs are the spin 1 d map
+        lmax = hp.Alm.getlmax(dlm.size)
+        redtot, imdtot = hp.alm2map_spin([dlm, np.zeros_like(dlm) if dclm is None else dclm], nside, 1, lmax)
+    else:
+        assert dclm is not None and dclm.size == dlm.size
+        redtot = dlm
+        imdtot = dclm
     times.add('defl. spin 1 transform')
     interp_pix = 0
     ret = np.empty(hp.nside2npix(nside),dtype = float if spin == 0 else complex)
