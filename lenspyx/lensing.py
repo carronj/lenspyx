@@ -30,8 +30,70 @@ class timer():
                              + " (total [" + (
                                  '%02d:%02d:%02d' % (dhi, dmi, dsi)) + "]) " + msg + ' %s \n' % self.suffix)
 
-def vtm2filtmap(spin, vtm, nphi, threads=None,phiflip=()):
+def vtm2filtmap(spin, vtm, nphi, threads=None, phiflip=()):
     return shts.vtm2map(spin, vtm, nphi, pfftwthreads=threads, bicubic_prefilt=True, phiflip=phiflip)
+
+def _sind_d_m1(d, deriv=False):
+    """Approximation to sind / d  - 1.
+
+      If deriv, this returns (sind /d )' / d
+    """
+    assert np.max(d) <= 0.01, (np.max(d), 'CMB Lensing deflections should never be that big')
+    d2 = d * d
+    if not deriv:
+        return np.poly1d([0., -1 / 6., 1. / 120., -1. / 5040.][::-1])(d2)
+    else:
+        return - 1 / 3. * (1. -  d2 / 10. * ( 1.  - d2 / 28.))
+
+def resolve_phi_poles(Red, Imd, cost, sint, cap, verbose=False):
+    d = np.sqrt(Red ** 2 + Imd ** 2)
+    sind_d = (1. + _sind_d_m1(d))
+    costp = np.cos(d) * cost - Red *  sind_d * sint
+    sintp = np.sqrt(1. - costp ** 2)
+    sign_0 = np.sign(Imd)
+    sign_1 = np.sign(Imd * np.cos(d) / sintp + Imd * sind_d / sintp ** 3 * costp * (-np.sin(d) * cost * d - Red * np.cos(d) * sint))
+    criticals = np.where(sign_0 != sign_1)[0]
+    if verbose:
+        print("resolve_poles: I have flipped %s signs out of %s investigated pixels on %s pole"%(len(criticals), len(Red), cap))
+    #: sol is dphi = pi - asin(Im / sintp * sind /d) instead of asin
+    return criticals
+
+def d2ang(Red, Imd, cost, phi, cap, increments_only=False, verbose=True):
+    """Builds deflected positions according to deflection field Red, Imd and undeflected coord. cost and phi.
+
+    Very close to the poles, the relation sin(p' - p) = Im[d] / sint' (sin d / d) can be ambiguous.
+    We resolve this through the *resolve_phi_poles* function for a number of candidate pixels.
+
+    Returns:
+        deflected cost and phi coordinates
+
+    """
+    assert cap in ['north', 'south']
+
+    sint = np.sqrt(1. - cost ** 2)
+    d = np.sqrt(Red ** 2 + Imd ** 2)
+    sind_d = _sind_d_m1(d) + 1.
+    cosd = np.cos(d)
+    costp = cost * cosd - Red * sind_d * sint
+    dphip = np.arcsin(Imd / np.sqrt(1. - costp ** 2) * sind_d)
+    if cap == 'north':
+        crit_phipts = np.where((cosd <=  cost) & (Red <= 0.))[0]
+    elif cap == 'south':
+        crit_phipts = np.where((cosd <= -cost) & (Red >= 0.))[0]
+    else:
+        assert 0
+    #: candidates for ambiguous relation sin dphi = Imd / sintp sind / d.
+    #: This is either arcsin(...) or pi - arcsin(...) (if > 0) or -(pi - |arcsin|) (if < 0)
+    if len(crit_phipts) > 0:
+        if np.isscalar(cost) and np.isscalar(sint): #for ring-only calc.
+            criticals = resolve_phi_poles(Red[crit_phipts], Imd[crit_phipts], cost, sint, cap, verbose=verbose)
+        else:
+            criticals = resolve_phi_poles(Red[crit_phipts], Imd[crit_phipts], cost[crit_phipts], sint[crit_phipts], cap,
+                                      verbose=verbose)
+
+        sgn = np.sign(dphip[crit_phipts[criticals]])
+        dphip[crit_phipts[criticals]] = sgn * (np.pi - np.abs(dphip[crit_phipts[criticals]]))
+    return (costp, phi + dphip) if not increments_only else (costp - cost, dphip)
 
 def _buildangles( tht_phi, Red,Imd):
     """
@@ -49,7 +111,7 @@ def _buildangles( tht_phi, Red,Imd):
     phinew[ii] += np.arcsin((Imd[ii] / norm[ii]) * np.sin(norm[ii]) / (np.sqrt(1. - costnew[ii] ** 2)))
     return np.arccos(costnew),phinew
 
-def get_Nphi(th1, th2, facres=0, target_amin=0.745):
+def get_nphi(th1, th2, facres=0, target_amin=0.745):
     """ Calculates a phi sampling density at co-latitude theta """
     # 0.66 corresponds to 2 ** 15 = 32768
     sint = max(np.sin(th1), np.sin(th2))
@@ -58,7 +120,7 @@ def get_Nphi(th1, th2, facres=0, target_amin=0.745):
     assert 0
 
 
-class thgrid():
+class thgrid:
     def __init__(self, th1, th2):
         """
         Co-latitudes th1 and th2 between 0 (N. pole) and pi (S. Pole).
@@ -92,7 +154,7 @@ def lens_glm_sym_timed(spin, dlm, glm, nside, nband=8, facres=0, clm=None, rotpo
     to make profit of the symmetries of the spherical harmonics.
     """
     assert spin >= 0,spin
-    t = timer(True,suffix=' ' + __name__)
+    t = timer(True, suffix=' ' + __name__)
     target_nt = 3 ** 1 * 2 ** (11 + facres) # on one hemisphere
     times = {}
 
@@ -119,8 +181,8 @@ def lens_glm_sym_timed(spin, dlm, glm, nside, nband=8, facres=0, clm=None, rotpo
         t0 = time.time()
         pixN = hp.query_strip(nside, th1, th2, inclusive=True)
         pixS = hp.query_strip(nside, np.pi- th2,np.pi - th1, inclusive=True)
-        tnewN,phinewN = _buildangles(hp.pix2ang(nside, pixN),Redtot[pixN],Imdtot[pixN])
-        tnewS,phinewS = _buildangles(hp.pix2ang(nside, pixS), Redtot[pixS], Imdtot[pixS])
+        tnewN, phinewN = _buildangles(hp.pix2ang(nside, pixN), Redtot[pixN], Imdtot[pixN])
+        tnewS, phinewS = _buildangles(hp.pix2ang(nside, pixS), Redtot[pixS], Imdtot[pixS])
 
         # Adding a 10 pixels buffer for new angles to be safely inside interval.
         # th1,th2 is mapped onto pi - th2,pi -th1 so we need to make sure to cover both buffers
@@ -137,18 +199,18 @@ def lens_glm_sym_timed(spin, dlm, glm, nside, nband=8, facres=0, clm=None, rotpo
         #==== these are the theta and limits. It is ok to go negative or > 180
         print('input t1,t2 %.3f %.3f in degrees'%(_thup /np.pi * 180,_thdown/np.pi * 180.))
         print('North %.3f and South %.3f buffers in amin'%(buffN /np.pi * 180 * 60,buffS/np.pi * 180. * 60.))
-        Nphi = get_Nphi(_thup, _thdown, facres=facres)
-        dphi_patch = (2. * np.pi) / Nphi * max(np.sin(_thup),np.sin(_thdown))
+        nphi = get_nphi(_thup, _thdown, facres=facres)
+        dphi_patch = (2. * np.pi) / nphi * max(np.sin(_thup),np.sin(_thdown))
         dth_patch = (_thdown - _thup) / (Nt_perband -1)
         print("cell (theta,phi) in amin (%.3f,%.3f)" % (dth_patch / np.pi * 60. * 180, dphi_patch / np.pi * 60. * 180))
         times['dx,dy band split'] += time.time() - t0
         if spin == 0:
-            lenN,lenS,tim = lens_band_sym_timed(glm,_thup,_thdown,Nt_perband, tnewN,phinewN, tnewS,phinewS,nphi=Nphi)
+            lenN,lenS,tim = lens_band_sym_timed(glm,_thup,_thdown,Nt_perband, tnewN,phinewN, tnewS,phinewS,nphi=nphi)
             ret[pixN] = lenN
             ret[pixS] = lenS
         else :
             lenNR,lenNI,lenSR,lenSI,tim = gclm2lensmap_symband_timed(spin, glm, _thup, _thdown, Nt_perband,
-                                                            (tnewN, phinewN), (tnewS, phinewS), Nphi=Nphi, clm = clm)
+                                                            (tnewN, phinewN), (tnewS, phinewS), nphi=nphi, clm = clm)
             ret[pixN] = lenNR + 1j * lenNI
             ret[pixS] = lenSR + 1j * lenSI
             t0 = time.time()
@@ -159,7 +221,7 @@ def lens_glm_sym_timed(spin, dlm, glm, nside, nband=8, facres=0, clm=None, rotpo
         coadd_times(tim)
 
         #coadd_times(tim)
-        _Npix += 2 * Nt_perband * Nphi
+        _Npix += 2 * Nt_perband * nphi
     t.checkpoint('Total exec. time')
 
     print("STATS for lmax tlm %s lmax dlm %s"%(hp.Alm.getlmax(glm.size),hp.Alm.getlmax(dlm.size)))
