@@ -10,9 +10,8 @@ def configuration(parent_package='', top_path=''):
     config = Configuration('', parent_package, top_path)
     config.add_extension('lenspyx.bicubic', ['lenspyx/bicubic.f90'])
     config.add_extension('lenspyx.shts.fsht', ['lenspyx/shts/shts.f90'],
-                         libraries=['gomp'], extra_compile_args=['-Xpreprocessor', '-fopenmp', '-w'])
-#    config.add_extension('lenspix.bicubic', ['lenspix.bicubic.f90'],
-#                         libraries=['gomp'],  extra_compile_args=['-Xpreprocessor', '-fopenmp', '-w'])
+                         extra_link_args=['-lgomp'],
+                         libraries=['gomp'], extra_f90_compile_args=['-fopenmp', '-w'])
     return config
 
 setup(
