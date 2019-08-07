@@ -150,7 +150,7 @@ def _lens_gcband_sym(spin, glm, th1, th2, nt, nphi, thtpn, phipn, thtps, phips, 
     p_grid = phipn / ((2. * np.pi) / nphi)
     times.add('vtm2filtmap')
     lenmapnr = bicubic.deflect(np.require(filtmap.real, float, requirements='F'), t_grid, p_grid)
-    lenmapni = bicubic.deflect(np.require(np.copy(filtmap.imag), float, requirements='F'), t_grid, p_grid) if spin > 0 else None
+    lenmapni = bicubic.deflect(np.require(filtmap.imag.transpose(), float, requirements='F'), t_grid, p_grid) if spin > 0 else None
     times.add('interp')
 
     # Symmetric band on south hemisphere
@@ -159,7 +159,7 @@ def _lens_gcband_sym(spin, glm, th1, th2, nt, nphi, thtpn, phipn, thtps, phips, 
     p_grid = phips / ((2. * np.pi) / nphi)
     times.add('vtm2filtmap')
     lenmapsr = bicubic.deflect(np.require(filtmap.real, float, requirements='F'), t_grid, p_grid)
-    lenmapsi = bicubic.deflect(np.require(np.copy(filtmap.imag), float, requirements='F'), t_grid, p_grid) if spin > 0 else None
+    lenmapsi = bicubic.deflect(np.require(filtmap.imag.transpose(), float, requirements='F'), t_grid, p_grid) if spin > 0 else None
     times.add('interp')
     return lenmapnr, lenmapni, lenmapsr, lenmapsi
 
