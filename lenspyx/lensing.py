@@ -16,7 +16,7 @@ def alm2lenmap(alm, dlms, nside, facres=0, nband=8, verbose=True):
 
         Args:
             alm: undeflected map healpy alm array
-            dlms: The spin-1 deflection, in the form either a list of two healpy alm arrays or a list two healpix maps.
+            dlms: The spin-1 deflection, in the form of either a list of two healpy alm arrays or a list of two healpix maps.
 
                     In the former case the two arrays are the gradient and curl deflection healpy alms.
                     (e.g. :math:`\sqrt{L(L+1)}\phi_{LM}` with :math:`\phi` the lensing potential)
@@ -29,7 +29,7 @@ def alm2lenmap(alm, dlms, nside, facres=0, nband=8, verbose=True):
 
             nside: desired healpix resolution of the deflected map
             facres(optional): the deflected map is constructed by interpolation of the undeflected map,
-                              built at target res. ~ :math:`0.7 * 2^{\rm facres}.`
+                              built at target res. ~ :math:`0.7 * 2^{\rm facres}.` arcmin
             nband(optional): To avoid dealing with too many large maps in memory, the operations is split in bands.
             verbose(optional): If set, prints a bunch of timing and other info. Defaults to true.
 
@@ -47,7 +47,7 @@ def alm2lenmap_spin(gclm, dlms, nside, spin, nband=8, facres=-1, verbose=True):
 
         Args:
             gclm: list with undeflected map healpy gradient and curl array (e.g. polarization Elm and Blm).
-            dlms: The spin-1 deflection, in the form either a list of two healpy alm arrays or a list two healpix maps.
+            dlms: The spin-1 deflection, in the form of either a list of two healpy alm arrays or a list of two healpix maps.
 
                     In the former case the two arrays are the gradient and curl deflection healpy alms.
                     (e.g. :math:`\sqrt{L(L+1)}\phi_{LM}` with :math:`\phi` the lensing potential)
@@ -61,7 +61,7 @@ def alm2lenmap_spin(gclm, dlms, nside, spin, nband=8, facres=-1, verbose=True):
             nside: desired healpix resolution of the deflected map
             spin: spin-weight of the maps to deflect (2 for polarization).
             facres(optional): the deflected map is constructed by interpolation of the undeflected map,
-                              built at target res. ~ :math:`0.7 * 2^{\rm facres}.`
+                              built at target res. ~ :math:`0.7 * 2^{\rm facres}.` arcmin.
             nband(optional): To avoid dealing with too many large maps in memory, the operations is split in bands.
             verbose(optional): If set, prints a bunch of timing and other info. Defaults to true.
 
