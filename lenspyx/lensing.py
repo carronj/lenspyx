@@ -69,8 +69,9 @@ def alm2lenmap_spin(gclm, dlms, nside, spin, nband=8, facres=-1, verbose=True):
     assert len(gclm) == 2
     assert len(dlms) == 2
     if not np.iscomplexobj(dlms[0]): assert dlms[0].size == dlms[1].size and dlms[0].size == hp.nside2npix(nside)
-    return _lens_gclm_sym_timed(spin, dlms[0], gclm[0], nside,
+    ret = _lens_gclm_sym_timed(spin, dlms[0], gclm[0], nside,
                                 clm=gclm[1], dclm=dlms[1], nband=nband, facres=facres, verbose=verbose)
+    return ret.real, ret.imag
 
 def _lens_gclm_sym_timed(spin, dlm, glm, nside, nband=8, facres=0, clm=None, dclm=None, verbose=True):
     """Performs the deflection by splitting the full latitude range into distinct bands which are done one at a time.
@@ -79,6 +80,7 @@ def _lens_gclm_sym_timed(spin, dlm, glm, nside, nband=8, facres=0, clm=None, dcl
 
     """
     assert spin >= 0,spin
+    print(nside, spin)
     times = utils.timer(verbose, suffix=' ' + __name__)
     target_nt = 3 ** 1 * 2 ** (11 + facres) # on one hemisphere
 
@@ -90,7 +92,7 @@ def _lens_gclm_sym_timed(spin, dlm, glm, nside, nband=8, facres=0, clm=None, dcl
         lmax = hp.Alm.getlmax(dlm.size)
         redtot, imdtot = hp.alm2map_spin([dlm, np.zeros_like(dlm) if dclm is None else dclm], nside, 1, lmax)
     else:
-        assert dclm is not None and dclm.size == dlm.size
+        assert dclm is not None and dclm.size == dlm.size and dlm.size == hp.nside2npix(nside)
         redtot = dlm
         imdtot = dclm
     times.add('defl. spin 1 transform')
