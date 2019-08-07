@@ -2,8 +2,9 @@ from __future__ import print_function
 
 import numpy as np
 import healpy as hp
-from lenspyx.shts import shts
-from lenspyx.bicubic import bicubic
+try :
+    from lenspyx.shts import shts
+    from lenspyx.bicubic import bicubic
 from lenspyx import utils
 from lenspyx import angles
 
