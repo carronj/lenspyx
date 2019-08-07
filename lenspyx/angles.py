@@ -64,7 +64,7 @@ def get_angles(nside, pix, red, imd, cap, verbose=True):
     return np.arccos(costp), phi + dphip
 
 def rotation(nside, spin, pix, redi, imdi):
-    """Complex rotation of the deflected spin-weight field from local axes //-transport
+    """Complex rotation of the deflected spin-weight field from local axes //-transport.
 
     """
     assert spin > 0, spin
