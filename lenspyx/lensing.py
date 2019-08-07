@@ -101,8 +101,8 @@ def _lens_gclm_sym_timed(spin, dlm, glm, nside, nband=8, facres=0, clm=None, dcl
             ret[pixn] = len_nr
             ret[pixs] = len_sr
         else :
-            ret[pixn] = angles.rotation(nside, spin, pixn, redtot[pixn], imdtot[pixn]) * (len_nr + 1j * len_ni)
-            ret[pixs] = angles.rotation(nside, spin, pixs, redtot[pixs], imdtot[pixs]) * (len_sr + 1j * len_si)
+            ret[pixn] = (len_nr + 1j * len_ni) #* angles.rotation(nside, spin, pixn, redtot[pixn], imdtot[pixn])
+            ret[pixs] = (len_sr + 1j * len_si) #* angles.rotation(nside, spin, pixs, redtot[pixs], imdtot[pixs])
             times.add(r'pol. //-transport rot.')
         interp_pix += nphi * nt_perband * 2
     if verbose: print(times)
