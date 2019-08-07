@@ -1,16 +1,18 @@
-import time
+from __future__ import print_function
 import healpy as hp
 from lenspyx import lensing
 import numpy as np
-from plancklens import utils
 
-#  33   Megapix /s (excl. prefiltering) if the map already prefiltered for fortran ordering
-#  13   Megapix /s (excl. prefiltering) if the map already prefiltered for C ordering
+def test_len():
+    lmax = 200
+    nside = 256
+    cls_unl = np.ones(lmax + 1, dtype=float)
+    tunl = hp.synalm(cls_unl, new=True)
+    dlm = np.zeros_like(tunl)
+    hp.almxfl(dlm, np.sqrt(np.arange(lmax + 1) * np.arange(1, lmax + 2, dtype=float)), inplace=True)
+    unlmap = hp.alm2map(tunl, nside)
+    lenmap = lensing.alm2lenmap(tunl, dlm, nside, verbose=True, nband=8, facres=-1)
+    assert np.max(np.abs(lenmap - unlmap)) / np.std(unlmap) < 1e-5
 
-lmax = 2048 + 1024
-nside = 2048
-cls_unl = utils.camb_clfile('/Users/jcarron/PycharmProjects/Plancklens2018/plancklens/data/cls/FFP10_wdipole_lenspotentialCls.dat')
-tunl = hp.synalm(cls_unl['tt'][:lmax + 1])
-dunl = hp.synalm(cls_unl['pp'][:lmax + 1])
-hp.almxfl(dunl, np.sqrt(np.arange(lmax + 1) * np.arange(1, lmax + 2, dtype=float)), inplace=True)
-lenmap = lensing.tlm2lenmap(nside, tunl, dunl, verbose=True, nband=8, facres=-1)
+if __name__ == '__main__':
+    test_len()
