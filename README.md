@@ -6,7 +6,7 @@ Curved-sky python lensed CMB maps simulation package by Julien Carron.
 
 This allows one to build very easily (if familiar with healpy) lensed CMB simulations.
 
-The package basically provides two methods. Check the [doc](https://lenspyx.readthedocs.io/).
+The package basically provides two methods. Check the ![doc](https://lenspyx.readthedocs.io/).
 
 (This implementation is independent from the similar-sounding [lenspix](the https://cosmologist.info/lenspix/) package by A.Lewis)
 
