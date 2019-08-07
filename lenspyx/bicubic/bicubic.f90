@@ -37,14 +37,14 @@ double precision function eval(ftl_map, fx, fy, nx, ny)
     py = floor(fy)
     gx = fx - px
     gy = fy - py
-    eval = cubicfilter(fy, &
-              cubicfilter(fx, tex2d(ftl_map, px-1, py-1,nx, ny), tex2d(ftl_map, px, py-1,nx, ny), &
+    eval = cubicfilter(gy, &
+              cubicfilter(gx, tex2d(ftl_map, px-1, py-1,nx, ny), tex2d(ftl_map, px, py-1,nx, ny), &
                         tex2d(ftl_map, px+1, py-1,nx, ny), tex2d(ftl_map, px+2,py-1,nx, ny)), &
-              cubicfilter(fx, tex2D(ftl_map, px-1, py, nx, ny),   tex2d(ftl_map, px, py,nx, ny),   &
+              cubicfilter(gx, tex2D(ftl_map, px-1, py, nx, ny),   tex2d(ftl_map, px, py,nx, ny),   &
                         tex2d(ftl_map, px+1, py, nx, ny),   tex2d(ftl_map, px+2, py,nx, ny)),&
-              cubicfilter(fx, tex2D(ftl_map, px-1, py+1,nx, ny), tex2d(ftl_map, px, py+1,nx, ny), &
+              cubicfilter(gx, tex2D(ftl_map, px-1, py+1,nx, ny), tex2d(ftl_map, px, py+1,nx, ny), &
                         tex2d(ftl_map, px+1, py+1, nx, ny), tex2d(ftl_map, px+2, py+1,nx, ny)), &
-              cubicfilter(fx, tex2D(ftl_map, px-1, py+2,nx, ny), tex2d(ftl_map, px, py+2,nx, ny), &
+              cubicfilter(gx, tex2D(ftl_map, px-1, py+2,nx, ny), tex2d(ftl_map, px, py+2,nx, ny), &
                         tex2d(ftl_map, px+1, py+2,nx, ny), tex2d(ftl_map, px+2, py+2,nx, ny)) )
 end
 
