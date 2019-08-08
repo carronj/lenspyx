@@ -64,7 +64,7 @@ def get_angles(nside, pix, red, imd, cap, verbose=True):
     return np.arccos(costp), phi + dphip
 
 def rotation(nside, spin, pix, redi, imdi):
-    """Complex rotation of the deflected spin-weight field from local axes //-transport
+    """Complex rotation of the deflected spin-weight field from local axes //-transport.
 
     """
     assert spin > 0, spin
@@ -76,7 +76,7 @@ def rotation(nside, spin, pix, redi, imdi):
 
         gamma = np.arctan2(imdi, redi) - np.arctan2(imdi, d * np.sin(d) * (np.cos(tht) / np.sin(tht)) + redi * np.cos(d))
     else:
-        gamma = np.zeros(hp.nside2npix(nside), dtype=float)
+        gamma = np.zeros(len(pix), dtype=float)
         i = np.where(d > 0.)
         # tanap = imdi[i] / (d[i] * np.sin(d[i]) * (np.cos(tht[i]) / np.sin(tht[i])) + redi[i] * np.cos(d[i]))
         gamma[i] = np.arctan2(imdi[i], redi[i]) - np.arctan2(imdi[i],

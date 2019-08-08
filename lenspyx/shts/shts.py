@@ -12,7 +12,7 @@ from lenspyx.shts import fsht
 from lenspyx import utils
 
 def vtm2map(spin, vtm, Nphi, pfftwthreads=None, bicubic_prefilt=False, phiflip=()):
-    """Longitudinal Fourier transform to an ECP grid.
+    r"""Longitudinal Fourier transform to an ECP grid.
 
         Sends vtm array to (bicubic prefiltered map) with Nphi points equidistant in [0,2pi).
         With bicubic prefiltering this uses 2lmax + 1 1d Ntheta-sized FFTs and one 2d (Ntheta x Nphi) iFFT.
@@ -27,7 +27,7 @@ def vtm2map(spin, vtm, Nphi, pfftwthreads=None, bicubic_prefilt=False, phiflip=(
         Flipping phi amounts to phi -> 2pi - phi -> The phi fft is sent to its transpose.
 
     """
-    if pfftwthreads is None: pfftwthreads = os.environ.get('OMP_NUM_THREADS', 1)
+    if pfftwthreads is None: pfftwthreads = int(os.environ.get('OMP_NUM_THREADS', 1))
     lmax = (vtm.shape[1] - 1) // 2
     Nt = vtm.shape[0]
     assert (Nt, 2 * lmax + 1) == vtm.shape, ((Nt, 2 * lmax + 1), vtm.shape)
@@ -73,7 +73,7 @@ def vtm2map(spin, vtm, Nphi, pfftwthreads=None, bicubic_prefilt=False, phiflip=(
 
 
 def glm2vtm_sym(s, tht, glm):
-    """This produces :math:`\sum_l _s\Lambda_{lm} v_{lm}` for pure gradient input for a range of colatitudes"""
+    r"""This produces :math:`\sum_l _s\Lambda_{lm} v_{lm}` for pure gradient input for a range of colatitudes"""
 
     if s == 0:
         lmax = utils.nlm2lmax(len(glm))
@@ -85,7 +85,7 @@ def glm2vtm_sym(s, tht, glm):
 
 
 def vlm2vtm_sym(s, tht, vlm):
-    """This produces :math:`\sum_l _s\Lambda_{lm} v_{lm}` for a range of colatitudes"""
+    r"""This produces :math:`\sum_l _s\Lambda_{lm} v_{lm}` for a range of colatitudes"""
     assert s >= 0
     tht = np.array(tht)
     lmax = int(np.sqrt(len(vlm)) - 1)
@@ -117,7 +117,7 @@ def vlm2vtm_sym(s, tht, vlm):
 
 
 def _vlm2vtm_northpole(s, vlm):
-    """Spin-weight harmonics on the north pole
+    r"""Spin-weight harmonics on the north pole
 
         :math: `_s\Lambda_{l,-s} (-1)^s  \sqrt{ (2l + 1) / 4\pi }`
 
@@ -134,7 +134,7 @@ def _vlm2vtm_northpole(s, vlm):
 
 
 def _vlm2vtm_southpole(s, vlm):
-    """Spin-weight harmonics on the north pole.
+    r"""Spin-weight harmonics on the north pole.
 
         :math:`_s\Lambda_{l,s} (-1)^l  \sqrt{ (2l + 1) / 4\pi }`
 
