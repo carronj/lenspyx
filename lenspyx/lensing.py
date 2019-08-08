@@ -107,8 +107,8 @@ def _lens_gclm_sym_timed(spin, dlm, glm, nside, nband=8, facres=0, clm=None, dcl
         if verbose: print("BAND %s in %s :"%(ib, nband))
         pixn = hp.query_strip(nside, th1, th2, inclusive=True)
         pixs = hp.query_strip(nside, np.pi- th2,np.pi - th1, inclusive=True)
-        thtp, phipn = angles.get_angles(nside, pixn, redtot[pixn], imdtot[pixn], 'north')
-        thtps, phips = angles.get_angles(nside, pixs, redtot[pixs], imdtot[pixs], 'south')
+        thtp, phipn = angles.get_angles(nside, pixn, redtot[pixn], imdtot[pixn], 'north', verbose=verbose)
+        thtps, phips = angles.get_angles(nside, pixs, redtot[pixs], imdtot[pixs], 'south', verbose=verbose)
 
         # Adding a 10 pixels buffer for new angles to be safely inside interval.
         # th1,th2 is mapped onto pi - th2,pi -th1 so we need to make sure to cover both buffers
