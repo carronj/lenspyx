@@ -1,4 +1,1 @@
-from lenspyx import lensing
-
-alm2lenmap = lensing.alm2lenmap
-alm2lenmap_spin = lensing.alm2lenmap_spin
+from lenspyx.lensing import alm2lenmap, alm2lenmap_spin

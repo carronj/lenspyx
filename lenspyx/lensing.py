@@ -47,6 +47,8 @@ def alm2lenmap_spin(gclm, dlms, nside, spin, nband=8, facres=-1, verbose=True):
 
         Args:
             gclm: list with undeflected map healpy gradient and curl array (e.g. polarization Elm and Blm).
+                    The curl mode can be set to None if irrelevant.
+
             dlms: The spin-1 deflection, in the form of either a list of two healpy alm arrays or a list of two healpix maps.
 
                     In the former case the two arrays are the gradient and curl deflection healpy alms.
