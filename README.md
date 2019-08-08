@@ -12,10 +12,8 @@ The package basically provides two methods. Check the [doc](https://lenspix.read
 (NB: This implementation is independent from the similar-sounding [lenspix](https://github.com/cmbant/lenspix) package by A.Lewis)
 
 ### Installation
-
-After cloning the repository, build an editable installation with
     
-    pip install -e . [--user]
+    pip install lenspyx [--user]
 
 The –-user is required only if you don’t have write permission to your main python installation. A fortran compiler is required for a successful installation.
 
