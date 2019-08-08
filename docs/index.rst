@@ -6,6 +6,8 @@
 Welcome to lenspyx's documentation!
 ===================================
 
+   pip install lenspyx [--user]
+
    Curved-sky python lensed CMB maps simulation package by Julien Carron.
 
    This allows one to build very easily (if familiar with healpy) lensed CMB simulations. Parallelization is done with openmp.
