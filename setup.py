@@ -15,8 +15,8 @@ def configuration(parent_package='', top_path=''):
 
 setup(
     name='lenspyx',
-    version='0.0.1',
-    packages=['lenspyx', 'tests', 'lenspyx.bicubic', 'lenspyx.shts'],
+    version='1.0.0',
+    packages=['lenspyx', 'lenspyx.bicubic', 'lenspyx.shts'],
     url='https://github.com/carronj/lenspyx',
     author='Julien Carron',
     data_files=[('lenspyx/data/cls', ['lenspyx/data/cls/FFP10_wdipole_lensedCls.dat',

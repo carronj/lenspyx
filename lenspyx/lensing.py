@@ -86,7 +86,6 @@ def _lens_gclm_sym_timed(spin, dlm, glm, nside, nband=8, facres=0, clm=None, dcl
 
     """
     assert spin >= 0,spin
-    print(nside, spin)
     times = utils.timer(verbose, suffix=' ' + __name__)
     target_nt = 3 ** 1 * 2 ** (11 + facres) # on one hemisphere
 
