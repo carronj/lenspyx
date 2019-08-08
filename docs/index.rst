@@ -6,7 +6,7 @@
 Welcome to lenspyx's documentation!
 ===================================
 
-   pip install lenspyx [--user]
+   pip install lenspyx [---user]
 
    Curved-sky python lensed CMB maps simulation package by Julien Carron.
 
