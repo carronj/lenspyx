@@ -58,6 +58,9 @@ end function mod_test
 subroutine deflect(output, ftl_map, fx, fy, nx, ny, npts)
     ! input ftl_map should be bicubic prefiltered map
     ! fx, fy new coordinate in grid units.
+    !FIXME: misleading notation. fx is deflection in first ftl_map array dimension, fy in second dimension
+    !FIXME: but nx is second dimension and ny first dimension.
+    !FIXME: should rename fx <-> fy here and in eval and in tex2d
 
     implicit none
     double precision, intent(in) :: ftl_map(0:ny-1,0:nx-1)

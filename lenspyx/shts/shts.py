@@ -65,8 +65,8 @@ def vtm2map(spin, vtm, Nphi, pfftwthreads=None, bicubic_prefilt=False, phiflip=(
             a[:,:2 * lmax + 1] = vtm
             ret = np.fft.ifft(a) * (np.exp(np.arange(Nphi) * (-1j / Nphi * (2. * np.pi) * lmax)) * Nphi)
         else:
-            ret = np.fft.ifft(vtm[:,lmax - Nphi/2:lmax + Nphi/2])
-            ret *= (np.exp(np.arange(Nphi) * (-1j / Nphi * (2. * np.pi) * Nphi/2)) * Nphi)
+            ret = np.fft.ifft(vtm[:,lmax - Nphi//2:lmax + Nphi//2])
+            ret *= (np.exp(np.arange(Nphi) * (-1j / Nphi * (2. * np.pi) * Nphi /2)) * Nphi)
         retmap = ret.real if spin == 0 else ret
     retmap[phiflip, :] = retmap[phiflip, ::-1]
     return retmap
