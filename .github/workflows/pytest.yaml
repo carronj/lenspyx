@@ -23,7 +23,7 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
       - name: Install
         run: |
-          pip install lenspyx --user
+          pip install -e . --user
       - name: Test with pytest
         run: |
           pytest
