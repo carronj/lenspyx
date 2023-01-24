@@ -29,7 +29,7 @@ def alm2lenmap(alm, dlms, nside, facres=0, nband=8, verbose=True):
 
             nside: desired healpix resolution of the deflected map
             facres(optional): the deflected map is constructed by interpolation of the undeflected map,
-                              built at target res. ~ :math:`0.7 * 2^{\rm facres}.` arcmin
+                              built at target res. ~ :math:`0.7 * 2^{-\rm facres}.` arcmin
             nband(optional): To avoid dealing with too many large maps in memory, the operations is split in bands.
             verbose(optional): If set, prints a bunch of timing and other info. Defaults to true.
 
@@ -63,7 +63,7 @@ def alm2lenmap_spin(gclm, dlms, nside, spin, nband=8, facres=-1, verbose=True):
             nside: desired healpix resolution of the deflected map
             spin: spin-weight of the maps to deflect (2 for polarization).
             facres(optional): the deflected map is constructed by interpolation of the undeflected map,
-                              built at target res. ~ :math:`0.7 * 2^{\rm facres}.` arcmin.
+                              built at target res. ~ :math:`0.7 * 2^{-\rm facres}.` arcmin.
             nband(optional): To avoid dealing with too many large maps in memory, the operations is split in bands.
             verbose(optional): If set, prints a bunch of timing and other info. Defaults to true.
 
