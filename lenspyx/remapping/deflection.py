@@ -151,6 +151,17 @@ class deflection:
         return deflection(self.pbgeom, dlm[0], mmax_dlm, self.sht_tr, cacher, dlm[1],
                           verbosity=self.verbosity, epsilon=self.epsilon, ofactor=self.ofactor)
 
+    def change_geom(self, pbgeom:pbdGeometry, cacher:cachers.cacher or None=None):
+        """Returns a deflection instance with a different position-space geometry
+
+                Args:
+                    pbgeom: new pbounded-scarf geometry
+                    cacher: cacher instance if desired
+
+
+        """
+        return deflection(pbgeom, self.dlm, self.mmax_dlm, self.sht_tr, cacher, self.dclm,
+                          verbosity=self.verbosity, epsilon=self.epsilon, ofactor=self.ofactor)
 
     def gclm2lenmap(self, gclm:np.ndarray or list, mmax:int or None, spin, backwards:bool, nomagn=False, polrot=True, ptg=None):
         assert not backwards, 'backward 2lenmap not implemented at this moment'
