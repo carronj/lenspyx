@@ -10,8 +10,15 @@ except:
     pass
 from lenspyx import utils
 from lenspyx import angles
+try:
+    from lenscarf.utils_scarf import Geom, pbdGeometry, pbounds
+    from lenspyx.remapping.deflection import deflection
 
-def alm2lenmap(alm, dlms, nside, facres=0, nband=8, verbose=True):
+except:
+    print("Could not load scarf modules")
+    pass
+
+def alm2lenmap(alm, dlms, nside, facres=0, nband=8, verbose=True, experimental=True):
     r"""Computes a deflected spin-0 healpix map from its alm and deflection field alm.
 
         Args:
@@ -32,6 +39,7 @@ def alm2lenmap(alm, dlms, nside, facres=0, nband=8, verbose=True):
                               built at target res. ~ :math:`0.7 * 2^{-\rm facres}.` arcmin
             nband(optional): To avoid dealing with too many large maps in memory, the operations is split in bands.
             verbose(optional): If set, prints a bunch of timing and other info. Defaults to true.
+            experimental(optional): well, that's experimental
 
         Returns:
             Deflected healpy map at resolution nside.
@@ -40,9 +48,15 @@ def alm2lenmap(alm, dlms, nside, facres=0, nband=8, verbose=True):
     """
     assert len(dlms) == 2
     if not np.iscomplexobj(dlms[0]): assert dlms[0].size == dlms[1].size and dlms[0].size == hp.nside2npix(nside)
+    if experimental:
+        #FIXME: here dlms must be healpy array
+        geom = Geom.get_healpix_geometry(nside)
+        pbgeom = pbdGeometry(geom, pbounds(0., 2 * np.pi))
+        defl = deflection(pbgeom, dlms[0], None, 0, dclm=dlms[1], epsilon=1e-7)
+        return defl.gclm2lenmap(alm, None, 0, False)
     return _lens_gclm_sym_timed(0, dlms[0], -alm, nside, dclm=dlms[1], nband=nband, facres=facres, verbose=verbose)
 
-def alm2lenmap_spin(gclm, dlms, nside, spin, nband=8, facres=-1, verbose=True):
+def alm2lenmap_spin(gclm, dlms, nside, spin, nband=8, facres=-1, verbose=True, experimental=True):
     r"""Computes a deflected spin-weight Healpix map from its gradient and curl modes and deflection field alm.
 
         Args:
@@ -66,6 +80,8 @@ def alm2lenmap_spin(gclm, dlms, nside, spin, nband=8, facres=-1, verbose=True):
                               built at target res. ~ :math:`0.7 * 2^{-\rm facres}.` arcmin.
             nband(optional): To avoid dealing with too many large maps in memory, the operations is split in bands.
             verbose(optional): If set, prints a bunch of timing and other info. Defaults to true.
+            experimental(optional): well, that's experimental
+
 
         Returns:
             Deflected healpy maps at resolution nside (real and imaginary parts).
@@ -75,6 +91,14 @@ def alm2lenmap_spin(gclm, dlms, nside, spin, nband=8, facres=-1, verbose=True):
     assert len(gclm) == 2
     assert len(dlms) == 2
     if not np.iscomplexobj(dlms[0]): assert dlms[0].size == dlms[1].size and dlms[0].size == hp.nside2npix(nside)
+    if experimental:
+        #FIXME: here dlms must be healpy array
+        geom = Geom.get_healpix_geometry(nside)
+        pbgeom = pbdGeometry(geom, pbounds(0., 2 * np.pi))
+        defl = deflection(pbgeom, dlms[0], None, 0, dclm=dlms[1], epsilon=1e-7)
+        if gclm[1] is None:
+            gclm[1] = np.zeros_like(gclm[0])
+        return defl.gclm2lenmap(gclm, None, spin, False)
     ret = _lens_gclm_sym_timed(spin, dlms[0], gclm[0], nside,
                                 clm=gclm[1], dclm=dlms[1], nband=nband, facres=facres, verbose=verbose)
     return ret.real, ret.imag
