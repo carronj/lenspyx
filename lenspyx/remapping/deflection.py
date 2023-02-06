@@ -54,20 +54,21 @@ def blm_gauss(fwhm, lmax, spin:int):
     return blm
 
 class deflection:
-    def __init__(self, scarf_pbgeometry:pbdGeometry, dglm, mmax_dlm:int or None, scarf_threads:int,
+    def __init__(self, scarf_pbgeometry:pbdGeometry, dglm, mmax_dlm:int or None, numthreads:int=0,
                  cacher:cachers.cacher or None=None, dclm:np.ndarray or None=None, epsilon=1e-5, ofactor=1.5,verbosity=0):
         """Deflection field object than can be used to lens several maps with forward or backward deflection
 
             Args:
                 scarf_pbgeometry: scarf.Geometry object holding info on the deflection operation pixelization
-                targetres_amin: float, desired interpolation resolution in arcmin
-                dglm: deflection-field alm array, gradient mode (:math:`\sqrt{L(L+1)}\phi_{LM}`)
-                fftw_threads: number of threads for FFTWs transforms (other than the ones in SHTs)
-                scarf_threads: number of threads for the SHTs scarf-ducc based calculations
+                dglm: deflection-field alm array, gradient mode (:math:`\sqrt{L(L+1)}\phi_{LM}` e.g.)
+                numthreads: number of threads for the SHTs scarf-ducc based calculations (uses all available by default)
                 cacher: cachers.cacher instance allowing if desired caching of several pieces of info;
                         Useless if only one maps is intended to be deflected, but useful if more.
                 dclm: deflection-field alm array, curl mode (if relevant)
                 mmax_dlm: maximal m of the dlm / dclm arrays, if different from lmax
+                epsilon: desired accuracy on remapping
+                ofactor: upsampling parameter
+
 
 
         """
@@ -97,7 +98,7 @@ class deflection:
         # FIXME: can get d1 tbounds from geometry + buffers.
         self._tbds = Geom.tbounds(scarf_pbgeometry.geom)
         self._pbds = scarf_pbgeometry.pbound  # (patch ctr, patch extent)
-        self.sht_tr = scarf_threads
+        self.sht_tr = numthreads
 
         self.verbosity = verbosity
         self.epsilon = epsilon # accuracy of the totalconvolve interpolation result
