@@ -160,6 +160,7 @@ class deflection:
 
 
         """
+        print("**** change_geom, DO YOU REALLY WANT THIS??")
         return deflection(pbgeom, self.dlm, self.mmax_dlm, self.sht_tr, cacher, self.dclm,
                           verbosity=self.verbosity, epsilon=self.epsilon, ofactor=self.ofactor)
 
