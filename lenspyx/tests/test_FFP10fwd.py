@@ -23,8 +23,6 @@ thingauss = True # healpix rings if False
 dlm_fac = 1.
 
 
-ffi_ducc, ref_geom = syn_ffi_ducc(lmax_len=lmax_len, dlmax=dlmax,dlm_fac=dlm_fac,
-                                  nthreads=nthreads)
 
 
 def binit(cl, d=10):
@@ -33,6 +31,13 @@ def binit(cl, d=10):
         ret[l] = np.mean(cl[l-d:l+d+1])
     return ret
 if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description='test FFP10-like building')
+    parser.add_argument('-nt', dest='nt', default=4, type=int, help='numbers of openMP threads')
+    args = parser.parse_args()
+    nthreads = args.nt
+    ffi_ducc, ref_geom = syn_ffi_ducc(lmax_len=lmax_len, dlmax=dlmax, dlm_fac=dlm_fac,
+                                      nthreads=nthreads)
 
     # 1st try: 39.341 exec time2nd try: 29.574 exec time
     # 1st try (JC) : 137.667 exec time
