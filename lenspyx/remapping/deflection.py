@@ -1,3 +1,4 @@
+from __future__ import annotations
 import numpy as np
 from lenscarf.remapping import d2ang
 from lenscarf.utils_scarf import Geom, pbdGeometry, Geometry
@@ -6,6 +7,14 @@ from lenscarf import cachers
 import healpy as hp
 import ducc0
 
+# some helper functions
+
+ctype = {np.dtype(np.float32): np.complex64,
+         np.dtype(np.float64): np.complex128,
+         np.dtype(np.longfloat): np.longcomplex,
+         np.float32: np.complex64,
+         np.float64: np.complex128,
+         np.longfloat: np.longcomplex}
 
 
 def blm_gauss(fwhm, lmax, spin:int):
@@ -209,24 +218,33 @@ class deflection:
         lmax_unl = Alm.getlmax(gclm.size if spin == 0 else gclm[0].size, mmax)
         if mmax is None: mmax = lmax_unl
         # transform slm to Clenshaw-Curtis map
-        ntheta = lmax_unl + 2
-        nphi = 2 * lmax_unl + 2
+        ntheta = ducc0.fft.good_size(lmax_unl + 2)
+        nphihalf = ducc0.fft.good_size(lmax_unl + 1)
+        nphi = 2 * nphihalf
         # Is this any different to scarf wraps ?
         map = ducc0.sht.experimental.synthesis_2d(alm=np.atleast_2d(gclm), ntheta=ntheta, nphi=nphi,
                                 spin=spin, lmax=lmax_unl, mmax=mmax, geometry="CC", nthreads=self.sht_tr)
+
 
         # convert components to real or complex map
         map = map[0] if spin == 0 else map[0] + 1j * map[1]
 
         # extend map to double Fourier sphere map
         map_dfs = np.empty((2 * ntheta - 2, nphi), dtype=map.dtype)
+        #    map_dfs = ducc0.misc.make_noncritical_from_shape((2*ntheta-2, nphi), dtype=np.dtype(map.dtype))
         map_dfs[:ntheta, :] = map
-        spinfac = 1 if (spin % 2) == 0 else -1
-        map_dfs[ntheta:, :lmax_unl + 1] = spinfac * map[-2:0:-1, lmax_unl + 1:]
-        map_dfs[ntheta:, lmax_unl + 1:] = spinfac * map[-2:0:-1, :lmax_unl + 1]
+        map_dfs[ntheta:, :nphihalf] = map_dfs[ntheta - 2:0:-1, nphihalf:]
+        map_dfs[ntheta:, nphihalf:] = map_dfs[ntheta - 2:0:-1, :nphihalf]
+        if (spin % 2) != 0:
+            map_dfs[ntheta:, :] *= -1
 
         # go to Fourier space
-        map_dfs = ducc0.fft.c2c(map_dfs, axes=(0, 1), inorm=2)
+        if spin == 0:
+            tmp = np.empty(map_dfs.shape, dtype=ctype[map.dtype])
+            #        tmp = ducc0.misc.make_noncritical_from_shape(map_dfs.shape, dtype=np.dtype(ctype[map.dtype]))
+            map_dfs = ducc0.fft.c2c(map_dfs, axes=(0, 1), inorm=2, nthreads=self.sht_tr, out=tmp)
+        else:
+            map_dfs = ducc0.fft.c2c(map_dfs, axes=(0, 1), inorm=2, nthreads=self.sht_tr, out=map_dfs)
 
         # perform NUFFT
         if ptg is None:
@@ -270,8 +288,9 @@ class deflection:
                 blm = blm_gauss(0, lmax_out, spin)
                 return inter.getSlm(blm).squeeze()
             # minimum dimensions for a Clenshaw-Curtis grid at this band limit
-            ntheta = lmax_out + 2
-            nphi = 2 * lmax_out + 2
+            ntheta = ducc0.fft.good_size(lmax_out + 2)
+            nphihalf = ducc0.fft.good_size(lmax_out + 1)
+            nphi = 2 * nphihalf
             ptg = self._get_ptg()
             if spin == 0:
                 # make complex if necessary
@@ -290,16 +309,19 @@ class deflection:
             map_dfs = np.empty((2 * ntheta - 2, nphi), dtype=np.complex128)
 
             # perform NUFFT
-            _ = ducc0.nufft.nu2u(points=points, coord=ptg[:, 0:2], out=map_dfs, forward=True,
+            map_dfs = ducc0.nufft.nu2u(points=points, coord=ptg[:, 0:2], out=map_dfs, forward=True,
                                     epsilon=self.epsilon, nthreads=self.sht_tr, verbosity=self.verbosity,
                                     periodicity=2 * np.pi, fft_order=True)
             # go to position space
-            map_dfs = ducc0.fft.c2c(map_dfs, axes=(0, 1), forward=False, inorm=2)
+            map_dfs = ducc0.fft.c2c(map_dfs, axes=(0, 1), forward=False, inorm=2, nthreads=self.sht_tr, out=map_dfs)
 
             # go from double Fourier sphere to Clenshaw-Curtis grid
-            spinfac = 1 if (spin % 2) == 0 else -1
-            map_dfs[1:ntheta - 1, :lmax_out + 1] += spinfac * map_dfs[-1:ntheta - 1:-1, lmax_out + 1:]
-            map_dfs[1:ntheta - 1, lmax_out + 1:] += spinfac * map_dfs[-1:ntheta - 1:-1, :lmax_out + 1]
+            if (spin % 2) != 0:
+                map_dfs[1:ntheta - 1, :nphihalf] -= map_dfs[-1:ntheta - 1:-1, nphihalf:]
+                map_dfs[1:ntheta - 1, nphihalf:] -= map_dfs[-1:ntheta - 1:-1, :nphihalf]
+            else:
+                map_dfs[1:ntheta - 1, :nphihalf] += map_dfs[-1:ntheta - 1:-1, nphihalf:]
+                map_dfs[1:ntheta - 1, nphihalf:] += map_dfs[-1:ntheta - 1:-1, :nphihalf]
             map_dfs = map_dfs[:ntheta, :]
             map = np.empty((1 if spin == 0 else 2, ntheta, nphi), dtype=np.float64)
             map[0] = map_dfs.real
@@ -309,3 +331,27 @@ class deflection:
             slm = ducc0.sht.experimental.adjoint_synthesis_2d(map=map, spin=spin,
                         lmax=lmax_out, mmax=mmax_out, geometry="CC", nthreads=self.sht_tr)
             return slm.squeeze()
+
+        # perform NUFFT
+        #map_dfs = ducc0.nufft.nu2u(points=points, coord=ptg, out=map_dfs, forward=True,
+        #                           epsilon=epsilon, nthreads=nthreads, verbosity=0,
+        #                           periodicity=2 * np.pi, fft_order=True)
+        # go to position space
+        #map_dfs = ducc0.fft.c2c(map_dfs, axes=(0, 1), forward=False, inorm=2, nthreads=nthreads, out=map_dfs)
+
+        # go from double Fourier sphere to Clenshaw-Curtis grid
+        #if (spin % 2) != 0:
+        #    map_dfs[1:ntheta - 1, :nphihalf] -= map_dfs[-1:ntheta - 1:-1, nphihalf:]
+        #    map_dfs[1:ntheta - 1, nphihalf:] -= map_dfs[-1:ntheta - 1:-1, :nphihalf]
+        #else:
+        #    map_dfs[1:ntheta - 1, :nphihalf] += map_dfs[-1:ntheta - 1:-1, nphihalf:]
+        #    map_dfs[1:ntheta - 1, nphihalf:] += map_dfs[-1:ntheta - 1:-1, :nphihalf]
+        #map_dfs = map_dfs[:ntheta, :]
+        #map = np.empty((1 if spin == 0 else 2, ntheta, nphi), dtype=np.float64)
+        #map[0] = map_dfs.real
+        #if spin > 0:
+        #    map[1] = map_dfs.imag
+        # adjoint SHT synthesis
+        #slm = ducc0.sht.experimental.adjoint_synthesis_2d(map=map, spin=spin,
+        #                                                  lmax=lmax, mmax=lmax, geometry="CC", nthreads=nthreads)
+        #return slm

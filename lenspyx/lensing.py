@@ -15,7 +15,7 @@ try:
     from lenspyx.remapping.deflection import deflection
 
 except:
-    print("Could not load scarf modules")
+    print("lensing.py::Could not load scarf modules")
     pass
 
 def alm2lenmap(alm, dlms, nside, facres=0, nband=8, verbose=True, experimental=True):
