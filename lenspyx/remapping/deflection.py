@@ -253,6 +253,7 @@ class deflection:
         # perform NUFFT
         if ptg is None:
             ptg = self._get_ptg()
+        tim.add('pointing')
         values = ducc0.nufft.u2nu(grid=map_dfs, coord=ptg[:, 0:2], forward=False,
                                   epsilon=self.epsilon, nthreads=self.sht_tr,
                                   verbosity=self.verbosity, periodicity=2 * np.pi, fft_order=True)
