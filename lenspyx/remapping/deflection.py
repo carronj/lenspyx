@@ -1,7 +1,7 @@
 import numpy as np
 from lenscarf.remapping import d2ang
 from lenscarf.utils_scarf import Geom, pbdGeometry
-from lenscarf.utils_hp import Alm, alm2cl
+from lenscarf.utils_hp import Alm, alm2cl, alm_copy
 from lenscarf import cachers
 import healpy as hp
 import ducc0
@@ -94,6 +94,7 @@ class deflection:
         self.cacher = cacher
         self.pbgeom = scarf_pbgeometry
         self.geom = scarf_pbgeometry.geom
+        self.fsky = Geom.fsky(scarf_pbgeometry.geom)
 
         # FIXME: can get d1 tbounds from geometry + buffers.
         self._tbds = Geom.tbounds(scarf_pbgeometry.geom)
@@ -213,6 +214,12 @@ class deflection:
         """Adjoint remapping operation from lensed alm space to unlensed alm space
 
         """
+        if mmax_out is None:
+            mmax_out = lmax_out
+        if self.sig_d <= 0 and np.abs(self.fsky - 1.) < 1e-6: # no actual deflection and single-precision full-sky
+            if spin == 0: return alm_copy(gclm, mmax, lmax_out, mmax_out)
+            glmret = alm_copy(gclm[0], mmax, lmax_out, mmax_out)
+            return np.array([glmret, alm_copy(gclm[1], mmax, lmax_out, mmax_out) if gclm[1] is not None else np.zeros_like(glmret)])
         if not backwards:
             m = self.gclm2lenmap(gclm, mmax, spin, backwards, nomagn=nomagn)
             if spin == 0:
