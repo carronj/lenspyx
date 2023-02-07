@@ -4,6 +4,7 @@ from lenscarf.remapping import d2ang
 from lenscarf.utils_scarf import Geom, pbdGeometry, Geometry
 from lenscarf.utils_hp import Alm, alm2cl, alm_copy
 from lenscarf import cachers
+from lenscarf.utils import timer
 import healpy as hp
 import ducc0
 
@@ -202,8 +203,9 @@ class deflection:
         T = geom.alm2map(gclm, lmax, mmax, self.sht_tr, [-1., 1.])[0::2]
         return T
 
-    def gclm2lenmap(self, gclm:np.ndarray or list, mmax:int or None, spin, backwards:bool, nomagn=False, polrot=True, ptg=None):
+    def gclm2lenmap(self, gclm:np.ndarray or list, mmax:int or None, spin, backwards:bool, polrot=True, ptg=None):
         assert not backwards, 'backward 2lenmap not implemented at this moment'
+        tim = timer(False, prefix='gclm2lenmap')
         if spin == 0: # The code below would work just as well for spin-0 but seems slightly slower
                      # For the moment this seems faster
             lmax_unl = Alm.getlmax(gclm.size, mmax)
@@ -224,7 +226,7 @@ class deflection:
         # Is this any different to scarf wraps ?
         map = ducc0.sht.experimental.synthesis_2d(alm=np.atleast_2d(gclm), ntheta=ntheta, nphi=nphi,
                                 spin=spin, lmax=lmax_unl, mmax=mmax, geometry="CC", nthreads=self.sht_tr)
-
+        tim.add('experimental.synthesis_2d')
 
         # convert components to real or complex map
         map = map[0] if spin == 0 else map[0] + 1j * map[1]
@@ -237,6 +239,7 @@ class deflection:
         map_dfs[ntheta:, nphihalf:] = map_dfs[ntheta - 2:0:-1, :nphihalf]
         if (spin % 2) != 0:
             map_dfs[ntheta:, :] *= -1
+        tim.add('map_dfs')
 
         # go to Fourier space
         if spin == 0:
@@ -245,6 +248,7 @@ class deflection:
             map_dfs = ducc0.fft.c2c(map_dfs, axes=(0, 1), inorm=2, nthreads=self.sht_tr, out=tmp)
         else:
             map_dfs = ducc0.fft.c2c(map_dfs, axes=(0, 1), inorm=2, nthreads=self.sht_tr, out=map_dfs)
+        tim.add('map_dfs 2 Fourier space')
 
         # perform NUFFT
         if ptg is None:
@@ -252,11 +256,16 @@ class deflection:
         values = ducc0.nufft.u2nu(grid=map_dfs, coord=ptg[:, 0:2], forward=False,
                                   epsilon=self.epsilon, nthreads=self.sht_tr,
                                   verbosity=self.verbosity, periodicity=2 * np.pi, fft_order=True)
+        tim.add('u2nu')
+
         if polrot and spin != 0:
             values *= np.exp( (-1j * spin) * ptg[:, 2]) # polrot. last entry is -gamma
+        tim.add('polrot')
+        if self.verbosity:
+            print(tim)
         return values.real if spin == 0 else (values.real, values.imag)
 
-    def lensgclm(self, gclm:np.ndarray or list, mmax:int or None, spin, lmax_out, mmax_out:int or None, backwards=False, nomagn=False, polrot=True):
+    def lensgclm(self, gclm:np.ndarray or list, mmax:int or None, spin, lmax_out, mmax_out:int or None, backwards=False, polrot=True):
         """Adjoint remapping operation from lensed alm space to unlensed alm space
 
         """
@@ -267,12 +276,18 @@ class deflection:
             glmret = alm_copy(gclm[0], mmax, lmax_out, mmax_out)
             return np.array([glmret, alm_copy(gclm[1], mmax, lmax_out, mmax_out) if gclm[1] is not None else np.zeros_like(glmret)])
         if not backwards:
-            m = self.gclm2lenmap(gclm, mmax, spin, backwards, nomagn=nomagn)
+            tim = timer(False)
+            m = self.gclm2lenmap(gclm, mmax, spin, backwards)
+            tim.add('alm2lenmap (total)')
             if spin == 0:
                 return self.geom.map2alm(m, lmax_out, mmax_out, self.sht_tr)
             else:
                 assert polrot
-                return self.geom.map2alm_spin(m, spin, lmax_out, mmax_out, self.sht_tr)
+                ret= self.geom.map2alm_spin(m, spin, lmax_out, mmax_out, self.sht_tr)
+                tim.add('map2alm_spin (total)')
+                if self.verbosity:
+                    print(tim)
+                return ret
         else:
             if spin == 0:
                 # The code below works for any spin but this seems a little bit faster for non-zero spin
