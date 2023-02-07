@@ -8,6 +8,12 @@ from lenscarf.utils import timer
 import healpy as hp
 import ducc0
 
+try:
+    from lenscarf.fortran import remapping as fremap
+    HAS_FORTRAN = True
+except:
+    HAS_FORTRAN = False
+
 # some helper functions
 
 ctype = {np.dtype(np.float32): np.complex64,
@@ -121,7 +127,7 @@ class deflection:
         # TODO improve this and fwd angles
         return self._build_angles() # -gamma in third argument
 
-    def _build_angles(self):
+    def _build_angles(self, fortran=True):
         """Builds deflected positions and angles
 
             Returns (npix, 3) array with new tht, phi and -gamma
@@ -129,9 +135,23 @@ class deflection:
         """
         fn = 'ptg'
         if not self.cacher.is_cached(fn):
+            assert np.all(self.geom.theta > 0.) and np.all(self.geom.theta < np.pi), 'fix this (cotangent below)'
+            tim = timer(False, prefix='build_angles')
             dclm = np.zeros_like(self.dlm) if self.dclm is None else self.dclm
             red, imd = self.geom.alm2map_spin([self.dlm, dclm], 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr, [-1., 1.])
             npix = Geom.pbounds2npix(self.geom, self._pbds)
+            tim.add('d1 alm2map_spin')
+            if fortran and HAS_FORTRAN and self.pbgeom.pbound.get_range() >= (2. * np.pi): # covering full phi range
+                tht, phi0, nph, ofs = self.geom.theta, self.geom.phi0, self.geom.nph, self.geom.ofs
+                thp_phip_mgamma = fremap.remapping.pointing(red, imd, tht, phi0, nph, ofs)
+                tim.add('thts and phis, fortran')
+                self.cacher.cache(fn, thp_phip_mgamma.transpose()) # I think this just turns the F-array into a C-contiguous array...
+                tim.add('cache it')
+                if self.verbosity:
+                    print(tim)
+                return thp_phip_mgamma.transpose()
+            elif fortran and not HAS_FORTRAN:
+                print('Cant use fortran pointing building since import failed. Falling back on python impl.')
             thp_phip_mgamma = np.empty( (3, npix), dtype=float) # (-1) gamma in last arguement
             startpix = 0
             for ir in np.argsort(self.geom.ofs): # We must follow the ordering of scarf position-space map
@@ -146,14 +166,17 @@ class deflection:
                     sli = slice(startpix, startpix + len(pixs))
                     thp_phip_mgamma[0, sli] = thtp_
                     thp_phip_mgamma[1, sli] = phip_
-                    assert 0 < self.geom.theta[ir] < np.pi, 'Fix this'
                     cot = np.cos(self.geom.theta[ir]) / np.sin(self.geom.theta[ir])
                     d = np.sqrt(t_red ** 2 + i_imd ** 2)
                     thp_phip_mgamma[2, sli]  = -np.arctan2(i_imd, t_red ) + np.arctan2(i_imd, d * np.sin(d) * cot + t_red  * np.cos(d))
                     startpix += len(pixs)
+            tim.add('thts and phis, python')
             thp_phip_mgamma = thp_phip_mgamma.transpose()
             self.cacher.cache(fn, thp_phip_mgamma)
+            tim.add('cache it')
             assert startpix == npix, (startpix, npix)
+            if self.verbosity:
+                print(tim)
             return thp_phip_mgamma
         return self.cacher.load(fn)
 
