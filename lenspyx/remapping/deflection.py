@@ -1,6 +1,6 @@
 import numpy as np
 from lenscarf.remapping import d2ang
-from lenscarf.utils_scarf import Geom, pbdGeometry
+from lenscarf.utils_scarf import Geom, pbdGeometry, Geometry
 from lenscarf.utils_hp import Alm, alm2cl, alm_copy
 from lenscarf import cachers
 import healpy as hp
@@ -164,6 +164,34 @@ class deflection:
         print("**** change_geom, DO YOU REALLY WANT THIS??")
         return deflection(pbgeom, self.dlm, self.mmax_dlm, self.sht_tr, cacher, self.dclm,
                           verbosity=self.verbosity, epsilon=self.epsilon, ofactor=self.ofactor)
+
+    def gclm2lenpixs(self, gclm:np.ndarray or list, mmax:int or None, spin:int, pixs:np.ndarray[int]):
+        """Produces the remapped field on the required lensing geometry pixels 'exactly', by brute-force calculation
+
+            Note:
+                The number of pixels must be small here, otherwise way too slow
+
+            Note:
+                If the remapping angles etc were not calculated previously, it will build the full map, so make take some time.
+
+        """
+        ptg = self._get_ptg()
+        thts, phis, gamma = ptg[pixs, 0], ptg[pixs, 1], ptg[pixs, 2] * (-1.)
+        nph = 2 * np.ones(thts.size, dtype=int) # I believe at least 2 points per ring if using scarf
+        ofs = 2 * np.arange(thts.size, dtype=int)
+        wt = np.ones(thts.size)
+        geom = Geometry(thts.size, nph, ofs, 1, phis.copy(), thts.copy(), wt) #copy necessary as this goes to C
+        #thts.size, nph, ofs, 1, phi0, thts, wt
+        if abs(spin) > 0:
+            lmax = Alm.getlmax(gclm[0].size, mmax)
+            if mmax is None: mmax = lmax
+            QU = geom.alm2map_spin(gclm, spin, lmax, mmax, self.sht_tr, [-1., 1.])[:, 0::2]
+            QU = np.exp(1j * spin * gamma) * (QU[0] + 1j * QU[1])
+            return QU.real, QU.imag
+        lmax = Alm.getlmax(gclm.size, mmax)
+        if mmax is None: mmax = lmax
+        T = geom.alm2map(gclm, lmax, mmax, self.sht_tr, [-1., 1.])[0::2]
+        return T
 
     def gclm2lenmap(self, gclm:np.ndarray or list, mmax:int or None, spin, backwards:bool, nomagn=False, polrot=True, ptg=None):
         assert not backwards, 'backward 2lenmap not implemented at this moment'
