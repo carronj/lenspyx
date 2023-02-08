@@ -1,6 +1,7 @@
 import time
 import numpy as np
 import sys
+from lenscarf.utils_hp import Alm
 
 class timer:
     def __init__(self, verbose, prefix='', suffix=''):
@@ -62,6 +63,49 @@ class timer:
                              + " (total [" + (
                                  '%02d:%02d:%02d' % (dhi, dmi, dsi)) + "]) " + msg + ' %s \n' % self.suffix)
 
+
+
+def blm_gauss(fwhm, lmax, spin:int):
+    """Computes spherical harmonic coefficients of a circular Gaussian beam
+    pointing towards the North Pole
+
+    See an example of usage
+    `in the documentation <https://healpy.readthedocs.io/en/latest/blm_gauss_plot.html>`_
+
+    Parameters
+    ----------
+    fwhm : float, scalar
+        desired FWHM of the beam, in radians
+    lmax : int, scalar
+        maximum l multipole moment to compute
+    spin : bool, scalar
+        if True, E and B coefficients will also be computed
+
+    Returns
+    -------
+    blm : array with dtype numpy.complex128
+          lmax will be as specified
+          mmax is equal to spin
+    """
+    fwhm = float(fwhm)
+    lmax = int(lmax)
+    mmax = spin
+    ncomp = 2 if spin > 0 else 1
+    nval = Alm.getsize(lmax, mmax)
+
+    if mmax > lmax:
+        raise ValueError("lmax value too small")
+
+    blm = np.zeros((ncomp, nval), dtype=np.complex128)
+    sigmasq = fwhm * fwhm / (8 * np.log(2.0))
+    ls = np.arange(spin, lmax + 1)
+    if spin == 0:
+        blm[0, Alm.getidx(lmax, ls, spin)] = np.sqrt((2 * ls + 1) / (4.0 * np.pi)) * np.exp(-0.5 * sigmasq * ls * ls)
+
+    if spin > 0:
+        blm[0, Alm.getidx(lmax, ls, spin)] = np.sqrt((2 * ls + 1) / (32 * np.pi)) * np.exp(-0.5 * sigmasq * ls * ls)
+        blm[1] = 1j * blm[0]
+    return blm
 
 def get_nphi(th1, th2, facres=0, target_amin=0.745):
     """Calculates a phi sampling density at co-latitude theta """
