@@ -5,6 +5,7 @@ from lenscarf.utils_scarf import Geom, pbdGeometry, Geometry
 from lenscarf.utils_hp import Alm, alm2cl, alm_copy
 from lenscarf import cachers
 from lenscarf.utils import timer
+from lenspyx.utils import blm_gauss
 import healpy as hp
 import ducc0
 
@@ -23,51 +24,6 @@ ctype = {np.dtype(np.float32): np.complex64,
          np.float64: np.complex128,
          np.longfloat: np.longcomplex}
 
-
-def blm_gauss(fwhm, lmax, spin:int):
-    """Computes spherical harmonic coefficients of a circular Gaussian beam
-    pointing towards the North Pole
-
-    See an example of usage
-    `in the documentation <https://healpy.readthedocs.io/en/latest/blm_gauss_plot.html>`_
-
-    Parameters
-    ----------
-    fwhm : float, scalar
-        desired FWHM of the beam, in radians
-    lmax : int, scalar
-        maximum l multipole moment to compute
-    spin : bool, scalar
-        if True, E and B coefficients will also be computed
-
-    Returns
-    -------
-    blm : array with dtype numpy.complex128
-          lmax will be as specified
-          mmax is equal to spin
-    """
-    fwhm = float(fwhm)
-    lmax = int(lmax)
-    mmax = spin
-    ncomp = 2 if spin > 0 else 1
-    nval = hp.Alm.getsize(lmax, mmax)
-
-    if mmax > lmax:
-        raise ValueError("lmax value too small")
-
-    blm = np.zeros((ncomp, nval), dtype=np.complex128)
-    sigmasq = fwhm * fwhm / (8 * np.log(2.0))
-
-    if spin == 0:
-        for l in range(0, lmax + 1):
-            blm[0, hp.Alm.getidx(lmax, l, spin)] = np.sqrt((2 * l + 1) / (4.0 * np.pi)) * np.exp(-0.5 * sigmasq * l * l)
-
-    if spin > 0:
-        for l in range(spin, lmax + 1):
-            blm[0, hp.Alm.getidx(lmax, l, spin)] = np.sqrt((2 * l + 1) / (32 * np.pi)) * np.exp(-0.5 * sigmasq * l * l)
-        blm[1] = 1j * blm[0]
-
-    return blm
 
 class deflection:
     def __init__(self, scarf_pbgeometry:pbdGeometry, dglm, mmax_dlm:int or None, numthreads:int=0,
@@ -123,6 +79,8 @@ class deflection:
 
         print(" DUCC totalconvolve deflection instantiated", self.epsilon, self.ofactor)
 
+        self.single_prec = True # Uses single precision arithmetic in some places
+
     def _get_ptg(self):
         # TODO improve this and fwd angles
         return self._build_angles() # -gamma in third argument
@@ -143,9 +101,14 @@ class deflection:
             tim.add('d1 alm2map_spin')
             if fortran and HAS_FORTRAN and self.pbgeom.pbound.get_range() >= (2. * np.pi): # covering full phi range
                 tht, phi0, nph, ofs = self.geom.theta, self.geom.phi0, self.geom.nph, self.geom.ofs
-                thp_phip_mgamma = fremap.remapping.pointing(red, imd, tht, phi0, nph, ofs)
-                tim.add('thts and phis, fortran')
-                self.cacher.cache(fn, thp_phip_mgamma.transpose()) # I think this just turns the F-array into a C-contiguous array...
+                if self.single_prec:
+                    thp_phip_mgamma = fremap.remapping.fpointing(red, imd, tht, phi0, nph, ofs)
+                else:
+                    thp_phip_mgamma = fremap.remapping.pointing(red, imd, tht, phi0, nph, ofs)
+
+                tim.add('thts, phis and gammas  (fortran)')
+                # I think this just trivially turns the F-array into a C-contiguous array:
+                self.cacher.cache(fn, thp_phip_mgamma.transpose())
                 tim.add('cache it')
                 if self.verbosity:
                     print(tim)
@@ -170,7 +133,7 @@ class deflection:
                     d = np.sqrt(t_red ** 2 + i_imd ** 2)
                     thp_phip_mgamma[2, sli]  = -np.arctan2(i_imd, t_red ) + np.arctan2(i_imd, d * np.sin(d) * cot + t_red  * np.cos(d))
                     startpix += len(pixs)
-            tim.add('thts and phis, python')
+            tim.add('thts, phis and gammas  (python)')
             thp_phip_mgamma = thp_phip_mgamma.transpose()
             self.cacher.cache(fn, thp_phip_mgamma)
             tim.add('cache it')
