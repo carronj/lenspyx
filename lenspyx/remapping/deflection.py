@@ -189,20 +189,27 @@ class deflection:
         T = geom.alm2map(gclm, lmax, mmax, self.sht_tr, [-1., 1.])[0::2]
         return T
 
-    def gclm2lenmap(self, gclm:np.ndarray or list, mmax:int or None, spin, backwards:bool, polrot=True, ptg=None):
+    def gclm2lenmap(self, gclm:np.ndarray or list, mmax:int or None, spin, backwards:bool, polrot=True, ptg=None, tim:timer=None):
         assert not backwards, 'backward 2lenmap not implemented at this moment'
-        tim = timer(False, prefix='gclm2lenmap')
+        if tim is None:
+            tim = timer(False, prefix='gclm2lenmap')
         if spin == 0: # The code below would work just as well for spin-0 but seems slightly slower
                      # For the moment this seems faster
             lmax_unl = Alm.getlmax(gclm.size, mmax)
             blm_T = blm_gauss(0, lmax_unl, 0)
+            tim.add('blm_gauss')
             if ptg is None:
                 ptg = self._get_ptg()
+            tim.add('ptg')
+
             inter_I = ducc0.totalconvolve.Interpolator(np.atleast_2d(gclm), blm_T, separate=False, lmax=lmax_unl,
                                                        kmax=0,
                                                        epsilon=self.epsilon, ofactor=self.ofactor,
                                                        nthreads=self.sht_tr)
-            return inter_I.interpol(ptg).squeeze()
+            tim.add('interp. setup')
+            ret = inter_I.interpol(ptg).squeeze()
+            tim.add('interpolation')
+            return ret
         lmax_unl = Alm.getlmax(gclm.size if spin == 0 else gclm[0].size, mmax)
         if mmax is None: mmax = lmax_unl
         # transform slm to Clenshaw-Curtis map
@@ -225,7 +232,7 @@ class deflection:
         map_dfs[ntheta:, nphihalf:] = map_dfs[ntheta - 2:0:-1, :nphihalf]
         if (spin % 2) != 0:
             map_dfs[ntheta:, :] *= -1
-        tim.add('map_dfs')
+        tim.add('map_dfs build')
 
         # go to Fourier space
         if spin == 0:
@@ -234,12 +241,12 @@ class deflection:
             map_dfs = ducc0.fft.c2c(map_dfs, axes=(0, 1), inorm=2, nthreads=self.sht_tr, out=tmp)
         else:
             map_dfs = ducc0.fft.c2c(map_dfs, axes=(0, 1), inorm=2, nthreads=self.sht_tr, out=map_dfs)
-        tim.add('map_dfs 2 Fourier space')
+        tim.add('map_dfs 2DFFT')
 
         # perform NUFFT
         if ptg is None:
             ptg = self._get_ptg()
-        tim.add('pointing')
+        tim.add('ptg')
         values = ducc0.nufft.u2nu(grid=map_dfs, coord=ptg[:, 0:2], forward=False,
                                   epsilon=self.epsilon, nthreads=self.sht_tr,
                                   verbosity=self.verbosity, periodicity=2 * np.pi, fft_order=True)
@@ -263,15 +270,15 @@ class deflection:
             glmret = alm_copy(gclm[0], mmax, lmax_out, mmax_out)
             return np.array([glmret, alm_copy(gclm[1], mmax, lmax_out, mmax_out) if gclm[1] is not None else np.zeros_like(glmret)])
         if not backwards:
-            tim = timer(False)
-            m = self.gclm2lenmap(gclm, mmax, spin, backwards)
-            tim.add('alm2lenmap (total)')
+            tim = timer(False, prefix='lensgclm fwd, spin %s'%spin)
+            m = self.gclm2lenmap(gclm, mmax, spin, backwards, tim=tim)
+            tim.add_elapsed('alm2lenmap (total)')
             if spin == 0:
                 return self.geom.map2alm(m, lmax_out, mmax_out, self.sht_tr)
             else:
                 assert polrot
                 ret= self.geom.map2alm_spin(m, spin, lmax_out, mmax_out, self.sht_tr)
-                tim.add('map2alm_spin (total)')
+                tim.add_elapsed('map2alm_spin (total)')
                 if self.verbosity:
                     print(tim)
                 return ret
