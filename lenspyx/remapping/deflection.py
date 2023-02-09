@@ -92,8 +92,8 @@ class deflection:
 
         """
         fn = 'ptg'
-        self.tim.start('_build_angles')
         if not self.cacher.is_cached(fn):
+            self.tim.start('_build_angles')
             self.tim.reset()
             assert np.all(self.geom.theta > 0.) and np.all(self.geom.theta < np.pi), 'fix this (cotangent below)'
             dclm = np.zeros_like(self.dlm) if self.dclm is None else self.dclm
