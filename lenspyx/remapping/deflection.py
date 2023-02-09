@@ -110,7 +110,7 @@ class deflection:
                 self.tim.add('thts, phis and gammas  (fortran)')
                 # I think this just trivially turns the F-array into a C-contiguous array:
                 self.cacher.cache(fn, thp_phip_mgamma.transpose())
-                self.tim.close('_build_angle')
+                self.tim.close('_build_angles')
                 if self.verbosity:
                     print(self.tim)
                 return thp_phip_mgamma.transpose()
