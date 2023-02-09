@@ -2,6 +2,7 @@ import time
 import numpy as np
 import sys
 from lenscarf.utils_hp import Alm
+import json
 
 class timer:
     def __init__(self, verbose, prefix='', suffix=''):
@@ -21,6 +22,10 @@ class timer:
         return self
 
     def reset(self):
+        self.t0 = time.time()
+
+    def reset_ti(self):
+        self.ti = time.time()
         self.t0 = time.time()
 
     def __str__(self):
@@ -45,8 +50,17 @@ class timer:
         if label not in self.keys:
             self.keys[label] = 0.
         t0 = time.time()
-        self.keys[label] += t0  - self.t0
+        self.keys[label] += t0 - self.t0
         self.t0 = t0
+
+    def add_elapsed(self, label):
+        if label not in self.keys:
+            self.keys[label] = 0.
+        t0 = time.time()
+        self.keys[label] += t0 - self.ti
+
+    def dumpjson(self, fn):
+        json.dump(self.keys, open(fn, 'w'))
 
     def checkpoint(self, msg):
         dt = time.time() - self.t0
