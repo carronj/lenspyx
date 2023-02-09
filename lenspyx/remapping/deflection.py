@@ -96,7 +96,7 @@ class deflection:
         if not self.cacher.is_cached(fn):
             self.tim.reset()
             assert np.all(self.geom.theta > 0.) and np.all(self.geom.theta < np.pi), 'fix this (cotangent below)'
-            dclm = np.zeros_lik(self.dlm) if self.dclm is None else self.dclm
+            dclm = np.zeros_like(self.dlm) if self.dclm is None else self.dclm
             red, imd = self.geom.alm2map_spin([self.dlm, dclm], 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr, [-1., 1.])
             npix = Geom.pbounds2npix(self.geom, self._pbds)
             self.tim.add('d1 alm2map_spin')
