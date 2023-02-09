@@ -8,24 +8,12 @@ import healpy as hp, numpy as np
 import pylab as pl
 from time import time
 
-def get_lensedcmb(ffi:duccd, ebunl=None, single_precision=False):
-    lmax_len, mmax_len, dlmax = 4096, 4096, 1024
-    lmax_unl = lmax_len + dlmax
-    mmax_unl = lmax_unl
-    if ebunl is None:
-        ebunl = np.array([hp.synalm(cls_unl['ee'][:lmax_unl + 1]),
-                     hp.synalm(cls_unl['bb'][:lmax_unl + 1])])
-    if single_precision:
-        ebunl = ebunl.astype(np.complex64)
-    else:
-        ebunl = ebunl.astype(np.complex128)
-    return ffi.lensgclm(ebunl, mmax_unl, 2, lmax_len, mmax_len, False), ebunl
-
 def binit(cl, d=10):
     ret = cl.copy()
     for l in range(d, ret.size -d):
         ret[l] = np.mean(cl[l-d:l+d+1])
     return ret
+
 
 def get_ffi(dlmax_gl, nthreads=4, dlmax=1024):
     lmax_len, mmax_len, dlmax, dlmax_gl = 4096, 4096, dlmax, dlmax_gl
@@ -58,3 +46,4 @@ if __name__ == '__main__':
             ffi.tim.keys['lensgclm (total, lmax_unl %s )'%lmax_unl] = time.time() - t0
             ffi.tim.dumpjson(json_file)
             print(json.load(open(json_file, 'r')))
+

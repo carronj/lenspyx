@@ -12,6 +12,7 @@ class timer:
         self.prefix = prefix
         self.suffix = suffix
         self.keys = {}
+        self.t0s = {}
 
     def __iadd__(self, othertimer):
         for k in othertimer.keys:
@@ -27,6 +28,18 @@ class timer:
     def reset_ti(self):
         self.ti = time.time()
         self.t0 = time.time()
+
+    def start(self, key): # starts a new time tracker
+        assert key not in self.keys.keys()
+        self.t0s[key] = time.time()
+
+    def close(self, key): # close tracker and store result
+        assert key in self.t0s.keys()
+        if key not in self.keys.keys():
+            self.keys[key]  = time.time() - self.t0s[key]
+        else:
+            self.keys[key] += time.time() - self.t0s[key]
+        del self.t0s[key]
 
     def __str__(self):
         if len(self.keys) == 0:

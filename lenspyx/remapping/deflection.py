@@ -92,10 +92,11 @@ class deflection:
 
         """
         fn = 'ptg'
-        self.tim.reset_ti()
+        self.tim.start('_build_angles')
         if not self.cacher.is_cached(fn):
+            self.tim.reset()
             assert np.all(self.geom.theta > 0.) and np.all(self.geom.theta < np.pi), 'fix this (cotangent below)'
-            dclm = np.zeros_like(self.dlm) if self.dclm is None else self.dclm
+            dclm = np.zeros_lik(self.dlm) if self.dclm is None else self.dclm
             red, imd = self.geom.alm2map_spin([self.dlm, dclm], 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr, [-1., 1.])
             npix = Geom.pbounds2npix(self.geom, self._pbds)
             self.tim.add('d1 alm2map_spin')
@@ -109,7 +110,7 @@ class deflection:
                 self.tim.add('thts, phis and gammas  (fortran)')
                 # I think this just trivially turns the F-array into a C-contiguous array:
                 self.cacher.cache(fn, thp_phip_mgamma.transpose())
-                self.tim.add_elapsed('build pointing (total)')
+                self.tim.close('_build_angle')
                 if self.verbosity:
                     print(self.tim)
                 return thp_phip_mgamma.transpose()
@@ -136,7 +137,7 @@ class deflection:
             self.tim.add('thts, phis and gammas  (python)')
             thp_phip_mgamma = thp_phip_mgamma.transpose()
             self.cacher.cache(fn, thp_phip_mgamma)
-            self.tim.add_elapsed('build pointing (total)')
+            self.tim.close('_build_angle')
             assert startpix == npix, (startpix, npix)
             if self.verbosity:
                 print(self.tim)
@@ -191,7 +192,8 @@ class deflection:
 
     def gclm2lenmap(self, gclm:np.ndarray or list, mmax:int or None, spin, backwards:bool, polrot=True, ptg=None):
         assert not backwards, 'backward 2lenmap not implemented at this moment'
-        self.tim.reset_ti()
+        self.tim.start('gclm2lenmap')
+        self.tim.reset()
         if spin == 0: # The code below would work just as well for spin-0 but seems slightly slower
                      # For the moment this seems faster
             lmax_unl = Alm.getlmax(gclm.size, mmax)
@@ -254,7 +256,7 @@ class deflection:
         if polrot and spin != 0:
             values *= np.exp( (-1j * spin) * ptg[:, 2]) # polrot. last entry is -gamma
         self.tim.add('polrot')
-        self.tim.add_elapsed('gclm2lenmap (total)')
+        self.tim.close('gclm2lenmap')
         if self.verbosity:
             print(self.tim)
         return values.real if spin == 0 else (values.real, values.imag)
@@ -263,22 +265,29 @@ class deflection:
         """Adjoint remapping operation from lensed alm space to unlensed alm space
 
         """
-        self.tim.reset_ti()
+        self.tim.start('lengclm')
+        self.tim.reset()
         if mmax_out is None:
             mmax_out = lmax_out
         if self.sig_d <= 0 and np.abs(self.fsky - 1.) < 1e-6: # no actual deflection and single-precision full-sky
             if spin == 0: return alm_copy(gclm, mmax, lmax_out, mmax_out)
             glmret = alm_copy(gclm[0], mmax, lmax_out, mmax_out)
-            return np.array([glmret, alm_copy(gclm[1], mmax, lmax_out, mmax_out) if gclm[1] is not None else np.zeros_like(glmret)])
+            ret = np.array([glmret, alm_copy(gclm[1], mmax, lmax_out, mmax_out) if gclm[1] is not None else np.zeros_like(glmret)])
+            self.tim.close('lengclm')
+            return ret
         if not backwards:
             m = self.gclm2lenmap(gclm, mmax, spin, backwards)
-            self.tim.add_elapsed('alm2lenmap (total)')
+            self.tim.add('alm2lenmap (total)')
             if spin == 0:
-                return self.geom.map2alm(m, lmax_out, mmax_out, self.sht_tr)
+                ret = self.geom.map2alm(m, lmax_out, mmax_out, self.sht_tr)
+                self.tim.add('map2alm')
+                self.tim.close('lengclm')
+                return ret
             else:
                 assert polrot
-                ret= self.geom.map2alm_spin(m, spin, lmax_out, mmax_out, self.sht_tr)
-                self.tim.add_elapsed('map2alm_spin (total)')
+                ret = self.geom.map2alm_spin(m, spin, lmax_out, mmax_out, self.sht_tr)
+                self.tim.add('map2alm_spin')
+                self.tim.close('lengclm')
                 if self.verbosity:
                     print(self.tim)
                 return ret
@@ -340,27 +349,3 @@ class deflection:
             slm = ducc0.sht.experimental.adjoint_synthesis_2d(map=map, spin=spin,
                         lmax=lmax_out, mmax=mmax_out, geometry="CC", nthreads=self.sht_tr)
             return slm.squeeze()
-
-        # perform NUFFT
-        #map_dfs = ducc0.nufft.nu2u(points=points, coord=ptg, out=map_dfs, forward=True,
-        #                           epsilon=epsilon, nthreads=nthreads, verbosity=0,
-        #                           periodicity=2 * np.pi, fft_order=True)
-        # go to position space
-        #map_dfs = ducc0.fft.c2c(map_dfs, axes=(0, 1), forward=False, inorm=2, nthreads=nthreads, out=map_dfs)
-
-        # go from double Fourier sphere to Clenshaw-Curtis grid
-        #if (spin % 2) != 0:
-        #    map_dfs[1:ntheta - 1, :nphihalf] -= map_dfs[-1:ntheta - 1:-1, nphihalf:]
-        #    map_dfs[1:ntheta - 1, nphihalf:] -= map_dfs[-1:ntheta - 1:-1, :nphihalf]
-        #else:
-        #    map_dfs[1:ntheta - 1, :nphihalf] += map_dfs[-1:ntheta - 1:-1, nphihalf:]
-        #    map_dfs[1:ntheta - 1, nphihalf:] += map_dfs[-1:ntheta - 1:-1, :nphihalf]
-        #map_dfs = map_dfs[:ntheta, :]
-        #map = np.empty((1 if spin == 0 else 2, ntheta, nphi), dtype=np.float64)
-        #map[0] = map_dfs.real
-        #if spin > 0:
-        #    map[1] = map_dfs.imag
-        # adjoint SHT synthesis
-        #slm = ducc0.sht.experimental.adjoint_synthesis_2d(map=map, spin=spin,
-        #                                                  lmax=lmax, mmax=lmax, geometry="CC", nthreads=nthreads)
-        #return slm
