@@ -6,7 +6,7 @@ try :
     from lenspyx.shts import shts
     from lenspyx.bicubic import bicubic
 except:
-    print('Could not load fortran modules')
+    print('lensing.py::Could not load fortran modules')
     pass
 from lenspyx import utils
 from lenspyx import angles
