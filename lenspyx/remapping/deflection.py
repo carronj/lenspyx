@@ -277,7 +277,7 @@ class deflection:
             return ret
         if not backwards:
             m = self.gclm2lenmap(gclm, mmax, spin, backwards)
-            self.tim.add('alm2lenmap (total)')
+            self.tim.reset()
             if spin == 0:
                 ret = self.geom.map2alm(m, lmax_out, mmax_out, self.sht_tr)
                 self.tim.add('map2alm')
