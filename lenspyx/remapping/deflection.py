@@ -347,7 +347,7 @@ class deflection:
                 points = self.geom.alm2map_spin(gclm, spin, lmax_unl, mmax, self.sht_tr, [-1., 1.])
                 points = points[0] + 1j * points[1]
                 self.tim.add('points')
-                if polrot:#TODO: can make this 10 times faster with numexpr etc
+                if polrot:#TODO: at some point get rid of these exp(atan2)...
                     if HAS_NUMEXPR:
                         x = ptg[:, 2]
                         js = + 1j * spin
