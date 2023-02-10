@@ -64,7 +64,12 @@ ctype = {np.dtype(np.float32): np.complex64,
          np.float32: np.complex64,
          np.float64: np.complex128,
          np.longfloat: np.longcomplex}
-
+rtype = {np.dtype(np.complex64): np.float32,
+         np.dtype(np.complex128): np.float64,
+         np.dtype(np.longcomplex): np.longfloat,
+         np.complex64: np.float32,
+         np.complex128: np.float64,
+         np.longcomplex: np.longfloat}
 
 class deflection:
     def __init__(self, scarf_pbgeometry:pbdGeometry, dglm, mmax_dlm:int or None, numthreads:int=0,
@@ -385,7 +390,7 @@ class deflection:
             if spin == 0:
                 # make complex if necessary
                 lmax_unl = hp.Alm.getlmax(gclm.size, mmax)
-                points = alm2map(gclm, spin, self.geom, lmax_unl, mmax, self.sht_tr) + 0j
+                points = alm2map(gclm, spin, self.geom, lmax_unl, mmax, self.sht_tr)
                 self.tim.add('points')
             else:
                 lmax_unl = hp.Alm.getlmax(gclm[0].size, mmax)
@@ -406,15 +411,15 @@ class deflection:
                 points[int(ofs):int(ofs + nph)] *= w
             self.tim.add('weighting')
 
-            #FIXME: here always complex128?
-            map_dfs = np.empty((2 * ntheta - 2, nphi), dtype=np.complex128)
+            # make complex if necessary
+            points2 = points.astype(ctype[points.dtype]) if spin == 0 else points
+            map_dfs = np.empty((2 * ntheta - 2, nphi), dtype=points2.dtype)
 
             # perform NUFFT
-            map_dfs = ducc0.nufft.nu2u(points=points, coord=ptg[:, 0:2], out=map_dfs, forward=True,
-                                    epsilon=self.epsilon, nthreads=self.sht_tr, verbosity=self.verbosity,
-                                    periodicity=2 * np.pi, fft_order=True)
+            map_dfs = ducc0.nufft.nu2u(points=points2, coord=ptg[:, 0:2], out=map_dfs, forward=True,
+                                       epsilon=self.epsilon, nthreads=self.sht_tr, verbosity=0,
+                                       periodicity=2 * np.pi, fft_order=True)
             self.tim.add('map_dfs')
-
             # go to position space
             map_dfs = ducc0.fft.c2c(map_dfs, axes=(0, 1), forward=False, inorm=2, nthreads=self.sht_tr, out=map_dfs)
             self.tim.add('c2c FFT')
@@ -427,17 +432,18 @@ class deflection:
                 map_dfs[1:ntheta - 1, :nphihalf] += map_dfs[-1:ntheta - 1:-1, nphihalf:]
                 map_dfs[1:ntheta - 1, nphihalf:] += map_dfs[-1:ntheta - 1:-1, :nphihalf]
             map_dfs = map_dfs[:ntheta, :]
-            map = np.empty((1 if spin == 0 else 2, ntheta, nphi), dtype=np.float64)
+            map = np.empty((1 if spin == 0 else 2, ntheta, nphi),
+                           dtype=points.dtype if spin == 0 else rtype[points.dtype])
             map[0] = map_dfs.real
             if spin > 0:
                 map[1] = map_dfs.imag
+            del map_dfs
             self.tim.add('Double Fourier')
 
             # adjoint SHT synthesis
             slm = ducc0.sht.experimental.adjoint_synthesis_2d(map=map, spin=spin,
-                        lmax=lmax_out, mmax=mmax_out, geometry="CC", nthreads=self.sht_tr)
+                                lmax=lmax_out, mmax=lmax_out, geometry="CC", nthreads=self.sht_tr)
             self.tim.add('map2alm_spin')
-
             self.tim.close('lengclm')
 
             return slm.squeeze()
