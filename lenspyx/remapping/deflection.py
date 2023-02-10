@@ -274,13 +274,15 @@ class deflection:
                                 spin=spin, lmax=lmax_unl, mmax=mmax, geometry="CC", nthreads=self.sht_tr)
         self.tim.add('experimental.synthesis_2d')
 
-        # convert components to real or complex map
-        map = map[0] if spin == 0 else map[0] + 1j * map[1]
-
         # extend map to double Fourier sphere map
-        map_dfs = np.empty((2 * ntheta - 2, nphi), dtype=map.dtype)
-        #    map_dfs = ducc0.misc.make_noncritical_from_shape((2*ntheta-2, nphi), dtype=np.dtype(map.dtype))
-        map_dfs[:ntheta, :] = map
+        map_dfs = np.empty((2 * ntheta - 2, nphi), dtype=map.dtype if spin == 0 else ctype[map.dtype])
+        if spin == 0:
+            map_dfs[:ntheta, :] = map[0]
+        else:
+            map_dfs[:ntheta, :].real = map[0]
+            map_dfs[:ntheta, :].imag = map[1]
+        del map
+
         map_dfs[ntheta:, :nphihalf] = map_dfs[ntheta - 2:0:-1, nphihalf:]
         map_dfs[ntheta:, nphihalf:] = map_dfs[ntheta - 2:0:-1, :nphihalf]
         if (spin % 2) != 0:
@@ -289,9 +291,9 @@ class deflection:
 
         # go to Fourier space
         if spin == 0:
-            tmp = np.empty(map_dfs.shape, dtype=ctype[map.dtype])
-            #        tmp = ducc0.misc.make_noncritical_from_shape(map_dfs.shape, dtype=np.dtype(ctype[map.dtype]))
+            tmp = np.empty(map_dfs.shape, dtype=ctype[map_dfs.dtype])
             map_dfs = ducc0.fft.c2c(map_dfs, axes=(0, 1), inorm=2, nthreads=self.sht_tr, out=tmp)
+            del tmp
         else:
             map_dfs = ducc0.fft.c2c(map_dfs, axes=(0, 1), inorm=2, nthreads=self.sht_tr, out=map_dfs)
         self.tim.add('map_dfs 2DFFT')
@@ -300,13 +302,14 @@ class deflection:
         if ptg is None:
             ptg = self._get_ptg()
         self.tim.add('get ptg')
+        # perform NUFFT
         values = ducc0.nufft.u2nu(grid=map_dfs, coord=ptg[:, 0:2], forward=False,
                                   epsilon=self.epsilon, nthreads=self.sht_tr,
-                                  verbosity=self.verbosity, periodicity=2 * np.pi, fft_order=True)
+                                  verbosity=0, periodicity=2 * np.pi, fft_order=True)
         self.tim.add('u2nu')
-        print('*** u2nu', map_dfs.dtype, ptg.dtype)
 
-        if polrot and spin != 0: #TODO: at some point get rid of these exp(arctan...)
+        if spin * polrot: #TODO: at some point get rid of these exp(arctan...)
+                          # maybe simplest to cache cis g and multpily in place a couple of times
             if HAS_NUMEXPR:
                 x = ptg[:, 2]
                 js = - 1j * spin
@@ -339,14 +342,12 @@ class deflection:
             m = self.gclm2lenmap(gclm, mmax, spin, backwards)
             self.tim.reset()
             if spin == 0:
-                #TODO: this does not respect the input dtype ?
                 ret = map2alm(m, spin, self.geom, lmax_out, mmax_out, self.sht_tr)
                 self.tim.add('map2alm')
                 self.tim.close('lengclm')
                 return ret
             else:
                 assert polrot
-                #TODO: this does not respect the input dtype ?
                 ret = map2alm(m, spin, self.geom, lmax_out, mmax_out, self.sht_tr)
                 self.tim.add('map2alm_spin')
                 self.tim.close('lengclm')
@@ -392,6 +393,7 @@ class deflection:
                 points = points[0] + 1j * points[1]
                 self.tim.add('points')
                 if polrot:#TODO: at some point get rid of these exp(atan2)...
+                          # maybe simplest to save cis gamma and twice multiply in place...
                     if HAS_NUMEXPR:
                         x = ptg[:, 2]
                         js = + 1j * spin
@@ -404,6 +406,7 @@ class deflection:
                 points[int(ofs):int(ofs + nph)] *= w
             self.tim.add('weighting')
 
+            #FIXME: here always complex128?
             map_dfs = np.empty((2 * ntheta - 2, nphi), dtype=np.complex128)
 
             # perform NUFFT
