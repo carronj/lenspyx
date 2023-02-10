@@ -203,12 +203,15 @@ class deflection:
         T = geom.alm2map(gclm, lmax, mmax, self.sht_tr, [-1., 1.])[0::2]
         return T
 
-    def gclm2lenmap(self, gclm:np.ndarray or list, mmax:int or None, spin, backwards:bool, polrot=True, ptg=None):
+    def gclm2lenmap(self, gclm:np.ndarray, mmax:int or None, spin, backwards:bool, polrot=True, ptg=None):
         assert not backwards, 'backward 2lenmap not implemented at this moment'
         self.tim.start('gclm2lenmap')
         self.tim.reset()
+        if self.single_prec and gclm.dtype != np.complex64:
+            gclm = gclm.astype(np.complex64)
         if spin == 0: # The code below would work just as well for spin-0 but seems slightly slower
                      # For the moment this seems faster
+
             lmax_unl = Alm.getlmax(gclm.size, mmax)
             blm_T = blm_gauss(0, lmax_unl, 0)
             self.tim.add('blm_gauss')
@@ -231,6 +234,7 @@ class deflection:
         nphihalf = ducc0.fft.good_size(lmax_unl + 1)
         nphi = 2 * nphihalf
         # Is this any different to scarf wraps ?
+        # NB: type of map, map_df, and FFTs will follow that of input gclm
         map = ducc0.sht.experimental.synthesis_2d(alm=np.atleast_2d(gclm), ntheta=ntheta, nphi=nphi,
                                 spin=spin, lmax=lmax_unl, mmax=mmax, geometry="CC", nthreads=self.sht_tr)
         self.tim.add('experimental.synthesis_2d')
@@ -298,12 +302,14 @@ class deflection:
             m = self.gclm2lenmap(gclm, mmax, spin, backwards)
             self.tim.reset()
             if spin == 0:
+                #TODO: this does not respect the input dtype ?
                 ret = self.geom.map2alm(m, lmax_out, mmax_out, self.sht_tr)
                 self.tim.add('map2alm')
                 self.tim.close('lengclm')
                 return ret
             else:
                 assert polrot
+                #TODO: this does not respect the input dtype ?
                 ret = self.geom.map2alm_spin(m, spin, lmax_out, mmax_out, self.sht_tr)
                 self.tim.add('map2alm_spin')
                 self.tim.close('lengclm')
@@ -317,7 +323,10 @@ class deflection:
                 lmax_unl = hp.Alm.getlmax(gclm[0].size if abs(spin) > 0 else gclm.size, mmax)
                 inter = ducc0.totalconvolve.Interpolator(lmax_out, spin, 1, epsilon=self.epsilon,
                                                          ofactor=self.ofactor, nthreads=self.sht_tr)
-                I = self.geom.alm2map(gclm, lmax_unl, mmax, self.sht_tr)
+                if self.single_prec and gclm.dtype != np.complex64:  # will return same prec. output
+                    I = self.geom.alm2map(gclm.astype(np.complex64), lmax_unl, mmax, self.sht_tr)
+                else:
+                    I = self.geom.alm2map(gclm, lmax_unl, mmax, self.sht_tr)
                 for ofs, w, nph in zip(self.geom.ofs, self.geom.weight, self.geom.nph):
                     I[int(ofs):int(ofs + nph)] *= w
                 self.tim.add('points')
@@ -339,12 +348,18 @@ class deflection:
             if spin == 0:
                 # make complex if necessary
                 lmax_unl = hp.Alm.getlmax(gclm.size, mmax)
-                points = self.geom.alm2map(gclm, lmax_unl, mmax, self.sht_tr, [-1., 1.]) + 0j
+                if self.single_prec and gclm.dtype != np.complex64:  # will return same prec. output
+                    points = self.geom.alm2map(gclm.astype(np.complex64), lmax_unl, mmax, self.sht_tr, [-1., 1.]) + 0j
+                else:
+                    points = self.geom.alm2map(gclm, lmax_unl, mmax, self.sht_tr, [-1., 1.]) + 0j
                 self.tim.add('points')
             else:
                 lmax_unl = hp.Alm.getlmax(gclm[0].size, mmax)
-                #NB: experimential_sythesis return already complex
-                points = self.geom.alm2map_spin(gclm, spin, lmax_unl, mmax, self.sht_tr, [-1., 1.])
+                #TODO: experimential_sythesis return already complex
+                if self.single_prec and gclm[0].dtype != np.complex64:
+                    points = self.geom.alm2map_spin(gclm.astype(np.complex64), spin, lmax_unl, mmax, self.sht_tr, [-1., 1.])
+                else:
+                    points = self.geom.alm2map_spin(gclm, spin, lmax_unl, mmax, self.sht_tr, [-1., 1.])
                 points = points[0] + 1j * points[1]
                 self.tim.add('points')
                 if polrot:#TODO: at some point get rid of these exp(atan2)...
