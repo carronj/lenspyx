@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+import os
+
 import numpy as np
 from lenscarf.remapping import d2ang
 from lenscarf.utils_scarf import Geom, pbdGeometry, Geometry
@@ -13,6 +16,12 @@ try:
     HAS_FORTRAN = True
 except:
     HAS_FORTRAN = False
+
+try:
+    import numexpr
+    HAS_NUMEXPR = True
+except:
+    HAS_NUMEXPR = False
 
 # some helper functions
 
@@ -81,9 +90,13 @@ class deflection:
         self.single_prec = True # Uses single precision arithmetic in some places
         self.tim = timer(False, 'deflection instance timer')
 
+        if HAS_NUMEXPR:
+            os.environ['NUMEXPR_MAX_THREADS'] = str(numthreads)
+            os.environ['NUMEXPR_NUM_THREADS'] = str(numthreads)
+
     def _get_ptg(self):
         # TODO improve this and fwd angles
-        return self._build_angles() # -gamma in third argument
+        return self._build_angles()  # -gamma in third argument
 
     def _build_angles(self, fortran=True):
         """Builds deflected positions and angles
@@ -116,7 +129,7 @@ class deflection:
                 return thp_phip_mgamma.transpose()
             elif fortran and not HAS_FORTRAN:
                 print('Cant use fortran pointing building since import failed. Falling back on python impl.')
-            thp_phip_mgamma = np.empty( (3, npix), dtype=float) # (-1) gamma in last arguement
+            thp_phip_mgamma = np.empty((3, npix), dtype=float)  # (-1) gamma in last arguement
             startpix = 0
             for ir in np.argsort(self.geom.ofs): # We must follow the ordering of scarf position-space map
                 pixs = Geom.pbounds2pix(self.geom, ir, self._pbds)
@@ -253,9 +266,15 @@ class deflection:
                                   verbosity=self.verbosity, periodicity=2 * np.pi, fft_order=True)
         self.tim.add('u2nu')
 
-        if polrot and spin != 0:
-            values *= np.exp( (-1j * spin) * ptg[:, 2]) # polrot. last entry is -gamma
-        self.tim.add('polrot')
+        if polrot and spin != 0: #TODO: at some point get rid of these exp(arctan...)
+            if HAS_NUMEXPR:
+                x = ptg[:, 2]
+                js = - 1j * spin
+                values *= numexpr.evaluate("exp(js * x)")
+                self.tim.add('polrot (numexpr)')
+            else:
+                values *= np.exp((-1j * spin) * ptg[:, 2])  # polrot. last entry is -gamma
+                self.tim.add('polrot (python)')
         self.tim.close('gclm2lenmap')
         if self.verbosity:
             print(self.tim)
@@ -328,12 +347,18 @@ class deflection:
                 points = self.geom.alm2map_spin(gclm, spin, lmax_unl, mmax, self.sht_tr, [-1., 1.])
                 points = points[0] + 1j * points[1]
                 self.tim.add('points')
-                if polrot:
-                    points *= np.exp( (1j * spin) * ptg[:, 2])  # ptg[:, 2] is -gamma
-                self.tim.add('polrot')
+                if polrot:#TODO: can make this 10 times faster with numexpr etc
+                    if HAS_NUMEXPR:
+                        x = ptg[:, 2]
+                        js = + 1j * spin
+                        points *= numexpr.evaluate("exp(js * x)")
+                        self.tim.add('polrot (numexpr)')
+                    else:
+                        points *= np.exp( (1j * spin) * ptg[:, 2])  # ptg[:, 2] is -gamma
+                        self.tim.add('polrot (python)')
             for ofs, w, nph in zip(self.geom.ofs, self.geom.weight, self.geom.nph):
                 points[int(ofs):int(ofs + nph)] *= w
-                self.tim.add('polrot')
+            self.tim.add('weighting')
 
             map_dfs = np.empty((2 * ntheta - 2, nphi), dtype=np.complex128)
 
