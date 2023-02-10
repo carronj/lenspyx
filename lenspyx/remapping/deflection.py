@@ -10,6 +10,7 @@ from lenscarf import cachers
 from lenspyx.utils import timer,blm_gauss
 import healpy as hp
 import ducc0
+from ducc0.sht.experimental import synthesis, adjoint_synthesis
 
 try:
     from lenscarf.fortran import remapping as fremap
@@ -23,6 +24,37 @@ try:
 except:
     HAS_NUMEXPR = False
 
+
+def alm2map(gclm:np.ndarray, spin, geom, lmax, mmax, nthreads):
+    """Wrapper to ducc shts
+
+        Return a map or a pair of map for spin non-zero, with the same type as gclm
+
+    """
+    #FIXME: mmax, probably with mstart
+    tht = geom.theta .astype(np.float64) if geom.theta.dtype != np.float64 else geom.theta
+    nph = geom.nph.astype(np.uint64) if geom.nph.dtype != np.uint64 else geom.nph
+    ofs = geom.ofs.astype(np.uint64) if geom.ofs.dtype != np.uint64 else geom.ofs
+    phi0 = geom.phi0
+    m = synthesis(alm=gclm, theta=tht, lmax=lmax, nphi=nph, spin=spin, phi0=phi0, nthreads=nthreads, ringstart=ofs)
+    return m.squeeze()  #FIXME: do I really want the squeeze?
+
+def map2alm(m:np.ndarray, spin, geom, lmax, mmax, nthreads):
+    """Wrapper to ducc shts
+
+        Return a map or a pair of map for spin non-zero
+
+    """
+    #FIXME: mmax, probably with mstart
+    tht = geom.theta .astype(np.float64) if geom.theta.dtype != np.float64 else geom.theta
+    nph = geom.nph.astype(np.uint64) if geom.nph.dtype != np.uint64 else geom.nph
+    ofs = geom.ofs.astype(np.uint64) if geom.ofs.dtype != np.uint64 else geom.ofs
+    phi0 = geom.phi0
+    m = np.atleast_2d(m)
+    for of, w, npi in zip(ofs, geom.weight, nph):
+        m[:, int(of):int(of + npi)] *= w
+    gclm = adjoint_synthesis(map=m, theta=tht, lmax=lmax, nphi=nph, spin=spin, phi0=phi0, nthreads=nthreads, ringstart=ofs)
+    return gclm  #FIXME: do I really want the squeeze?
 # some helper functions
 
 ctype = {np.dtype(np.float32): np.complex64,
@@ -110,7 +142,9 @@ class deflection:
             self.tim.reset()
             assert np.all(self.geom.theta > 0.) and np.all(self.geom.theta < np.pi), 'fix this (cotangent below)'
             dclm = np.zeros_like(self.dlm) if self.dclm is None else self.dclm
-            red, imd = self.geom.alm2map_spin([self.dlm, dclm], 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr, [-1., 1.])
+            #red, imd = self.geom.alm2map_spin([self.dlm, dclm], 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr, [-1., 1.])
+            red, imd = alm2map([self.dlm, dclm], 1, self.geom, self.lmax_dlm, self.mmax_dlm, self.sht_tr)
+            # Probably want to keep red, imd double precision for the calc?
             npix = Geom.pbounds2npix(self.geom, self._pbds)
             self.tim.add('d1 alm2map_spin')
             if fortran and HAS_FORTRAN and self.pbgeom.pbound.get_range() >= (2. * np.pi): # covering full phi range
@@ -269,6 +303,7 @@ class deflection:
                                   epsilon=self.epsilon, nthreads=self.sht_tr,
                                   verbosity=self.verbosity, periodicity=2 * np.pi, fft_order=True)
         self.tim.add('u2nu')
+        print('*** u2nu', map_dfs.dtype, ptg.dtype)
 
         if polrot and spin != 0: #TODO: at some point get rid of these exp(arctan...)
             if HAS_NUMEXPR:
@@ -284,7 +319,7 @@ class deflection:
             print(self.tim)
         return values.real if spin == 0 else (values.real, values.imag)
 
-    def lensgclm(self, gclm:np.ndarray or list, mmax:int or None, spin, lmax_out, mmax_out:int or None, backwards=False, polrot=True):
+    def lensgclm(self, gclm:np.ndarray, mmax:int or None, spin, lmax_out, mmax_out:int or None, backwards=False, polrot=True):
         """Adjoint remapping operation from lensed alm space to unlensed alm space
 
         """
@@ -299,34 +334,34 @@ class deflection:
             self.tim.close('lengclm')
             return ret
         if not backwards:
+            # FIXME: should return here 2d array?
             m = self.gclm2lenmap(gclm, mmax, spin, backwards)
             self.tim.reset()
             if spin == 0:
                 #TODO: this does not respect the input dtype ?
-                ret = self.geom.map2alm(m, lmax_out, mmax_out, self.sht_tr)
+                ret = map2alm(m, spin, self.geom, lmax_out, mmax_out, self.sht_tr)
                 self.tim.add('map2alm')
                 self.tim.close('lengclm')
                 return ret
             else:
                 assert polrot
                 #TODO: this does not respect the input dtype ?
-                ret = self.geom.map2alm_spin(m, spin, lmax_out, mmax_out, self.sht_tr)
+                ret = map2alm(m, spin, self.geom, lmax_out, mmax_out, self.sht_tr)
                 self.tim.add('map2alm_spin')
                 self.tim.close('lengclm')
                 if self.verbosity:
                     print(self.tim)
                 return ret
         else:
+            if self.single_prec and gclm.dtype != np.complex64:
+                gclm = gclm.astype(np.complex64)
             if spin == 0:
                 # The code below works for any spin but this seems a little bit faster for non-zero spin
                 # So keeping this for the moment
                 lmax_unl = hp.Alm.getlmax(gclm[0].size if abs(spin) > 0 else gclm.size, mmax)
                 inter = ducc0.totalconvolve.Interpolator(lmax_out, spin, 1, epsilon=self.epsilon,
                                                          ofactor=self.ofactor, nthreads=self.sht_tr)
-                if self.single_prec and gclm.dtype != np.complex64:  # will return same prec. output
-                    I = self.geom.alm2map(gclm.astype(np.complex64), lmax_unl, mmax, self.sht_tr)
-                else:
-                    I = self.geom.alm2map(gclm, lmax_unl, mmax, self.sht_tr)
+                I = alm2map(gclm, spin, self.geom, lmax_unl, mmax, self.sht_tr)
                 for ofs, w, nph in zip(self.geom.ofs, self.geom.weight, self.geom.nph):
                     I[int(ofs):int(ofs + nph)] *= w
                 self.tim.add('points')
@@ -348,18 +383,11 @@ class deflection:
             if spin == 0:
                 # make complex if necessary
                 lmax_unl = hp.Alm.getlmax(gclm.size, mmax)
-                if self.single_prec and gclm.dtype != np.complex64:  # will return same prec. output
-                    points = self.geom.alm2map(gclm.astype(np.complex64), lmax_unl, mmax, self.sht_tr, [-1., 1.]) + 0j
-                else:
-                    points = self.geom.alm2map(gclm, lmax_unl, mmax, self.sht_tr, [-1., 1.]) + 0j
+                points = alm2map(gclm, spin, self.geom, lmax_unl, mmax, self.sht_tr) + 0j
                 self.tim.add('points')
             else:
                 lmax_unl = hp.Alm.getlmax(gclm[0].size, mmax)
-                #TODO: experimential_sythesis return already complex
-                if self.single_prec and gclm[0].dtype != np.complex64:
-                    points = self.geom.alm2map_spin(gclm.astype(np.complex64), spin, lmax_unl, mmax, self.sht_tr, [-1., 1.])
-                else:
-                    points = self.geom.alm2map_spin(gclm, spin, lmax_unl, mmax, self.sht_tr, [-1., 1.])
+                points = alm2map(gclm, spin, self.geom, lmax_unl, mmax, self.sht_tr)
                 points = points[0] + 1j * points[1]
                 self.tim.add('points')
                 if polrot:#TODO: at some point get rid of these exp(atan2)...
