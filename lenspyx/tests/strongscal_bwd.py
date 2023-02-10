@@ -3,10 +3,7 @@
 
 """
 from lenspyx.tests.helper import syn_ffi_ducc, cls_unl, cls_len, duccd
-from lenscarf import cachers
 import healpy as hp, numpy as np
-import pylab as pl
-from time import time
 
 def binit(cl, d=10):
     ret = cl.copy()
@@ -32,18 +29,18 @@ if __name__ == '__main__':
     lmax_unl = lmax_len + dlmax
     mmax_unl = lmax_unl
     dlmax_gl = 1024
-    ebunl = np.array([hp.synalm(cls_unl['ee'][:lmax_unl + 1]),
-                      hp.synalm(cls_unl['bb'][:lmax_unl + 1])])
+    eblen = np.array([hp.synalm(cls_len['ee'][:lmax_len + 1]),
+                      hp.synalm(cls_len['bb'][:lmax_len + 1])])
     for tentative in [1, 2]:
         for nt in range(1, 37):
             os.environ['OMP_NUM_THREADS'] = str(nt)
             print('doing %s_%s'%(nt, tentative))
-            json_file = os.environ['SCRATCH'] + '/lenspyx/sscal_fwd_%s_%s.json'%(nt, tentative)
+            json_file = os.environ['SCRATCH'] + '/lenspyx/sscal_bwd_%s_%s.json'%(nt, tentative)
             ffi = get_ffi(dlmax_gl, nt)
             ffi.verbosity = 0
             t0 = time.time()
-            ffi.lensgclm(ebunl, mmax_unl, 2, lmax_len, mmax_len, False)
-            ffi.tim.keys['lensgclm (total, lmax_unl %s )'%lmax_unl] = time.time() - t0
+            ffi.lensgclm(eblen, mmax_len, 2, lmax_unl, mmax_unl, True)
+            ffi.tim.keys['lensgclm (total, lmax in-out %s %s )'%(lmax_len, lmax_unl)] = time.time() - t0
             ffi.tim.dumpjson(json_file)
             print(json.load(open(json_file, 'r')))
 

@@ -30,7 +30,7 @@ class timer:
         self.t0 = time.time()
 
     def start(self, key): # starts a new time tracker
-        assert key not in self.keys.keys()
+        assert key not in self.t0s.keys()
         self.t0s[key] = time.time()
 
     def close(self, key): # close tracker and store result

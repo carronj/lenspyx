@@ -301,28 +301,39 @@ class deflection:
                 I = self.geom.alm2map(gclm, lmax_unl, mmax, self.sht_tr)
                 for ofs, w, nph in zip(self.geom.ofs, self.geom.weight, self.geom.nph):
                     I[int(ofs):int(ofs + nph)] *= w
+                self.tim.add('points')
                 xptg = self._get_ptg()
+                self.tim.add('_get_ptg')
                 inter.deinterpol(xptg, np.atleast_2d(I))
+                self.tim.add('deinterpol')
                 blm = blm_gauss(0, lmax_out, spin)
-                return inter.getSlm(blm).squeeze()
+                ret = inter.getSlm(blm).squeeze()
+                self.tim.add('getSlm')
+                self.tim.close('lensgclm')
+                return ret
             # minimum dimensions for a Clenshaw-Curtis grid at this band limit
             ntheta = ducc0.fft.good_size(lmax_out + 2)
             nphihalf = ducc0.fft.good_size(lmax_out + 1)
             nphi = 2 * nphihalf
             ptg = self._get_ptg()
+            self.tim.add('_get_ptg')
             if spin == 0:
                 # make complex if necessary
                 lmax_unl = hp.Alm.getlmax(gclm.size, mmax)
                 points = self.geom.alm2map(gclm, lmax_unl, mmax, self.sht_tr, [-1., 1.]) + 0j
+                self.tim.add('points')
             else:
                 lmax_unl = hp.Alm.getlmax(gclm[0].size, mmax)
                 #NB: experimential_sythesis return already complex
                 points = self.geom.alm2map_spin(gclm, spin, lmax_unl, mmax, self.sht_tr, [-1., 1.])
                 points = points[0] + 1j * points[1]
+                self.tim.add('points')
                 if polrot:
                     points *= np.exp( (1j * spin) * ptg[:, 2])  # ptg[:, 2] is -gamma
+                self.tim.add('polrot')
             for ofs, w, nph in zip(self.geom.ofs, self.geom.weight, self.geom.nph):
                 points[int(ofs):int(ofs + nph)] *= w
+                self.tim.add('polrot')
 
             map_dfs = np.empty((2 * ntheta - 2, nphi), dtype=np.complex128)
 
@@ -330,8 +341,11 @@ class deflection:
             map_dfs = ducc0.nufft.nu2u(points=points, coord=ptg[:, 0:2], out=map_dfs, forward=True,
                                     epsilon=self.epsilon, nthreads=self.sht_tr, verbosity=self.verbosity,
                                     periodicity=2 * np.pi, fft_order=True)
+            self.tim.add('map_dfs')
+
             # go to position space
             map_dfs = ducc0.fft.c2c(map_dfs, axes=(0, 1), forward=False, inorm=2, nthreads=self.sht_tr, out=map_dfs)
+            self.tim.add('c2c FFT')
 
             # go from double Fourier sphere to Clenshaw-Curtis grid
             if (spin % 2) != 0:
@@ -345,7 +359,13 @@ class deflection:
             map[0] = map_dfs.real
             if spin > 0:
                 map[1] = map_dfs.imag
+            self.tim.add('Double Fourier')
+
             # adjoint SHT synthesis
             slm = ducc0.sht.experimental.adjoint_synthesis_2d(map=map, spin=spin,
                         lmax=lmax_out, mmax=mmax_out, geometry="CC", nthreads=self.sht_tr)
+            self.tim.add('map2alm_spin')
+
+            self.tim.close('lengclm')
+
             return slm.squeeze()
