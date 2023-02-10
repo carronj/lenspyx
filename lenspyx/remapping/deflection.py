@@ -36,6 +36,7 @@ def alm2map(gclm:np.ndarray, spin, geom, lmax, mmax, nthreads):
     nph = geom.nph.astype(np.uint64) if geom.nph.dtype != np.uint64 else geom.nph
     ofs = geom.ofs.astype(np.uint64) if geom.ofs.dtype != np.uint64 else geom.ofs
     phi0 = geom.phi0
+    gclm = np.atleast_2d(gclm)
     m = synthesis(alm=gclm, theta=tht, lmax=lmax, nphi=nph, spin=spin, phi0=phi0, nthreads=nthreads, ringstart=ofs)
     return m.squeeze()  #FIXME: do I really want the squeeze?
 
