@@ -33,12 +33,12 @@ if __name__ == '__main__':
     mmax_unl = lmax_unl
     dlmax_gl = 1024
     ebunl = np.array([hp.synalm(cls_unl['ee'][:lmax_unl + 1]),
-                      hp.synalm(cls_unl['bb'][:lmax_unl + 1])])
+                      hp.synalm(cls_unl['bb'][:lmax_unl + 1])]).astype(np.complex64)
     for tentative in [1, 2]:
         for nt in range(1, 37):
             os.environ['OMP_NUM_THREADS'] = str(nt)
             print('doing %s_%s'%(nt, tentative))
-            json_file = os.environ['SCRATCH'] + '/lenspyx/sscal_fwd_%s_%s.json'%(nt, tentative)
+            json_file = os.environ['SCRATCH'] + '/lenspyx/sscal_fwd_%s_%s_sgl.json'%(nt, tentative)
             ffi = get_ffi(dlmax_gl, nt)
             ffi.verbosity = 0
             t0 = time.time()

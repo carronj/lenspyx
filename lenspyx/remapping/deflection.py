@@ -23,6 +23,7 @@ try:
     HAS_NUMEXPR = True
 except:
     HAS_NUMEXPR = False
+    print("deflection.py::could not load numexpr, falling back on python impl.")
 
 
 def alm2map(gclm:np.ndarray, spin, geom, lmax, mmax, nthreads):

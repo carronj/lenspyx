@@ -24,6 +24,7 @@ dlm_fac = 1.
 
 ffi_ducc, ref_geom = syn_ffi_ducc(lmax_len=lmax_len, dlmax=dlmax, dlm_fac=dlm_fac,
                                   nthreads=nthreads)
+ffi_ducc.single_prec = False
 
 #ffi_ducc_opti, ref_geom = syn_ffi_ducc(lmax_len=lmax_len, dlmax=dlmax, target_res=res, nside=nside, dlm_fac=dlm_fac,
 #                                  nthreads=nthreads, thingauss=thingauss, optiversion=True)
@@ -55,10 +56,12 @@ for ie, epsilon in enumerate([1e-3, 1e-5, 1e-7, 1e-9][::-1]):
     tffi_ducc, _ = syn_ffi_ducc(lmax_len=lmax_len, dlmax=dlmax, dlm_fac=dlm_fac,
                                       nthreads=nthreads, epsilon=epsilon)
     tffi_ducc = tffi_ducc.change_dlm([ffi_ducc.dlm, None], ffi_ducc.mmax_dlm, cacher=cachers.cacher_mem(safe=False))
+    tffi_ducc.single_prec = False
+
     tffi_ducc.verbosity = 0
     tffi_ducc.cacher.cache('ptg', ptg) # avoiding angle calculation overhead
     t0 = time()
-    Q, U = tffi_ducc.gclm2lenmap(eblm,mmax_unl, 2, False, ptg=ptg)
+    Q, U = tffi_ducc.gclm2lenmap(eblm, mmax_unl, 2, False, ptg=ptg)
     print(' %.3f exec time for eps' % (time() - t0), int(np.log10(epsilon)))
 
     if norm is None:
