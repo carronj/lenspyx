@@ -21,7 +21,11 @@ def get_ffi(dlmax_gl, nthreads=4, dlmax=1024):
 if __name__ == '__main__':
     import argparse, os, time, json
     parser = argparse.ArgumentParser(description='test FFP10-like fwd building')
-    DIR = os.environ['SCRATCH'] + '/lenspyx/'
+    if os.path.exists('SCRATCH'):
+        DIR = os.environ['SCRATCH'] + '/lenspyx/'
+    else:
+        #local ?
+        DIR = os.environ['ONED'] + '/ducclens/Tex/figs/MacOSlocal'
     if not os.path.exists(DIR):
         os.makedirs(DIR)
     args = parser.parse_args()
@@ -31,11 +35,13 @@ if __name__ == '__main__':
     dlmax_gl = 1024
     eblen = np.array([hp.synalm(cls_len['ee'][:lmax_len + 1]),
                       hp.synalm(cls_len['bb'][:lmax_len + 1])]).astype(np.complex64)
+    import multiprocessing
+    cpu_count = min(multiprocessing.cpu_count(), 36)
     for tentative in [1, 2]:
-        for nt in range(1, 37):
+        for nt in range(1, cpu_count + 1):
             os.environ['OMP_NUM_THREADS'] = str(nt)
             print('doing %s_%s'%(nt, tentative))
-            json_file = os.environ['SCRATCH'] + '/lenspyx/sscal_bwd_%s_%s_sgl.json'%(nt, tentative)
+            json_file = DIR + '/sscal_bwd_%s_%s_sgl.json'%(nt, tentative)
             ffi = get_ffi(dlmax_gl, nt)
             ffi.verbosity = 0
             t0 = time.time()

@@ -28,7 +28,7 @@ class sims_cmb_len(object):
                  cache:cachers.cacher or None=None, offsets_plm:tuple or None=None, offsets_cmbunl:tuple or None=None,
                  dlmax:int=1024, dlmax_gl:int=1024, epsilon:float=1e-5, ofactor:float=1.5, verbosity=0):
 
-        if cache is None: # wont save the lensed CMBs
+        if cache is None:  # Will not save the lensed CMBs
             cache = cachers.cacher_none()
 
         self.lmax = lmax_len

@@ -25,6 +25,7 @@ except:
     HAS_NUMEXPR = False
     print("deflection.py::could not load numexpr, falling back on python impl.")
 
+# TODO remove scarf, we dont it it
 
 def alm2map(gclm:np.ndarray, spin, geom, lmax, mmax, nthreads):
     """Wrapper to ducc shts
@@ -32,13 +33,12 @@ def alm2map(gclm:np.ndarray, spin, geom, lmax, mmax, nthreads):
         Return a map or a pair of map for spin non-zero, with the same type as gclm
 
     """
-    #FIXME: mmax, probably with mstart
     tht = geom.theta .astype(np.float64) if geom.theta.dtype != np.float64 else geom.theta
     nph = geom.nph.astype(np.uint64) if geom.nph.dtype != np.uint64 else geom.nph
     ofs = geom.ofs.astype(np.uint64) if geom.ofs.dtype != np.uint64 else geom.ofs
     phi0 = geom.phi0
     gclm = np.atleast_2d(gclm)
-    m = synthesis(alm=gclm, theta=tht, lmax=lmax, nphi=nph, spin=spin, phi0=phi0, nthreads=nthreads, ringstart=ofs)
+    m = synthesis(alm=gclm, theta=tht, lmax=lmax, mmax=mmax, nphi=nph, spin=spin, phi0=phi0, nthreads=nthreads, ringstart=ofs)
     return m.squeeze()  #FIXME: do I really want the squeeze?
 
 def map2alm(m:np.ndarray, spin, geom, lmax, mmax, nthreads):
@@ -47,7 +47,6 @@ def map2alm(m:np.ndarray, spin, geom, lmax, mmax, nthreads):
         Return a map or a pair of map for spin non-zero
 
     """
-    #FIXME: mmax, probably with mstart
     tht = geom.theta .astype(np.float64) if geom.theta.dtype != np.float64 else geom.theta
     nph = geom.nph.astype(np.uint64) if geom.nph.dtype != np.uint64 else geom.nph
     ofs = geom.ofs.astype(np.uint64) if geom.ofs.dtype != np.uint64 else geom.ofs
@@ -55,8 +54,8 @@ def map2alm(m:np.ndarray, spin, geom, lmax, mmax, nthreads):
     m = np.atleast_2d(m)
     for of, w, npi in zip(ofs, geom.weight, nph):
         m[:, int(of):int(of + npi)] *= w
-    gclm = adjoint_synthesis(map=m, theta=tht, lmax=lmax, nphi=nph, spin=spin, phi0=phi0, nthreads=nthreads, ringstart=ofs)
-    return gclm  #FIXME: do I really want the squeeze?
+    gclm = adjoint_synthesis(map=m, theta=tht, lmax=lmax, mmax=mmax, nphi=nph, spin=spin, phi0=phi0, nthreads=nthreads, ringstart=ofs)
+    return gclm.squeeze()  #FIXME: do I really want the squeeze?
 # some helper functions
 
 ctype = {np.dtype(np.float32): np.complex64,
@@ -73,6 +72,7 @@ rtype = {np.dtype(np.complex64): np.float32,
          np.longcomplex: np.longfloat}
 
 class deflection:
+    #TODO: get rid of 'scarf' geom object
     def __init__(self, scarf_pbgeometry:pbdGeometry, dglm, mmax_dlm:int or None, numthreads:int=0,
                  cacher:cachers.cacher or None=None, dclm:np.ndarray or None=None, epsilon=1e-5, ofactor=1.5,verbosity=0):
         """Deflection field object than can be used to lens several maps with forward or backward deflection
@@ -97,9 +97,9 @@ class deflection:
 
 
         # std deviation of deflection:
-        s2_d = np.sum(alm2cl(dglm, dglm, lmax, mmax_dlm, lmax) * (2 * np.arange(lmax + 1) + 1) ) / (4 * np.pi)
+        s2_d = np.sum(alm2cl(dglm, dglm, lmax, mmax_dlm, lmax) * (2 * np.arange(lmax + 1) + 1)) / (4 * np.pi)
         if dclm is not None:
-            s2_d += np.sum(alm2cl(dclm, dclm, lmax, mmax_dlm, lmax) * (2 * np.arange(lmax + 1) + 1) ) / (4 * np.pi)
+            s2_d += np.sum(alm2cl(dclm, dclm, lmax, mmax_dlm, lmax) * (2 * np.arange(lmax + 1) + 1)) / (4 * np.pi)
         sig_d = np.sqrt(s2_d)
         if sig_d >= 0.01:
             print('deflection std is %.2e amin: this is really too high a value for something sensible'%(sig_d/np.pi * 180 * 60))
@@ -116,8 +116,8 @@ class deflection:
         self.fsky = Geom.fsky(scarf_pbgeometry.geom)
 
         # FIXME: can get d1 tbounds from geometry + buffers.
-        self._tbds = Geom.tbounds(scarf_pbgeometry.geom)
-        self._pbds = scarf_pbgeometry.pbound  # (patch ctr, patch extent)
+        self._tbds = Geom.tbounds(scarf_pbgeometry.geom) #FIXME: is this used anyhere ?
+        self._pbds = scarf_pbgeometry.pbound  #FIXME: is this used anyhere ?
         self.sht_tr = numthreads
 
         self.verbosity = verbosity
@@ -133,9 +133,14 @@ class deflection:
             os.environ['NUMEXPR_MAX_THREADS'] = str(numthreads)
             os.environ['NUMEXPR_NUM_THREADS'] = str(numthreads)
 
+        self._totalconvolves0 = False
+
     def _get_ptg(self):
         # TODO improve this and fwd angles
         return self._build_angles()  # -gamma in third argument
+
+    def _get_mgamma(self):
+        return self._build_angles()[:, 2]
 
     def _build_angles(self, fortran=True):
         """Builds deflected positions and angles
@@ -250,16 +255,16 @@ class deflection:
         self.tim.reset()
         if self.single_prec and gclm.dtype != np.complex64:
             gclm = gclm.astype(np.complex64)
-        if spin == 0: # The code below would work just as well for spin-0 but seems slightly slower
-                     # For the moment this seems faster
-
+        if spin == 0 and self._totalconvolves0:
+            # The code below would work just as well for spin-0 but seems slightly slower
+            # For the moment this seems faster
             lmax_unl = Alm.getlmax(gclm.size, mmax)
             blm_T = blm_gauss(0, lmax_unl, 0)
             self.tim.add('blm_gauss')
             if ptg is None:
                 ptg = self._get_ptg()
             self.tim.add('ptg')
-
+            # FIXME: this might only accept doubple prec input
             inter_I = ducc0.totalconvolve.Interpolator(np.atleast_2d(gclm), blm_T, separate=False, lmax=lmax_unl,
                                                        kmax=0,
                                                        epsilon=self.epsilon, ofactor=self.ofactor,
@@ -267,6 +272,7 @@ class deflection:
             self.tim.add('interp. setup')
             ret = inter_I.interpol(ptg).squeeze()
             self.tim.add('interpolation')
+            self.tim.close('gclm2lenmap')
             return ret
         lmax_unl = Alm.getlmax(gclm.size if spin == 0 else gclm[0].size, mmax)
         if mmax is None: mmax = lmax_unl
@@ -311,7 +317,7 @@ class deflection:
         # perform NUFFT
         values = ducc0.nufft.u2nu(grid=map_dfs, coord=ptg[:, 0:2], forward=False,
                                   epsilon=self.epsilon, nthreads=self.sht_tr,
-                                  verbosity=0, periodicity=2 * np.pi, fft_order=True)
+                                  verbosity=self.verbosity, periodicity=2 * np.pi, fft_order=True)
         self.tim.add('u2nu')
 
         if spin * polrot: #TODO: at some point get rid of these exp(arctan...)
@@ -338,7 +344,8 @@ class deflection:
         if mmax_out is None:
             mmax_out = lmax_out
         if self.sig_d <= 0 and np.abs(self.fsky - 1.) < 1e-6: # no actual deflection and single-precision full-sky
-            if spin == 0: return alm_copy(gclm, mmax, lmax_out, mmax_out)
+            if spin == 0:
+                return alm_copy(gclm, mmax, lmax_out, mmax_out)
             glmret = alm_copy(gclm[0], mmax, lmax_out, mmax_out)
             ret = np.array([glmret, alm_copy(gclm[1], mmax, lmax_out, mmax_out) if gclm[1] is not None else np.zeros_like(glmret)])
             self.tim.close('lengclm')
@@ -363,7 +370,7 @@ class deflection:
         else:
             if self.single_prec and gclm.dtype != np.complex64:
                 gclm = gclm.astype(np.complex64)
-            if spin == 0:
+            if spin == 0 and self._totalconvolves0:
                 # The code below works for any spin but this seems a little bit faster for non-zero spin
                 # So keeping this for the moment
                 lmax_unl = hp.Alm.getlmax(gclm[0].size if abs(spin) > 0 else gclm.size, mmax)
@@ -418,7 +425,7 @@ class deflection:
 
             # perform NUFFT
             map_dfs = ducc0.nufft.nu2u(points=points2, coord=ptg[:, 0:2], out=map_dfs, forward=True,
-                                       epsilon=self.epsilon, nthreads=self.sht_tr, verbosity=0,
+                                       epsilon=self.epsilon, nthreads=self.sht_tr, verbosity=self.verbosity,
                                        periodicity=2 * np.pi, fft_order=True)
             self.tim.add('map_dfs')
             # go to position space
