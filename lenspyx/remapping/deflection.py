@@ -342,7 +342,7 @@ class deflection:
                                                          ofactor=self.ofactor, nthreads=self.sht_tr)
                 I = self.geom.alm2map(gclm, spin, lmax_unl, mmax, self.sht_tr)
                 for ofs, w, nph in zip(self.geom.ofs, self.geom.weight, self.geom.nph):
-                    I[int(ofs):int(ofs + nph)] *= w
+                    I[ofs:ofs + nph] *= w
                 self.tim.add('points')
                 xptg = self._get_ptg()
                 self.tim.add('_get_ptg')
@@ -379,7 +379,7 @@ class deflection:
                         points = (points[0] + 1j * points[1]) * np.exp((1j * spin) * self._get_mgamma())
                         self.tim.add('polrot (python)')
             for ofs, w, nph in zip(self.geom.ofs, self.geom.weight, self.geom.nph):
-                points[int(ofs):int(ofs + nph)] *= w
+                points[ofs:ofs + nph] *= w
             self.tim.add('weighting')
 
             # make complex if necessary
