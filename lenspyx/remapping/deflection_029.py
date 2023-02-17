@@ -199,24 +199,30 @@ class deflection:
         print(ptg.shape, ptg.dtype, gclm.dtype, gclm.shape, lmax_unl, mmax)
         if self.single_prec: #FIXMEL synthesis general only accepts float
             ptg = ptg.astype(np.float64)
-        values = ducc0.sht.experimental.synthesis_general(lmax=lmax_unl, mmax=mmax, alm=gclm, loc=ptg, spin=spin,
-                                                          epsilon=self.epsilon, nthreads=self.sht_tr)
 
-        if spin * polrot: #TODO: at some point get rid of these exp(arctan...)
-                          # maybe simplest to cache cis g and multpily in place a couple of times
-            re, im = values #FIX THIS
-            if HAS_NUMEXPR:
-                mg = self._get_mgamma()
-                js = - 1j * spin
-                values = numexpr.evaluate("(re + 1j * im) *exp(js * mg)")
-                self.tim.add('polrot (numexpr)')
-            else:
-                values = (re + 1j * im) * np.exp((-1j * spin) * self._get_mgamma())  # polrot. last entry is -gamma
-                self.tim.add('polrot (python)')
+        if spin == 0:
+            values = ducc0.sht.experimental.synthesis_general(lmax=lmax_unl, mmax=mmax, alm=gclm, loc=ptg, spin=spin,
+                                                          epsilon=self.epsilon, nthreads=self.sht_tr)
+        else:
+            npix = self.geom.npix()
+            # This is a trick with two views of the same array to get complex values as output to multiply by the phase
+            valuesc = np.empty((npix,), dtype=np.complex64 if self.single_prec else np.complex128)
+            values = valuesc.view(np.float32 if self.single_prec else np.float64).reshape((npix, 2)).T
+            ducc0.sht.experimental.synthesis_general(map=values, lmax=lmax_unl, mmax=mmax, alm=gclm, loc=ptg,
+                                                              spin=spin, epsilon=self.epsilon, nthreads=self.sht_tr)
+            if polrot:
+                if HAS_NUMEXPR:
+                    mg = self._get_mgamma()
+                    js = - 1j * spin
+                    valuesc *= numexpr.evaluate("exp(js * mg)")
+                    self.tim.add('polrot (numexpr)')
+                else:
+                    valuesc *= np.exp((-1j * spin) * self._get_mgamma())  # polrot. last entry is -gamma
+                    self.tim.add('polrot (python)')
         self.tim.close('gclm2lenmap')
         if self.verbosity:
             print(self.tim)
-        return values.real if spin == 0 else (values.real, values.imag)
+        return values
 
     def lensgclm(self, gclm:np.ndarray, mmax:int or None, spin, lmax_out, mmax_out:int or None, backwards=False, polrot=True):
         """Adjoint remapping operation from lensed alm space to unlensed alm space
@@ -255,8 +261,6 @@ class deflection:
             if self.single_prec and gclm.dtype != np.complex64:
                 gclm = gclm.astype(np.complex64)
             # minimum dimensions for a Clenshaw-Curtis grid at this band limit
-            ptg = self._get_ptg()
-            self.tim.add('_get_ptg')
             self.tim.start('points')
             points = self.geom.alm2map(gclm, spin, lmax_unl, mmax, self.sht_tr)
             self.tim.add('points, alm2map')
@@ -282,6 +286,9 @@ class deflection:
 
             # here we must turn back to 2-comp array
             self.tim.close('points')
+            ptg = self._get_ptg()
+            # FIXME: here ptg must be double prec
+            self.tim.add('_get_ptg')
             slm = ducc0.sht.experimental.adjoint_synthesis_general(lmax=lmax_unl, mmax=mmax, map=points2, loc=ptg, spin=spin,
                                                               epsilon=self.epsilon, nthreads=self.sht_tr)
             self.tim.add('synthesis_general')

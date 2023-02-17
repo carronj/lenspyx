@@ -4,17 +4,15 @@ import os
 
 import numpy as np
 from lenscarf.remapping import d2ang
-#from lenscarf.utils_scarf import Geom, pbdGeometry, Geometry
-from lenscarf.utils_hp import Alm, alm2cl, alm_copy
-from lenscarf import cachers
-from lenspyx.utils import timer,blm_gauss
+from lenspyx.utils_hp import Alm, alm2cl, alm_copy
+from lenscarf import cachers #FIXME
+from lenspyx.utils import timer, blm_gauss
 import healpy as hp
 import ducc0
-from ducc0.sht.experimental import synthesis, adjoint_synthesis
 from lenspyx.remapping.utils_geom import Geom
 
 try:
-    from lenscarf.fortran import remapping as fremap
+    from lenspyx.fortran import remapping as fremap
     HAS_FORTRAN = True
 except:
     HAS_FORTRAN = False
@@ -26,7 +24,6 @@ except:
     HAS_NUMEXPR = False
     print("deflection.py::could not load numexpr, falling back on python impl.")
 
-# TODO remove scarf, we dont it it
 
 ctype = {np.dtype(np.float32): np.complex64,
          np.dtype(np.float64): np.complex128,
@@ -42,7 +39,6 @@ rtype = {np.dtype(np.complex64): np.float32,
          np.longcomplex: np.longfloat}
 
 class deflection:
-    #TODO: get rid of 'scarf' geom object
     def __init__(self, lens_geom:Geom, dglm, mmax_dlm:int or None, numthreads:int=0,
                  cacher:cachers.cacher or None=None, dclm:np.ndarray or None=None, epsilon=1e-5, ofactor=1.5,verbosity=0):
         """Deflection field object than can be used to lens several maps with forward or backward deflection
@@ -217,36 +213,37 @@ class deflection:
         assert not backwards, 'backward 2lenmap not implemented at this moment'
         self.tim.start('gclm2lenmap')
         self.tim.reset()
+        gclm = np.atleast_2d(gclm)
+        lmax_unl = Alm.getlmax(gclm[0].size, mmax)
+        if mmax is None:
+            mmax = lmax_unl
         if self.single_prec and gclm.dtype != np.complex64:
             gclm = gclm.astype(np.complex64)
-        if spin == 0 and self._totalconvolves0:
+        if spin == 0 and self._totalconvolves0: # this will probably just disappear
             # The code below would work just as well for spin-0 but seems slightly slower
             # For the moment this seems faster
-            lmax_unl = Alm.getlmax(gclm.size, mmax)
             blm_T = blm_gauss(0, lmax_unl, 0)
             self.tim.add('blm_gauss')
             if ptg is None:
                 ptg = self._get_ptg()
             self.tim.add('ptg')
             # FIXME: this might only accept doubple prec input
-            inter_I = ducc0.totalconvolve.Interpolator(np.atleast_2d(gclm), blm_T, separate=False, lmax=lmax_unl,
+            inter_I = ducc0.totalconvolve.Interpolator(gclm, blm_T, separate=False, lmax=lmax_unl,
                                                        kmax=0,
                                                        epsilon=self.epsilon, ofactor=self.ofactor,
-                                                       nthreads=self.sht_tr)
+                                                       nthreads=self.sht_tr, mmax=mmax)
             self.tim.add('interp. setup')
             ret = inter_I.interpol(ptg).squeeze()
             self.tim.add('interpolation')
             self.tim.close('gclm2lenmap')
             return ret
-        lmax_unl = Alm.getlmax(gclm.size if spin == 0 else gclm[0].size, mmax)
-        if mmax is None: mmax = lmax_unl
         # transform slm to Clenshaw-Curtis map
         ntheta = ducc0.fft.good_size(lmax_unl + 2)
         nphihalf = ducc0.fft.good_size(lmax_unl + 1)
         nphi = 2 * nphihalf
         # Is this any different to scarf wraps ?
         # NB: type of map, map_df, and FFTs will follow that of input gclm
-        map = ducc0.sht.experimental.synthesis_2d(alm=np.atleast_2d(gclm), ntheta=ntheta, nphi=nphi,
+        map = ducc0.sht.experimental.synthesis_2d(alm=gclm, ntheta=ntheta, nphi=nphi,
                                 spin=spin, lmax=lmax_unl, mmax=mmax, geometry="CC", nthreads=self.sht_tr)
         self.tim.add('experimental.synthesis_2d')
 

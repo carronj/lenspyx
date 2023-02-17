@@ -7,7 +7,7 @@ import os
 
 from lenspyx.tests.helper import  cls_unl, cls_len
 from lenspyx.tests.helper import syn_ffi_ducc
-#from lenspyx.tests.helper import syn_ffi_ducc_29 as syn_ffi_ducc
+from lenspyx.tests.helper import syn_ffi_ducc_29 as syn_ffi_ducc
 from lenscarf import cachers
 import healpy as hp, numpy as np
 import pylab as pl
@@ -22,9 +22,9 @@ matplotlib.rc('font', **font)
 
 
 res, nside, nthreads = 1.71, 2048, 8
-lmax_len, mmax_len, dlmax = 4096, 4096, 1024
+#lmax_len, mmax_len, dlmax = 4096, 4096, 1024
 res, nside, nthreads = 1.7, 2048, 8
-#lmax_len, mmax_len, dlmax = 100, 100, 20
+lmax_len, mmax_len, dlmax = 100, 100, 20
 SAVE = (lmax_len == 4096) * (os.environ.get('ONED', 'SCRATCH') + '/ducclens/Tex/figs/epsilon.pdf')
 OPTI = True
 
