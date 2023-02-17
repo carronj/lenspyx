@@ -5,9 +5,9 @@
 import os.path
 import os
 
-from lenspyx.tests.helper import syn_ffi_ducc,  cls_unl, cls_len
-#from lenspyx.tests.helper import syn_ffi_ducc
-from lenspyx.tests.helper import syn_ffi_ducc_29 as syn_ffi_ducc
+from lenspyx.tests.helper import  cls_unl, cls_len
+from lenspyx.tests.helper import syn_ffi_ducc
+#from lenspyx.tests.helper import syn_ffi_ducc_29 as syn_ffi_ducc
 from lenscarf import cachers
 import healpy as hp, numpy as np
 import pylab as pl
@@ -22,9 +22,9 @@ matplotlib.rc('font', **font)
 
 
 res, nside, nthreads = 1.71, 2048, 8
-#lmax_len, mmax_len, dlmax = 4096, 4096, 1024
+lmax_len, mmax_len, dlmax = 4096, 4096, 1024
 res, nside, nthreads = 1.7, 2048, 8
-lmax_len, mmax_len, dlmax = 100, 100, 20
+#lmax_len, mmax_len, dlmax = 100, 100, 20
 SAVE = (lmax_len == 4096) * (os.environ.get('ONED', 'SCRATCH') + '/ducclens/Tex/figs/epsilon.pdf')
 OPTI = True
 
@@ -58,7 +58,7 @@ for ir in rings:
     Pexs.append(Qex + 1j * Uex)
     pixels.append(pixs)
     phis.append(phi)
-ptg=ffi_ducc._get_ptg()
+angles = np.copy(ffi_ducc._build_angles())
 Colors = ['C%s'%s for s in range(10)]
 ls = ['-', '--', '-.', ':']
 pl.figure(figsize=(20, 5))
@@ -70,10 +70,10 @@ for ie, epsilon in enumerate([1e-3, 1e-6, 1e-8, 2e-13][::-1]):
     tffi_ducc.single_prec = (epsilon >= 1e-6)
 
     tffi_ducc.verbosity = 0
-    tffi_ducc.cacher.cache('ptg', ptg.astype(np.float64 if not tffi_ducc.single_prec else np.float32)) # avoiding angle calculation overhead
+    tffi_ducc.cacher.cache('ptg', angles.astype(np.float64 if not tffi_ducc.single_prec else np.float32)) # avoiding angle calculation overhead
     t0 = time()
     this_eblm = eblm.astype(np.complex64 if tffi_ducc.single_prec else np.complex128)
-    Q, U = tffi_ducc.gclm2lenmap(this_eblm, mmax_unl, 2, False, ptg=ptg)
+    Q, U = tffi_ducc.gclm2lenmap(this_eblm, mmax_unl, 2, False)
     print(' %.3f exec time for eps' % (time() - t0), int(np.log10(epsilon)))
 
     if norm is None:

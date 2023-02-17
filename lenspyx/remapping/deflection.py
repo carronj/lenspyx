@@ -4,13 +4,14 @@ import os
 
 import numpy as np
 from lenscarf.remapping import d2ang
-from lenscarf.utils_scarf import Geom, pbdGeometry, Geometry
+#from lenscarf.utils_scarf import Geom, pbdGeometry, Geometry
 from lenscarf.utils_hp import Alm, alm2cl, alm_copy
 from lenscarf import cachers
 from lenspyx.utils import timer,blm_gauss
 import healpy as hp
 import ducc0
 from ducc0.sht.experimental import synthesis, adjoint_synthesis
+from lenspyx.remapping.utils_geom import Geom
 
 try:
     from lenscarf.fortran import remapping as fremap
@@ -27,37 +28,6 @@ except:
 
 # TODO remove scarf, we dont it it
 
-def alm2map(gclm:np.ndarray, spin, geom, lmax, mmax, nthreads):
-    """Wrapper to ducc shts
-
-        Return a map or a pair of map for spin non-zero, with the same type as gclm
-
-    """
-    tht = geom.theta .astype(np.float64) if geom.theta.dtype != np.float64 else geom.theta
-    nph = geom.nph.astype(np.uint64) if geom.nph.dtype != np.uint64 else geom.nph
-    ofs = geom.ofs.astype(np.uint64) if geom.ofs.dtype != np.uint64 else geom.ofs
-    phi0 = geom.phi0
-    gclm = np.atleast_2d(gclm)
-    m = synthesis(alm=gclm, theta=tht, lmax=lmax, mmax=mmax, nphi=nph, spin=spin, phi0=phi0, nthreads=nthreads, ringstart=ofs)
-    return m.squeeze()  #FIXME: do I really want the squeeze?
-
-def map2alm(m:np.ndarray, spin, geom, lmax, mmax, nthreads):
-    """Wrapper to ducc shts
-
-        Return a map or a pair of map for spin non-zero
-
-    """
-    tht = geom.theta .astype(np.float64) if geom.theta.dtype != np.float64 else geom.theta
-    nph = geom.nph.astype(np.uint64) if geom.nph.dtype != np.uint64 else geom.nph
-    ofs = geom.ofs.astype(np.uint64) if geom.ofs.dtype != np.uint64 else geom.ofs
-    phi0 = geom.phi0
-    m = np.atleast_2d(m)
-    for of, w, npi in zip(ofs, geom.weight, nph):
-        m[:, int(of):int(of + npi)] *= w
-    gclm = adjoint_synthesis(map=m, theta=tht, lmax=lmax, mmax=mmax, nphi=nph, spin=spin, phi0=phi0, nthreads=nthreads, ringstart=ofs)
-    return gclm.squeeze()  #FIXME: do I really want the squeeze?
-# some helper functions
-
 ctype = {np.dtype(np.float32): np.complex64,
          np.dtype(np.float64): np.complex128,
          np.dtype(np.longfloat): np.longcomplex,
@@ -73,7 +43,7 @@ rtype = {np.dtype(np.complex64): np.float32,
 
 class deflection:
     #TODO: get rid of 'scarf' geom object
-    def __init__(self, scarf_pbgeometry:pbdGeometry, dglm, mmax_dlm:int or None, numthreads:int=0,
+    def __init__(self, lens_geom:Geom, dglm, mmax_dlm:int or None, numthreads:int=0,
                  cacher:cachers.cacher or None=None, dclm:np.ndarray or None=None, epsilon=1e-5, ofactor=1.5,verbosity=0):
         """Deflection field object than can be used to lens several maps with forward or backward deflection
 
@@ -111,13 +81,8 @@ class deflection:
         self.mmax_dlm = mmax_dlm
 
         self.cacher = cacher
-        self.pbgeom = scarf_pbgeometry
-        self.geom = scarf_pbgeometry.geom
-        self.fsky = Geom.fsky(scarf_pbgeometry.geom)
+        self.geom = lens_geom
 
-        # FIXME: can get d1 tbounds from geometry + buffers.
-        self._tbds = Geom.tbounds(scarf_pbgeometry.geom) #FIXME: is this used anyhere ?
-        self._pbds = scarf_pbgeometry.pbound  #FIXME: is this used anyhere ?
         self.sht_tr = numthreads
 
         self.verbosity = verbosity
@@ -137,7 +102,7 @@ class deflection:
 
     def _get_ptg(self):
         # TODO improve this and fwd angles
-        return self._build_angles()  # -gamma in third argument
+        return self._build_angles()[:, 0:2]  # -gamma in third argument
 
     def _get_mgamma(self):
         return self._build_angles()[:, 2]
@@ -155,11 +120,11 @@ class deflection:
             assert np.all(self.geom.theta > 0.) and np.all(self.geom.theta < np.pi), 'fix this (cotangent below)'
             dclm = np.zeros_like(self.dlm) if self.dclm is None else self.dclm
             #red, imd = self.geom.alm2map_spin([self.dlm, dclm], 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr, [-1., 1.])
-            red, imd = alm2map([self.dlm, dclm], 1, self.geom, self.lmax_dlm, self.mmax_dlm, self.sht_tr)
+            red, imd = self.geom.alm2map([self.dlm, dclm], 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr)
             # Probably want to keep red, imd double precision for the calc?
-            npix = Geom.pbounds2npix(self.geom, self._pbds)
+            npix = Geom.npix(self.geom)
             self.tim.add('d1 alm2map_spin')
-            if fortran and HAS_FORTRAN and self.pbgeom.pbound.get_range() >= (2. * np.pi): # covering full phi range
+            if fortran and HAS_FORTRAN and (np.abs(self.geom.fsky()- 1.) > 1e-5):
                 tht, phi0, nph, ofs = self.geom.theta, self.geom.phi0, self.geom.nph, self.geom.ofs
                 if self.single_prec:
                     thp_phip_mgamma = fremap.remapping.fpointing(red, imd, tht, phi0, nph, ofs)
@@ -178,25 +143,25 @@ class deflection:
             thp_phip_mgamma = np.empty((3, npix), dtype=float)  # (-1) gamma in last arguement
             startpix = 0
             for ir in np.argsort(self.geom.ofs): # We must follow the ordering of scarf position-space map
-                pixs = Geom.pbounds2pix(self.geom, ir, self._pbds)
+                pixs = Geom.rings2pix(self.geom, [ir])
                 if pixs.size > 0:
                     t_red = red[pixs]
                     i_imd = imd[pixs]
                     phis = Geom.phis(self.geom, ir)[pixs - self.geom.ofs[ir]]
                     assert phis.size == pixs.size, (phis.size, pixs.size)
-                    thts = self.geom.get_theta(ir) * np.ones(pixs.size)
+                    thts = self.geom.theta[ir] * np.ones(pixs.size)
                     thtp_, phip_ = d2ang(t_red, i_imd, thts , phis, int(np.round(np.cos(self.geom.theta[ir]))))
                     sli = slice(startpix, startpix + len(pixs))
                     thp_phip_mgamma[0, sli] = thtp_
                     thp_phip_mgamma[1, sli] = phip_
                     cot = np.cos(self.geom.theta[ir]) / np.sin(self.geom.theta[ir])
                     d = np.sqrt(t_red ** 2 + i_imd ** 2)
-                    thp_phip_mgamma[2, sli]  = -np.arctan2(i_imd, t_red ) + np.arctan2(i_imd, d * np.sin(d) * cot + t_red  * np.cos(d))
+                    thp_phip_mgamma[2, sli] = -np.arctan2(i_imd, t_red ) + np.arctan2(i_imd, d * np.sin(d) * cot + t_red  * np.cos(d))
                     startpix += len(pixs)
             self.tim.add('thts, phis and gammas  (python)')
             thp_phip_mgamma = thp_phip_mgamma.transpose()
             self.cacher.cache(fn, thp_phip_mgamma)
-            self.tim.close('_build_angle')
+            self.tim.close('_build_angles')
             assert startpix == npix, (startpix, npix)
             if self.verbosity:
                 print(self.tim)
@@ -205,23 +170,23 @@ class deflection:
 
     def change_dlm(self, dlm:list or np.ndarray, mmax_dlm:int or None, cacher:cachers.cacher or None=None):
         assert len(dlm) == 2, (len(dlm), 'gradient and curl mode (curl can be none)')
-        return deflection(self.pbgeom, dlm[0], mmax_dlm, self.sht_tr, cacher, dlm[1],
+        return deflection(self.geom, dlm[0], mmax_dlm, self.sht_tr, cacher, dlm[1],
                           verbosity=self.verbosity, epsilon=self.epsilon, ofactor=self.ofactor)
 
-    def change_geom(self, pbgeom:pbdGeometry, cacher:cachers.cacher or None=None):
+    def change_geom(self, lens_geom:Geom, cacher:cachers.cacher or None=None):
         """Returns a deflection instance with a different position-space geometry
 
                 Args:
-                    pbgeom: new pbounded-scarf geometry
+                    lens_geom: new geometry
                     cacher: cacher instance if desired
 
 
         """
         print("**** change_geom, DO YOU REALLY WANT THIS??")
-        return deflection(pbgeom, self.dlm, self.mmax_dlm, self.sht_tr, cacher, self.dclm,
+        return deflection(lens_geom, self.dlm, self.mmax_dlm, self.sht_tr, cacher, self.dclm,
                           verbosity=self.verbosity, epsilon=self.epsilon, ofactor=self.ofactor)
 
-    def gclm2lenpixs(self, gclm:np.ndarray or list, mmax:int or None, spin:int, pixs:np.ndarray[int]):
+    def gclm2lenpixs(self, gclm:np.ndarray, mmax:int or None, spin:int, pixs:np.ndarray[int], polrot=True):
         """Produces the remapped field on the required lensing geometry pixels 'exactly', by brute-force calculation
 
             Note:
@@ -231,23 +196,22 @@ class deflection:
                 If the remapping angles etc were not calculated previously, it will build the full map, so make take some time.
 
         """
+        assert spin >= 0, spin
+        gclm = np.atleast_2d(gclm)
         ptg = self._get_ptg()
-        thts, phis, gamma = ptg[pixs, 0], ptg[pixs, 1], ptg[pixs, 2] * (-1.)
-        nph = 2 * np.ones(thts.size, dtype=int) # I believe at least 2 points per ring if using scarf
-        ofs = 2 * np.arange(thts.size, dtype=int)
-        wt = np.ones(thts.size)
-        geom = Geometry(thts.size, nph, ofs, 1, phis.copy(), thts.copy(), wt) #copy necessary as this goes to C
-        #thts.size, nph, ofs, 1, phi0, thts, wt
-        if abs(spin) > 0:
-            lmax = Alm.getlmax(gclm[0].size, mmax)
-            if mmax is None: mmax = lmax
-            QU = geom.alm2map_spin(gclm, spin, lmax, mmax, self.sht_tr, [-1., 1.])[:, 0::2]
-            QU = np.exp(1j * spin * gamma) * (QU[0] + 1j * QU[1])
-            return QU.real, QU.imag
-        lmax = Alm.getlmax(gclm.size, mmax)
+        thts, phis, gamma = ptg[pixs, 0], ptg[pixs, 1], self._get_mgamma()[pixs] * (-1.)
+        nph = 2 * np.ones(thts.size, dtype=np.uint64)  # I believe at least 2 points per ring
+        ofs = 2 * np.arange(thts.size, dtype=np.uint64)
+        wt = np.ones(thts.size, dtype=float)
+        geom = Geom(thts.copy(), phis.copy(), nph, ofs, wt)
+        gclm = np.atleast_2d(gclm)
+        lmax = Alm.getlmax(gclm[0].size, mmax)
         if mmax is None: mmax = lmax
-        T = geom.alm2map(gclm, lmax, mmax, self.sht_tr, [-1., 1.])[0::2]
-        return T
+        m = geom.alm2map(gclm, spin, lmax, mmax, self.sht_tr)[:, 0::2]
+        if spin * polrot:
+            m = np.exp(1j * spin * gamma) * (m[0] + 1j * m[1])
+            return m.real, m.imag
+        return m.squeeze()
 
     def gclm2lenmap(self, gclm:np.ndarray, mmax:int or None, spin, backwards:bool, polrot=True, ptg=None):
         assert not backwards, 'backward 2lenmap not implemented at this moment'
@@ -315,7 +279,7 @@ class deflection:
             ptg = self._get_ptg()
         self.tim.add('get ptg')
         # perform NUFFT
-        values = ducc0.nufft.u2nu(grid=map_dfs, coord=ptg[:, 0:2], forward=False,
+        values = ducc0.nufft.u2nu(grid=map_dfs, coord=ptg, forward=False,
                                   epsilon=self.epsilon, nthreads=self.sht_tr,
                                   verbosity=self.verbosity, periodicity=2 * np.pi, fft_order=True)
         self.tim.add('u2nu')
@@ -323,12 +287,12 @@ class deflection:
         if spin * polrot: #TODO: at some point get rid of these exp(arctan...)
                           # maybe simplest to cache cis g and multpily in place a couple of times
             if HAS_NUMEXPR:
-                x = ptg[:, 2]
+                mg = self._get_mgamma()
                 js = - 1j * spin
-                values *= numexpr.evaluate("exp(js * x)")
+                values *= numexpr.evaluate("exp(js * mg)")
                 self.tim.add('polrot (numexpr)')
             else:
-                values *= np.exp((-1j * spin) * ptg[:, 2])  # polrot. last entry is -gamma
+                values *= np.exp((-1j * spin) * self._get_mgamma())  # polrot. last entry is -gamma
                 self.tim.add('polrot (python)')
         self.tim.close('gclm2lenmap')
         if self.verbosity:
@@ -343,7 +307,7 @@ class deflection:
         self.tim.reset()
         if mmax_out is None:
             mmax_out = lmax_out
-        if self.sig_d <= 0 and np.abs(self.fsky - 1.) < 1e-6: # no actual deflection and single-precision full-sky
+        if self.sig_d <= 0 and np.abs(self.geom.fsky() - 1.) < 1e-6: # no actual deflection and single-precision full-sky
             if spin == 0:
                 return alm_copy(gclm, mmax, lmax_out, mmax_out)
             glmret = alm_copy(gclm[0], mmax, lmax_out, mmax_out)
@@ -355,13 +319,13 @@ class deflection:
             m = self.gclm2lenmap(gclm, mmax, spin, backwards)
             self.tim.reset()
             if spin == 0:
-                ret = map2alm(m, spin, self.geom, lmax_out, mmax_out, self.sht_tr)
+                ret = self.geom.map2alm(m, spin, lmax_out, mmax_out, self.sht_tr)
                 self.tim.add('map2alm')
                 self.tim.close('lengclm')
                 return ret
             else:
                 assert polrot
-                ret = map2alm(m, spin, self.geom, lmax_out, mmax_out, self.sht_tr)
+                ret = self.geom.map2alm(m, spin, lmax_out, mmax_out, self.sht_tr)
                 self.tim.add('map2alm_spin')
                 self.tim.close('lengclm')
                 if self.verbosity:
@@ -376,7 +340,7 @@ class deflection:
                 lmax_unl = hp.Alm.getlmax(gclm[0].size if abs(spin) > 0 else gclm.size, mmax)
                 inter = ducc0.totalconvolve.Interpolator(lmax_out, spin, 1, epsilon=self.epsilon,
                                                          ofactor=self.ofactor, nthreads=self.sht_tr)
-                I = alm2map(gclm, spin, self.geom, lmax_unl, mmax, self.sht_tr)
+                I = self.geom.alm2map(gclm, spin, lmax_unl, mmax, self.sht_tr)
                 for ofs, w, nph in zip(self.geom.ofs, self.geom.weight, self.geom.nph):
                     I[int(ofs):int(ofs + nph)] *= w
                 self.tim.add('points')
@@ -393,27 +357,26 @@ class deflection:
             ntheta = ducc0.fft.good_size(lmax_out + 2)
             nphihalf = ducc0.fft.good_size(lmax_out + 1)
             nphi = 2 * nphihalf
-            ptg = self._get_ptg()
             self.tim.add('_get_ptg')
             if spin == 0:
                 # make complex if necessary
                 lmax_unl = hp.Alm.getlmax(gclm.size, mmax)
-                points = alm2map(gclm, spin, self.geom, lmax_unl, mmax, self.sht_tr)
+                points = self.geom.alm2map(gclm, spin, lmax_unl, mmax, self.sht_tr)
                 self.tim.add('points')
             else:
                 lmax_unl = hp.Alm.getlmax(gclm[0].size, mmax)
-                points = alm2map(gclm, spin, self.geom, lmax_unl, mmax, self.sht_tr)
-                points = points[0] + 1j * points[1]
+                points = self.geom.alm2map(gclm, spin, lmax_unl, mmax, self.sht_tr)
                 self.tim.add('points')
-                if polrot:#TODO: at some point get rid of these exp(atan2)...
+                if polrot * spin:#TODO: at some point get rid of these exp(atan2)...
                           # maybe simplest to save cis gamma and twice multiply in place...
                     if HAS_NUMEXPR:
-                        x = ptg[:, 2]
+                        re, im = points
+                        mg = self._get_mgamma()
                         js = + 1j * spin
-                        points *= numexpr.evaluate("exp(js * x)")
+                        points = numexpr.evaluate("(re + 1j * im) * exp(js * mg)")
                         self.tim.add('polrot (numexpr)')
                     else:
-                        points *= np.exp( (1j * spin) * ptg[:, 2])  # ptg[:, 2] is -gamma
+                        points = (points[0] + 1j * points[1]) * np.exp((1j * spin) * self._get_mgamma())
                         self.tim.add('polrot (python)')
             for ofs, w, nph in zip(self.geom.ofs, self.geom.weight, self.geom.nph):
                 points[int(ofs):int(ofs + nph)] *= w
@@ -424,7 +387,8 @@ class deflection:
             map_dfs = np.empty((2 * ntheta - 2, nphi), dtype=points2.dtype)
 
             # perform NUFFT
-            map_dfs = ducc0.nufft.nu2u(points=points2, coord=ptg[:, 0:2], out=map_dfs, forward=True,
+            ptg = self._get_ptg()
+            map_dfs = ducc0.nufft.nu2u(points=points2, coord=ptg, out=map_dfs, forward=True,
                                        epsilon=self.epsilon, nthreads=self.sht_tr, verbosity=self.verbosity,
                                        periodicity=2 * np.pi, fft_order=True)
             self.tim.add('map_dfs')
