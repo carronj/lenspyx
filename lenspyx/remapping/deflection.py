@@ -363,6 +363,8 @@ class deflection:
             else:
                 assert gclm.ndim == 2, gclm.ndim
                 lmax_unl = hp.Alm.getlmax(gclm[0].size, mmax)
+                if mmax is None:
+                    mmax = lmax_unl
                 points = self.geom.alm2map(gclm, spin, lmax_unl, mmax, self.sht_tr)
                 self.tim.add('points')
                 if polrot * spin:#TODO: at some point get rid of these exp(atan2)...
