@@ -361,6 +361,7 @@ class deflection:
                 points = self.geom.alm2map(gclm, spin, lmax_unl, mmax, self.sht_tr)
                 self.tim.add('points')
             else:
+                assert gclm.ndim == 2, gclm.ndim
                 lmax_unl = hp.Alm.getlmax(gclm[0].size, mmax)
                 points = self.geom.alm2map(gclm, spin, lmax_unl, mmax, self.sht_tr)
                 self.tim.add('points')
