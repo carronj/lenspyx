@@ -124,3 +124,9 @@ class sims_cmb_len(object):
             self.cacher.cache('sim_%04d_eblm' % idx, eblm)
             return eblm
         return self.cacher.load(fneb)
+
+    def get_sim_elm(self, idx):
+        return self.get_sim_eblm(idx)[0]
+
+    def get_sim_blm(self, idx):
+        return self.get_sim_eblm(idx)[1]
