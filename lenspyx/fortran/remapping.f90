@@ -1,5 +1,5 @@
 ! See python code for doc
-
+! FIXME: sinus cardinal
 subroutine helloworld
 USE OMP_LIB
 
@@ -27,6 +27,21 @@ module remapping
     end interface ang2d
 
     contains
+
+    subroutine sincd(npix, d, sind_d)
+        implicit none
+        double precision, intent(in) :: d(npix)
+        double precision, intent(out) :: sind_d(npix)
+        integer, intent(in) :: npix
+        integer ipix
+        do ipix=1, npix
+            if (d(ipix) /= 0.d0) then
+                sind_d(ipix) = dsin(d(ipix)) / d(ipix)
+            else
+                sind_d(ipix) = 1.d0
+            end if
+        end do
+    end subroutine sincd
 
     subroutine d2ang_scal(Red, Imd, tht, phi, thtp, phip)
         ! In principle double prec. accurate and avoiding any division by zero
@@ -177,4 +192,98 @@ module remapping
         end do
         !$OMP END PARALLEL DO
     end subroutine fpointing
+    subroutine pointing(npix, nring, red, imd, thts, phi0s, nphis, ptg, ofs)
+        ! output angles in single precision
+        implicit none
+        integer, intent(in) :: npix, nring
+        integer, intent(in) :: nphis(nring), ofs(nring)
+        double precision, intent(in) :: red(npix), imd(npix), thts(nring), phi0s(nring)
+        double precision, intent(out) :: ptg(3, npix)
+        real thtp, phip, gamma
+        double precision phi, dphi, sint, cost, cott, d, sind_d, e_t, e_d, e_tp, costp, sintp
+        double precision :: PI2 = DPI * 2d0
+        integer ir, ip, pix, version
+        ! This will not work right on the poles
+        ! This assumes d ** 2 < 0.01
+
+        !$OMP PARALLEL DO DEFAULT(NONE)&
+        !$OMP SHARED(PI2, thts, red, imd, ptg, nphis, phi0s, npix, nring, ofs)&
+        !$OMP PRIVATE(ip, thtp, phip,gamma, e_t, sint, cost, cott, e_d, e_tp, costp, sintp, pix, phi, dphi, version, d, sind_d)
+        do ir = 1, nring
+            sint = dsin(thts(ir))
+            cost = dcos(thts(ir))
+            cott = cost / sint
+            version = nint(1d0 - 2d0 * thts(ir) / DPI)
+            pix = ofs(ir) + 1
+            phi = phi0s(ir)
+            dphi =  PI2  / nphis(ir)
+            if (version == 0) then
+                do ip = 1, nphis(ir)
+                    d = red(pix) * red(pix) + imd(pix) * imd(pix)
+                    !sind_d = 1d0 - d / 6d0 * (1d0 - d / 20d0 * (1d0 - d / 42d0))
+                    !d = dsqrt(d)
+                    if (d > 0) then
+                        d = dsqrt(d)
+                        sind_d = dsin(d) / d
+                    else
+                        sind_d = 1d0
+                    end if
+                    costp = cost * dcos(d) - red(pix) * sind_d * sint
+                    thtp = dacos(costp)
+                    phip = modulo(phi + dasin(imd(pix) / dsqrt(1. - costp * costp) * sind_d), PI2) ! ok except for absurdly large d
+                    gamma = datan2(imd(pix), red(pix)) - datan2(imd(pix), d * sind_d * d * cott + red(pix) * dcos(d))
+                    ptg(1, pix) = thtp
+                    ptg(2, pix) = phip
+                    ptg(3, pix) = -gamma
+                    pix = pix + 1
+                    phi = phi  + dphi
+                end do
+            else if (version == 1) then
+                e_t = 2d0 * dsin(thts(ir) * 0.5d0) ** 2
+                do ip = 1, nphis(ir)
+                    d = red(pix) * red(pix) + imd(pix) * imd(pix)
+                    if (d > 0) then
+                        d = dsqrt(d)
+                        sind_d = dsin(d) / d
+                    else
+                        sind_d = 1d0
+                    end if
+                    e_d = 2d0 * dsin(d * 0.5d0) ** 2
+                    e_tp = e_t + e_d - e_t * e_d + red(pix) * sind_d * sint
+                    sintp = dsqrt(dmax1(0d0, e_tp * (2d0 - e_tp)))
+                    thtp = dasin(sintp)
+                    phip = modulo(phi + datan2(imd(pix) * sind_d, (1d0 - e_d) * sint + red(pix) * sind_d * (1d0 - e_t)), PI2)
+                    gamma = datan2(imd(pix), red(pix)) - datan2(imd(pix), d * sind_d * d * cott + red(pix) * dcos(d))
+                    ptg(1, pix) = thtp
+                    ptg(2, pix) = phip
+                    ptg(3, pix) = -gamma
+                    pix = pix + 1
+                    phi = phi  + dphi
+                end do
+            else if (version == -1) then
+                e_t = 2d0 * dcos(thts(ir) * 0.5d0) ** 2
+                do ip = 1, nphis(ir)
+                    d = red(pix) * red(pix) + imd(pix) * imd(pix)
+                    if (d > 0) then
+                        d = dsqrt(d)
+                        sind_d = dsin(d) / d
+                    else
+                        sind_d = 1d0
+                    end if
+                    e_d = 2d0 * dsin(d * 0.5d0) ** 2
+                    e_tp = e_t + e_d - e_t * e_d - red(pix) * sind_d * sint
+                    sintp = dsqrt(dmax1(0d0, e_tp * (2d0 - e_tp)))
+                    thtp = DPI - dasin(sintp)
+                    phip = modulo(phi + datan2(imd(pix) * sind_d, (1d0 - e_d) * sint + red(pix) * sind_d * (e_t - 1d0)), PI2)
+                    gamma = datan2(imd(pix), red(pix)) - datan2(imd(pix), d * sind_d * d * cott + red(pix) * dcos(d))
+                    ptg(1, pix) = thtp
+                    ptg(2, pix) = phip
+                    ptg(3, pix) = -gamma
+                    pix = pix + 1
+                    phi = phi  + dphi
+                end do
+            end if
+        end do
+        !$OMP END PARALLEL DO
+    end subroutine pointing
 end module remapping
