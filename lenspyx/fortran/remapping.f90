@@ -222,7 +222,7 @@ module remapping
                     d = red(pix) * red(pix) + imd(pix) * imd(pix)
                     !sind_d = 1d0 - d / 6d0 * (1d0 - d / 20d0 * (1d0 - d / 42d0))
                     !d = dsqrt(d)
-                    if (d > 0) then
+                    if (d > 0d0) then
                         d = dsqrt(d)
                         sind_d = dsin(d) / d
                     else
@@ -242,7 +242,7 @@ module remapping
                 e_t = 2d0 * dsin(thts(ir) * 0.5d0) ** 2
                 do ip = 1, nphis(ir)
                     d = red(pix) * red(pix) + imd(pix) * imd(pix)
-                    if (d > 0) then
+                    if (d > 0d0) then
                         d = dsqrt(d)
                         sind_d = dsin(d) / d
                     else
@@ -264,7 +264,7 @@ module remapping
                 e_t = 2d0 * dcos(thts(ir) * 0.5d0) ** 2
                 do ip = 1, nphis(ir)
                     d = red(pix) * red(pix) + imd(pix) * imd(pix)
-                    if (d > 0) then
+                    if (d > 0d0) then
                         d = dsqrt(d)
                         sind_d = dsin(d) / d
                     else
