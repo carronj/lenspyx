@@ -55,7 +55,7 @@ class Geom:
         """
         return np.sum(self.weight * self.nph) / (4 * np.pi)
 
-    def alm2map(self, gclm: np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int):
+    def synthesis(self, gclm: np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int):
         """Wrapper to ducc forward SHT
 
             Return a map or a pair of map for spin non-zero, with the same type as gclm
@@ -65,7 +65,7 @@ class Geom:
         return synthesis(alm=gclm, theta=self.theta, lmax=lmax, mmax=mmax, nphi=self.nph, spin=spin, phi0=self.phi0,
                          nthreads=nthreads, ringstart=self.ofs)
 
-    def map2alm(self, m: np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int):
+    def adjoint_synthesis(self, m: np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int):
         """Wrapper to ducc backward SHT
 
             Return an array with leading dimension 1 for spin-0 or 2 for spin non-zero
@@ -79,6 +79,26 @@ class Geom:
             m[:, of:of + npi] *= w
         return adjoint_synthesis(map=m, theta=self.theta, lmax=lmax, mmax=mmax, nphi=self.nph, spin=spin, phi0=self.phi0,
                                  nthreads=nthreads, ringstart=self.ofs)
+
+    def alm2map_spin(self, gclm:np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int, zbounds=(-1., 1.)):
+        # FIXME: method only here for backwards compatiblity
+        assert zbounds[0] == -1 and zbounds[1] == 1., zbounds
+        return self.synthesis(gclm, spin, lmax, mmax, nthreads)
+
+    def map2alm_spin(self, m:np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int, zbounds=(-1., 1.)):
+        # FIXME: method only here for backwards compatiblity
+        assert zbounds[0] == -1 and zbounds[1] == 1., zbounds
+        return self.adjoint_synthesis(m, spin, lmax, mmax, nthreads)
+
+    def alm2map(self, gclm:np.ndarray, lmax:int, mmax:int, nthreads:int, zbounds=(-1., 1.)):
+        # FIXME: method only here for backwards compatiblity
+        assert zbounds[0] == -1 and zbounds[1] == 1., zbounds
+        return self.synthesis(gclm, 0, lmax, mmax, nthreads).squeeze()
+
+    def map2alm(self, m:np.ndarray, lmax:int, mmax:int, nthreads:int, zbounds=(-1., 1.)):
+        # FIXME: method only here for backwards compatiblity
+        assert zbounds[0] == -1 and zbounds[1] == 1., zbounds
+        return self.adjoint_synthesis(m, 0, lmax, mmax, nthreads).squeeze()
 
     @staticmethod
     def rings2pix(geom:Geom, rings:np.ndarray[int]):
@@ -122,3 +142,45 @@ class Geom:
         nph = np.array([good_size(int(np.ceil(2 * m + 1))) for m in mmax])
         ofs = np.insert(np.cumsum(nph[:-1]), 0, 0)
         return Geom(tht, phi0, nph, ofs, wt / nph)
+
+
+class pbounds:
+    """Class to regroup simple functions handling sky maps longitude truncation
+
+            Args:
+                pctr: center of interval in radians
+                prange: full extent of interval in radians
+
+            Note:
+                2pi periodicity
+
+    """
+    def __init__(self, pctr:float, prange:float):
+        assert prange >= 0., prange
+        self.pctr = pctr % (2. * np.pi)
+        self.hext = min(prange * 0.5, np.pi) # half-extent
+
+    def __repr__(self):
+        return "ctr:%.2f range:%.2f"%(self.pctr, self.hext * 2)
+
+    def __eq__(self, other:pbounds):
+        return self.pctr == other.pctr and self.hext == other.hext
+
+    def get_range(self):
+        return 2 * self.hext
+
+    def get_ctr(self):
+        return self.pctr
+
+    def contains(self, phs:np.ndarray):
+        dph = (phs - self.pctr) % (2 * np.pi)  # points inside are either close to zero or 2pi
+        return (dph <= self.hext) |((2 * np.pi - dph) <= self.hext)
+
+class pbdGeometry:
+    def __init__(self, geom: Geom, pbound: pbounds):
+        """Gometry with additional info on longitudinal cuts
+
+
+        """
+        self.geom = geom
+        self.pbound = pbound

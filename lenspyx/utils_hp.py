@@ -34,10 +34,10 @@ def almxfl(alm:np.ndarray, fl:np.ndarray, mmax:int or None, inplace:bool):
             alm[b:b + lmax - m + 1] *= fl[m:lmax+1]
         return
     else:
-        ret = np.copy(alm)
+        ret = np.empty_like(alm)
         for m in range(mmax + 1):
             b = m * (2 * lmax + 1 - m) // 2 + m
-            ret[b:b + lmax - m + 1] *= fl[m:lmax+1]
+            ret[b:b + lmax - m + 1] = alm[b:b + lmax - m + 1] * fl[m:lmax+1]
         return ret
 
 

@@ -43,7 +43,7 @@ if __name__ == '__main__':
         for nt in range(1, cpu_count + 1):
             os.environ['OMP_NUM_THREADS'] = str(nt)
             print('doing %s_%s'%(nt, tentative))
-            json_file = DIR + '/sscal_fwd_%s%s_%s_sgl.json'%('v29_'*USE29,nt, tentative)
+            json_file = DIR + '/sscal_fwd_%s%s_%s_sgl.json'%('v29_'*USE29, nt, tentative)
             ffi = get_ffi(dlmax_gl, nt)
             ffi.verbosity = 0
             t0 = time.time()

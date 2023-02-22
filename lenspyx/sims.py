@@ -27,7 +27,7 @@ class sims_cmb_len(object):
     """
     def __init__(self, lmax_len:int, cmb_unl:cmbs.sims_cmb_unl,
                  cache:cachers.cacher or None=None, offsets_plm:tuple or None=None, offsets_cmbunl:tuple or None=None,
-                 dlmax:int=1024, dlmax_gl:int=1024, epsilon:float=1e-5, ofactor:float=1.5, verbosity=0):
+                 dlmax:int=1024, dlmax_gl:int=1024, epsilon:float=1e-5, verbosity=0):
 
         if cache is None:  # Will not save the lensed unless this is set
             cache = cachers.cacher_none()
@@ -38,8 +38,7 @@ class sims_cmb_len(object):
         self.dlmax_gl = dlmax_gl
 
         # ducc0 parameters:
-        self.epsilon=epsilon
-        self.ofactor=ofactor
+        self.epsilon = epsilon
         self.verbosity = verbosity
 
         self.unlcmbs = cmb_unl
@@ -61,7 +60,7 @@ class sims_cmb_len(object):
     def hashdict(self):
         return {'unl_cmbs': self.unlcmbs.hashdict(),'lmax':self.lmax,
                 'offset_plm':self.offset_plm, 'offset_cmb':self.offset_cmb,
-                'epsilon':self.epsilon, 'ofactor':self.ofactor}
+                'epsilon':self.epsilon, 'ofactor':1.5}
 
     def get_sim_alm(self, idx, field):
         if field == 't':
@@ -101,7 +100,7 @@ class sims_cmb_len(object):
         dlm, dclm, lmax_dlm, mmax_dlm = self._get_dlm(idx)
         lenjob_geometry = Geom.get_thingauss_geometry(self.lmax_unl + self.dlmax_gl, 2)
         f = deflection(lenjob_geometry, dlm, mmax_dlm, cacher=cachers.cacher_mem(safe=False), dclm=dclm,
-                       epsilon=self.epsilon, ofactor=self.ofactor, verbosity=self.verbosity)
+                       epsilon=self.epsilon, verbosity=self.verbosity)
         return f
 
     def get_sim_tlm(self, idx):
