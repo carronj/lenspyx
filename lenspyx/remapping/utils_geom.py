@@ -150,7 +150,7 @@ class Geom:
         base = ducc0.healpix.Healpix_Base(nside, "RING")
         geom = base.sht_info()
         area = (4 * np.pi) / (12 * nside ** 2)
-        return Geom(w=np.full( (geom['theta'].size, ), area), **geom)
+        return Geom(w=np.full((geom['theta'].size, ), area), **geom)
 
 class pbounds:
     """Class to regroup simple functions handling sky maps longitude truncation

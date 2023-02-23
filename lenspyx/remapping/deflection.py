@@ -361,12 +361,18 @@ class deflection:
             print(self.tim)
         return slm.squeeze()
 
-    def lensgclm(self, gclm:np.ndarray, mmax:int or None, spin, lmax_out, mmax_out:int or None, backwards=False, polrot=True):
+    def lensgclm(self, gclm:np.ndarray, mmax:int or None, spin, lmax_out, mmax_out:int or None, backwards=False, nomagn=True, polrot=True):
         """Adjoint remapping operation from lensed alm space to unlensed alm space
+
+
+            #FIXME: nomagn=True is a backward comptability thing to ask for inverse lensing
+            #        but in this implementation it actually puts a magn...
 
         """
         self.tim.start('lengclm ' + 'bwd' * backwards + 'fwd' * (not backwards))
         self.tim.reset()
+        if nomagn:
+            assert backwards
         if mmax_out is None:
             mmax_out = lmax_out
         if self.sig_d <= 0 and np.abs(self.geom.fsky() - 1.) < 1e-6: # no actual deflection and single-precision full-sky
@@ -421,6 +427,9 @@ class deflection:
                 lmax_unl = hp.Alm.getlmax(gclm.size, mmax)
                 points = self.geom.synthesis(gclm, spin, lmax_unl, mmax, self.sht_tr).squeeze()
                 self.tim.add('points')
+                if nomagn:
+                    points *= self.dlm2A()
+                    self.tim.add('nomagn')
             else:
                 assert gclm.ndim == 2, gclm.ndim
                 lmax_unl = hp.Alm.getlmax(gclm[0].size, mmax)
@@ -428,6 +437,9 @@ class deflection:
                     mmax = lmax_unl
                 points = self.geom.synthesis(gclm, spin, lmax_unl, mmax, self.sht_tr)
                 self.tim.add('points')
+                if nomagn:
+                    points *= self.dlm2A()
+                    self.tim.add('nomagn')
                 if polrot * spin:#TODO: at some point get rid of these exp(atan2)...
                           # maybe simplest to save cis gamma and twice multiply in place...
                     if HAS_NUMEXPR:
@@ -446,50 +458,13 @@ class deflection:
             for ofs, w, nph in zip(self.geom.ofs, self.geom.weight, self.geom.nph):
                 points[ofs:ofs + nph] *= w
             self.tim.add('weighting')
-
-            ptg = self._get_ptg()
-            self.tim.add('_get_ptg')
             # make complex if necessary
             points2 = points.astype(ctype[points.dtype]) if spin == 0 else points
-            # minimum dimensions for a Clenshaw-Curtis grid at this band limit
-            ntheta = ducc0.fft.good_size(lmax_out + 2)
-            nphihalf = ducc0.fft.good_size(lmax_out + 1)
-            nphi = 2 * nphihalf
-            map_dfs = np.empty((2 * ntheta - 2, nphi), dtype=points2.dtype)
-
-            # perform NUFFT
-            map_dfs = ducc0.nufft.nu2u(points=points2, coord=ptg, out=map_dfs, forward=True,
-                                       epsilon=self.epsilon, nthreads=self.sht_tr, verbosity=self.verbosity,
-                                       periodicity=2 * np.pi, fft_order=True)
-            self.tim.add('map_dfs')
-            # go to position space
-            map_dfs = ducc0.fft.c2c(map_dfs, axes=(0, 1), forward=False, inorm=2, nthreads=self.sht_tr, out=map_dfs)
-            self.tim.add('c2c FFT')
-
-            # go from double Fourier sphere to Clenshaw-Curtis grid
-            if (spin % 2) != 0:
-                map_dfs[1:ntheta - 1, :nphihalf] -= map_dfs[-1:ntheta - 1:-1, nphihalf:]
-                map_dfs[1:ntheta - 1, nphihalf:] -= map_dfs[-1:ntheta - 1:-1, :nphihalf]
-            else:
-                map_dfs[1:ntheta - 1, :nphihalf] += map_dfs[-1:ntheta - 1:-1, nphihalf:]
-                map_dfs[1:ntheta - 1, nphihalf:] += map_dfs[-1:ntheta - 1:-1, :nphihalf]
-            map_dfs = map_dfs[:ntheta, :]
-            map = np.empty((1 if spin == 0 else 2, ntheta, nphi),
-                           dtype=points.dtype if spin == 0 else rtype[points.dtype])
-            map[0] = map_dfs.real
-            if spin > 0:
-                map[1] = map_dfs.imag
-            del map_dfs
-            self.tim.add('Double Fourier')
-
-            # adjoint SHT synthesis
-            slm = ducc0.sht.experimental.adjoint_synthesis_2d(map=map, spin=spin,
-                                lmax=lmax_out, mmax=mmax_out, geometry="CC", nthreads=self.sht_tr)
-            self.tim.add('map2alm_spin')
+            slm = self.lenmap2gclm(points2, spin, lmax_out, mmax_out)
             self.tim.close('lengclm ' + 'bwd' * backwards + 'fwd' * (not backwards))
             if self.verbosity:
                 print(self.tim)
-            return slm.squeeze()
+            return slm
 
     def dlm2A(self):
         """Returns determinant of magnification matrix corresponding to input deflection field
@@ -497,12 +472,11 @@ class deflection:
             Returns:
                 determinant of magnification matrix. Array of size input pixelization geometry
 
+        #FIXME: get exact calc and test it on rot
         """
-        geom = self.geom
-        # uses twice lmax since magn is square of unlensed fields
+        geom, lmax, mmax, tr = self.geom, self.lmax_dlm, self.mmax_dlm, self.sht_tr
         dclm = np.zeros_like(self.dlm) if self.dclm is None else self.dclm
-        lmax, mmax, tr = self.lmax_dlm, self.mmax_dlm, self.sht_tr
-        d2k = -0.5 * get_spin_lower(1, self.lmax_dlm)  # For k = -1/2 Delta
+        d2k = -0.5 * get_spin_lower(1, self.lmax_dlm)  # For k = 12 \eth^{-1} d, g = 1/2\eth 1d
         d2g = -0.5 * get_spin_raise(1, self.lmax_dlm)
         A = (1. - geom.synthesis(almxfl(self.dlm, d2k, mmax, False), 0, lmax, mmax, tr)) ** 2 # (1 - k) ** 2
         glms = np.empty((2, self.dlm.size), dtype=self.dlm.dtype) # Shear
