@@ -1,5 +1,5 @@
 #FIXME: always work ith alms arrays of shape [ncomp, nlm] ?
-#FIXME: exact A
+#FIXME: check exact A
 #TODO: spin-0 gradient conventions ?
 #TODO: double-check delensing/adjoint for spin!= 0
 from __future__ import annotations
@@ -72,7 +72,7 @@ class deflection:
         s2_d = np.sum(alm2cl(dglm, dglm, lmax, mmax_dlm, lmax) * (2 * np.arange(lmax + 1) + 1)) / (4 * np.pi)
         if dclm is not None:
             s2_d += np.sum(alm2cl(dclm, dclm, lmax, mmax_dlm, lmax) * (2 * np.arange(lmax + 1) + 1)) / (4 * np.pi)
-        sig_d = np.sqrt(s2_d) / lens_geom.fsky()
+        sig_d = np.sqrt(s2_d / lens_geom.fsky())
         sig_d_amin = sig_d / np.pi * 180 * 60
         if sig_d >= 0.01:
             print('deflection std is %.2e amin: this is really too high a value for something sensible'%sig_d_amin)
@@ -473,7 +473,6 @@ class deflection:
             Returns:
                 determinant of magnification matrix. Array of size input pixelization geometry
 
-        #FIXME: get exact calc and test it on rot
         """
         self.tim.start('dlm2A')
         geom, lmax, mmax, tr = self.geom, self.lmax_dlm, self.mmax_dlm, self.sht_tr
@@ -481,7 +480,7 @@ class deflection:
         dgclm[0] = self.dlm
         dgclm[1] = np.zeros_like(self.dlm) if self.dclm is None else self.dclm
         d2k = -0.5 * get_spin_lower(1, self.lmax_dlm)  # For k = 12 \eth^{-1} d, g = 1/2\eth 1d
-        d2g = -0.5 * get_spin_raise(1, self.lmax_dlm)
+        d2g = -0.5 * get_spin_raise(1, self.lmax_dlm) #TODO: check the sign of this one
         glms = np.empty((2, self.dlm.size), dtype=self.dlm.dtype) # Shear
         glms[0] = almxfl(dgclm[0], d2g, self.mmax_dlm, False)
         glms[1] = almxfl(dgclm[1], d2g, self.mmax_dlm, False)
@@ -490,10 +489,11 @@ class deflection:
         g1, g2 = geom.synthesis(glms, 2, lmax, mmax, tr)
         d1, d2 = geom.synthesis(dgclm, 1, lmax, mmax, tr)
         if np.any(dgclm[1]):
-            w = geom.synthesis(almxfl(dgclm[1], d2k, mmax, False), 0, lmax, mmax, tr)
+            wlm = almxfl(dgclm[1], d2k, mmax, False)
+            w = geom.synthesis(wlm, 0, lmax, mmax, tr)
         else:
-            w = 0.
-        del dgclm, glms, klm
+            wlm, w = 0., 0.
+        del dgclm, glms, klm, wlm
         d = np.sqrt(d1 * d1 + d2 * d2)
         max_d = np.max(d)
         if max_d > 0:
