@@ -1,5 +1,4 @@
 ! See python code for doc
-! FIXME: sinus cardinal
 subroutine helloworld
 USE OMP_LIB
 
@@ -123,9 +122,6 @@ module remapping
         double precision phi, dphi, sint, cost, cott, d, sind_d, e_t, e_d, e_tp, costp, sintp
         double precision :: PI2 = DPI * 2d0
         integer ir, ip, pix, version
-        ! This will not work right on the poles
-        ! This assumes d ** 2 < 0.01
-
         !$OMP PARALLEL DO DEFAULT(NONE)&
         !$OMP SHARED(PI2, thts, red, imd, ptg, nphis, phi0s, npix, nring, ofs)&
         !$OMP PRIVATE(ip, thtp, phip,gamma, e_t, sint, cost, cott, e_d, e_tp, costp, sintp, pix, phi, dphi, version, d, sind_d)
@@ -140,8 +136,12 @@ module remapping
             if (version == 0) then
                 do ip = 1, nphis(ir)
                     d = red(pix) * red(pix) + imd(pix) * imd(pix)
-                    sind_d = 1d0 - d / 6d0 * (1d0 - d / 20d0 * (1d0 - d / 42d0))
-                    d = dsqrt(d)
+                    if (d > 0d0) then
+                        d = dsqrt(d)
+                        sind_d = dsin(d) / d
+                    else
+                        sind_d = 1d0
+                    end if
                     costp = cost * dcos(d) - red(pix) * sind_d * sint
                     thtp = dacos(costp)
                     phip = modulo(phi + dasin(imd(pix) / dsqrt(1. - costp * costp) * sind_d), PI2) ! ok except for absurdly large d
@@ -156,8 +156,12 @@ module remapping
                 e_t = 2d0 * dsin(thts(ir) * 0.5d0) ** 2
                 do ip = 1, nphis(ir)
                     d = red(pix) * red(pix) + imd(pix) * imd(pix)
-                    sind_d = 1d0 - d / 6d0 * (1d0 - d / 20d0 * (1d0 - d / 42d0))
-                    d = dsqrt(d)
+                    if (d > 0d0) then
+                        d = dsqrt(d)
+                        sind_d = dsin(d) / d
+                    else
+                        sind_d = 1d0
+                    end if
                     e_d = 2d0 * dsin(d * 0.5d0) ** 2
                     e_tp = e_t + e_d - e_t * e_d + red(pix) * sind_d * sint
                     sintp = dsqrt(dmax1(0d0, e_tp * (2d0 - e_tp)))
@@ -174,8 +178,12 @@ module remapping
                 e_t = 2d0 * dcos(thts(ir) * 0.5d0) ** 2
                 do ip = 1, nphis(ir)
                     d = red(pix) * red(pix) + imd(pix) * imd(pix)
-                    sind_d = 1d0 - d / 6d0 * (1d0 - d / 20d0 * (1d0 - d / 42d0))
-                    d = dsqrt(d)
+                    if (d > 0d0) then
+                        d = dsqrt(d)
+                        sind_d = dsin(d) / d
+                    else
+                        sind_d = 1d0
+                    end if
                     e_d = 2d0 * dsin(d * 0.5d0) ** 2
                     e_tp = e_t + e_d - e_t * e_d - red(pix) * sind_d * sint
                     sintp = dsqrt(dmax1(0d0, e_tp * (2d0 - e_tp)))
@@ -203,8 +211,6 @@ module remapping
         double precision phi, dphi, sint, cost, cott, d, sind_d, e_t, e_d, e_tp, costp, sintp
         double precision :: PI2 = DPI * 2d0
         integer ir, ip, pix, version
-        ! This will not work right on the poles
-        ! This assumes d ** 2 < 0.01
 
         !$OMP PARALLEL DO DEFAULT(NONE)&
         !$OMP SHARED(PI2, thts, red, imd, ptg, nphis, phi0s, npix, nring, ofs)&
