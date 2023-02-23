@@ -1,5 +1,6 @@
 from __future__ import annotations
 import numpy as np
+import ducc0
 from ducc0.misc import GL_thetas, GL_weights
 from ducc0.fft import good_size
 from ducc0.sht.experimental import synthesis, adjoint_synthesis
@@ -20,26 +21,26 @@ def st2mmax(spin, tht, lmax):
 
 
 class Geom:
-    def __init__(self, tht:np.ndarray[float], phi0:np.ndarray[float], nph:np.ndarray[np.uint64], ofs:np.ndarray[np.uint64], w:np.ndarray[float]):
+    def __init__(self, theta:np.ndarray[float], phi0:np.ndarray[float], nphi:np.ndarray[np.uint64], ringstart:np.ndarray[np.uint64], w:np.ndarray[float]):
         """Iso-latitude pixelisation of the sphere
 
                 Args:
-                    tht: rings co-latitudes in radians
+                    theta: rings co-latitudes in radians
                     phi0: longitude offset of first point in each ring
-                    nph: number of points in each ring
+                    nphi: number of points in each ring
                     ofs: offsets of each ring in real space map
                     w: quadrature weight for each ring
 
 
         """
-        for arr in [phi0, nph, ofs, w]:
-            assert arr.size == tht.size
+        for arr in [phi0, nphi, ringstart, w]:
+            assert arr.size == theta.size
 
-        self.theta = tht.astype(np.float64)
+        self.theta = theta.astype(np.float64)
         self.weight = w.astype(np.float64)
         self.phi0 = phi0.astype(np.float64)
-        self.nph = nph.astype(np.uint64)
-        self.ofs = ofs.astype(np.uint64)
+        self.nph = nphi.astype(np.uint64)
+        self.ofs = ringstart.astype(np.uint64)
 
         self.argsort = np.argsort(self.ofs)
 
@@ -113,6 +114,7 @@ class Geom:
     @staticmethod
     def rings2phi(geom:Geom, rings:np.ndarray[int]):
         return np.concatenate([Geom.phis(geom, ir) for ir in rings])
+
     @staticmethod
     def get_thingauss_geometry(lmax:int, smax:int, zbounds:tuple[float, float]=(-1., 1.)):
         """Build a 'thinned' Gauss-Legendre geometry
@@ -143,6 +145,12 @@ class Geom:
         ofs = np.insert(np.cumsum(nph[:-1]), 0, 0)
         return Geom(tht, phi0, nph, ofs, wt / nph)
 
+    @staticmethod
+    def get_healpix_geometry(nside:int):
+        base = ducc0.healpix.Healpix_Base(nside, "RING")
+        geom = base.sht_info()
+        area = (4 * np.pi) / (12 * nside ** 2)
+        return Geom(w=np.full( (geom['theta'].size, ), area), **geom)
 
 class pbounds:
     """Class to regroup simple functions handling sky maps longitude truncation
