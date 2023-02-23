@@ -361,7 +361,7 @@ class deflection:
             print(self.tim)
         return slm.squeeze()
 
-    def lensgclm(self, gclm:np.ndarray, mmax:int or None, spin, lmax_out, mmax_out:int or None, backwards=False, nomagn=True, polrot=True):
+    def lensgclm(self, gclm:np.ndarray, mmax:int or None, spin, lmax_out, mmax_out:int or None, backwards=False, nomagn=False, polrot=True):
         """Adjoint remapping operation from lensed alm space to unlensed alm space
 
 
@@ -369,7 +369,8 @@ class deflection:
             #        but in this implementation it actually puts a magn...
 
         """
-        self.tim.start('lengclm ' + 'bwd' * backwards + 'fwd' * (not backwards))
+        stri = 'lengclm ' + 'bwd' * backwards + 'fwd' * (not backwards)
+        self.tim.start(stri)
         self.tim.reset()
         if nomagn:
             assert backwards
@@ -378,11 +379,11 @@ class deflection:
         if self.sig_d <= 0 and np.abs(self.geom.fsky() - 1.) < 1e-6: # no actual deflection and single-precision full-sky
             if spin == 0:
                 ret = alm_copy(gclm, mmax, lmax_out, mmax_out)
-                self.tim.close('lengclm')
+                self.tim.close(stri)
                 return ret
             glmret = alm_copy(gclm[0], mmax, lmax_out, mmax_out)
             ret = np.array([glmret, alm_copy(gclm[1], mmax, lmax_out, mmax_out) if gclm[1] is not None else np.zeros_like(glmret)])
-            self.tim.close('lengclm')
+            self.tim.close(stri)
             return ret
         if not backwards:
             # FIXME: should return here 2d array?
@@ -461,7 +462,7 @@ class deflection:
             # make complex if necessary
             points2 = points.astype(ctype[points.dtype]) if spin == 0 else points
             slm = self.lenmap2gclm(points2, spin, lmax_out, mmax_out)
-            self.tim.close('lengclm ' + 'bwd' * backwards + 'fwd' * (not backwards))
+            self.tim.close(stri)
             if self.verbosity:
                 print(self.tim)
             return slm
@@ -474,18 +475,44 @@ class deflection:
 
         #FIXME: get exact calc and test it on rot
         """
+        self.tim.start('dlm2A')
         geom, lmax, mmax, tr = self.geom, self.lmax_dlm, self.mmax_dlm, self.sht_tr
-        dclm = np.zeros_like(self.dlm) if self.dclm is None else self.dclm
+        dgclm = np.empty((2, self.dlm.size), dtype=self.dlm.dtype)
+        dgclm[0] = self.dlm
+        dgclm[1] = np.zeros_like(self.dlm) if self.dclm is None else self.dclm
         d2k = -0.5 * get_spin_lower(1, self.lmax_dlm)  # For k = 12 \eth^{-1} d, g = 1/2\eth 1d
         d2g = -0.5 * get_spin_raise(1, self.lmax_dlm)
-        A = (1. - geom.synthesis(almxfl(self.dlm, d2k, mmax, False), 0, lmax, mmax, tr)) ** 2 # (1 - k) ** 2
         glms = np.empty((2, self.dlm.size), dtype=self.dlm.dtype) # Shear
-        glms[0] = almxfl(self.dlm, d2g, self.mmax_dlm, False)
-        glms[1] = almxfl(dclm, d2g, self.mmax_dlm, False)
-        A -= np.sum(geom.synthesis(glms, 2, lmax, mmax, tr) ** 2, axis=0)  # - g1 ** 2 - g2 ** 2
-        if self.dclm is not None and np.any(dclm):
-            A += geom.synthesis(almxfl(dclm, d2k, mmax, False), 0, lmax, mmax, tr) ** 2 # + w ** 2
-        return A.squeeze()
+        glms[0] = almxfl(dgclm[0], d2g, self.mmax_dlm, False)
+        glms[1] = almxfl(dgclm[1], d2g, self.mmax_dlm, False)
+        klm = almxfl(dgclm[0], d2k, mmax, False)
+        k = geom.synthesis(klm, 0, lmax, mmax, tr)
+        g1, g2 = geom.synthesis(glms, 2, lmax, mmax, tr)
+        d1, d2 = geom.synthesis(dgclm, 1, lmax, mmax, tr)
+        if np.any(dgclm[1]):
+            w = geom.synthesis(almxfl(dgclm[1], d2k, mmax, False), 0, lmax, mmax, tr)
+        else:
+            w = 0.
+        del dgclm, glms, klm
+        d = np.sqrt(d1 * d1 + d2 * d2)
+        max_d = np.max(d)
+        if max_d > 0:
+            f0 = np.sin(d) / d
+            di = d
+        else:
+            from scipy.special import spherical_jn as jn
+            f0 = jn(0, d)
+            di = np.where(d > 0, d, 1.) # Something I can take the inverse of
+        f1 = np.cos(d) - f0
+        if HAS_NUMEXPR:
+            A = numexpr.evaluate('f0 * ((1. - k) ** 2 - g1 * g1 - g2 * g2 + w * w)')
+            A+= numexpr.evaluate('f1 * (1. - k - ( (d1 * d1 - d2 * d2)  * g1 + (2 * d1 * d2) * g2) / (di * di))')
+        else:
+            A  = f0 * ((1. - k) ** 2 - g1 * g1 - g2 * g2 + w * w)
+            A += f1 * (1. - k - ( (d1 * d1 - d2 * d2)  * g1 + (2 * d1 * d2) * g2) / (di * di))
+            #                 -      (   cos 2b * g1 + sin 2b * g2 )
+        self.tim.close('dlm2A')
+        return A
 
 def get_spin_raise(s, lmax):
     r"""Response coefficient of spin-s spherical harmonic to spin raising operator.
