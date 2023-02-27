@@ -95,7 +95,8 @@ class deflection:
         self.epsilon = epsilon # accuracy of the totalconvolve interpolation result
         self.ofactor = 1.5  # upsampling grid factor
 
-        print(" DUCC totalconvolve deflection instantiated", self.epsilon)
+        if verbosity:
+            print(" DUCC totalconvolve deflection instantiated", self.epsilon)
 
         self.single_prec = True # Uses single precision arithmetic in some places
         self.single_prec_ptg = False
@@ -512,7 +513,7 @@ class deflection:
             A += f1 * (1. - k - ( (d1 * d1 - d2 * d2)  * g1 + (2 * d1 * d2) * g2) / (di * di))
             #                 -      (   cos 2b * g1 + sin 2b * g2 )
         self.tim.close('dlm2A')
-        return A
+        return A.squeeze()
 
 def get_spin_raise(s, lmax):
     r"""Response coefficient of spin-s spherical harmonic to spin raising operator.

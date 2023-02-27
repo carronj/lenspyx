@@ -13,7 +13,7 @@ path2cls = os.path.dirname(lenspyx.__file__)
 cls_unl  = camb_clfile(path2cls + '/data/cls/FFP10_wdipole_lenspotentialCls.dat')
 cls_len  = camb_clfile(path2cls + '/data/cls/FFP10_wdipole_lensedCls.dat')
 
-def syn_ffi_ducc(lmax_len = 4096, dlmax=1024, epsilon=1e-5, dlm_fac=1., nthreads=0, dlmax_gl=1024):
+def syn_ffi_ducc(lmax_len = 4096, dlmax=1024, epsilon=1e-5, dlm_fac=1., nthreads=0, dlmax_gl=1024, verbosity=1):
     """"Returns realistic LCDM deflection field scaled by dlm_fac
 
     """
@@ -23,10 +23,10 @@ def syn_ffi_ducc(lmax_len = 4096, dlmax=1024, epsilon=1e-5, dlm_fac=1., nthreads
     plm = hp.synalm(cls_unl['pp'][:lmax_dlm + 1], new=True)
     dlm = hp.almxfl(plm, dlm_fac * np.sqrt(np.arange(lmax_dlm + 1, dtype=float) * np.arange(1, lmax_dlm + 2)))
     ref_geom = utils_geom.Geom.get_thingauss_geometry(lmaxthingauss, 2)
-    ffi_ducc = duccd(ref_geom, dlm, mmax_dlm, numthreads=nthreads, verbosity=1, dclm=None, epsilon=epsilon, cacher=cachers.cacher_mem(safe=False))
+    ffi_ducc = duccd(ref_geom, dlm, mmax_dlm, numthreads=nthreads, verbosity=verbosity, dclm=None, epsilon=epsilon, cacher=cachers.cacher_mem(safe=False))
     return ffi_ducc, ref_geom
 
-def syn_ffi_ducc_29(lmax_len = 4096, dlmax=1024, epsilon=1e-5, dlm_fac=1., nthreads=0, dlmax_gl=1024):
+def syn_ffi_ducc_29(lmax_len = 4096, dlmax=1024, epsilon=1e-5, dlm_fac=1., nthreads=0, dlmax_gl=1024, verbosity=1):
     """"Returns realistic LCDM deflection field scaled by dlm_fac
 
     """
@@ -36,7 +36,7 @@ def syn_ffi_ducc_29(lmax_len = 4096, dlmax=1024, epsilon=1e-5, dlm_fac=1., nthre
     plm = hp.synalm(cls_unl['pp'][:lmax_dlm + 1], new=True)
     dlm = hp.almxfl(plm, dlm_fac * np.sqrt(np.arange(lmax_dlm + 1, dtype=float) * np.arange(1, lmax_dlm + 2)))
     ref_geom = utils_geom.Geom.get_thingauss_geometry(lmaxthingauss, 2)
-    ffi_ducc = duccd29(ref_geom, dlm, mmax_dlm, numthreads=nthreads, verbosity=1, dclm=None, epsilon=epsilon, cacher=cachers.cacher_mem(safe=False))
+    ffi_ducc = duccd29(ref_geom, dlm, mmax_dlm, numthreads=nthreads, verbosity=verbosity, dclm=None, epsilon=epsilon, cacher=cachers.cacher_mem(safe=False))
     return ffi_ducc, ref_geom
 
 def syn_ffi_lenscarf(lmax_len = 4096, dlmax=1024, target_res=1.7, dlm_fac=1., nthreads=4, dlmax_gl=1024, verbose=False, nbands=1):
