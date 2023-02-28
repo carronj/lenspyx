@@ -2,7 +2,7 @@ from __future__ import annotations
 
 
 import numpy as np
-from lenscarf.utils_hp import Alm
+from lenspyx.utils_hp import Alm
 from lenspyx.remapping import deflection as deflection_28
 import ducc0
 

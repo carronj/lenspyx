@@ -5,14 +5,13 @@
 from __future__ import annotations
 
 import os
-
 import numpy as np
-from lenscarf.remapping import d2ang
-from lenspyx.utils_hp import Alm, alm2cl,almxfl, alm_copy
-from lenscarf import cachers
-from lenspyx.utils import timer, blm_gauss
-import healpy as hp
 import ducc0
+
+from lenspyx.remapping.utils_angles import d2ang
+from lenspyx.utils_hp import Alm, alm2cl, almxfl, alm_copy
+from lenspyx import cachers
+from lenspyx.utils import timer, blm_gauss
 from lenspyx.remapping.utils_geom import Geom, pbdGeometry, pbounds
 
 try:
@@ -126,9 +125,10 @@ class deflection:
             self.tim.start('_build_angles')
             self.tim.reset()
             assert np.all(self.geom.theta > 0.) and np.all(self.geom.theta < np.pi), 'fix this (cotangent below)'
-            dclm = np.zeros_like(self.dlm) if self.dclm is None else self.dclm
-            #red, imd = self.geom.synthesis_spin([self.dlm, dclm], 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr, [-1., 1.])
-            red, imd = self.geom.synthesis([self.dlm, dclm], 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr)
+            dgclm = np.empty((2, self.dlm.size), dtype=self.dlm.dtype)
+            dgclm[0] = self.dlm
+            dgclm[1] = np.zeros_like(self.dlm) if self.dclm is None else self.dclm
+            red, imd = self.geom.synthesis(dgclm, 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr)
             # Probably want to keep red, imd double precision for the calc?
             npix = Geom.npix(self.geom)
             self.tim.add('d1 alm2map_spin')
@@ -408,7 +408,7 @@ class deflection:
             if spin == 0 and self._totalconvolves0:
                 # The code below works for any spin but this seems a little bit faster for non-zero spin
                 # So keeping this for the moment
-                lmax_unl = hp.Alm.getlmax(gclm[0].size if abs(spin) > 0 else gclm.size, mmax)
+                lmax_unl = Alm.getlmax(gclm[0].size if abs(spin) > 0 else gclm.size, mmax)
                 inter = ducc0.totalconvolve.Interpolator(lmax_out, spin, 1, epsilon=self.epsilon,
                                                          ofactor=self.ofactor, nthreads=self.sht_tr)
                 I = self.geom.synthesis(gclm, spin, lmax_unl, mmax, self.sht_tr)
@@ -426,7 +426,7 @@ class deflection:
                 return ret
             if spin == 0:
                 # make complex if necessary
-                lmax_unl = hp.Alm.getlmax(gclm.size, mmax)
+                lmax_unl = Alm.getlmax(gclm.size, mmax)
                 points = self.geom.synthesis(gclm, spin, lmax_unl, mmax, self.sht_tr).squeeze()
                 self.tim.add('points')
                 if nomagn:
@@ -434,7 +434,7 @@ class deflection:
                     self.tim.add('nomagn')
             else:
                 assert gclm.ndim == 2, gclm.ndim
-                lmax_unl = hp.Alm.getlmax(gclm[0].size, mmax)
+                lmax_unl = Alm.getlmax(gclm[0].size, mmax)
                 if mmax is None:
                     mmax = lmax_unl
                 points = self.geom.synthesis(gclm, spin, lmax_unl, mmax, self.sht_tr)
