@@ -46,7 +46,7 @@ def alm2lenmap(alm, dlms, nside, facres=0, nband=8, verbose=True, experimental=T
     if experimental:
         #FIXME: here dlms must be healpy array
         geom = Geom.get_healpix_geometry(nside)
-        defl = deflection(geom, dlms[0], None, 0, dclm=dlms[1], epsilon=1e-7)
+        defl = deflection(geom, dlms[0], None, 0, dclm=dlms[1], epsilon=1e-5)
         return defl.gclm2lenmap(alm, None, 0, False)
     return _lens_gclm_sym_timed(0, dlms[0], -alm, nside, dclm=dlms[1], nband=nband, facres=facres, verbose=verbose)
 
@@ -88,7 +88,7 @@ def alm2lenmap_spin(gclm, dlms, nside, spin, nband=8, facres=-1, verbose=True, e
     if experimental:
         #FIXME: here dlms must be healpy array
         geom = Geom.get_healpix_geometry(nside)
-        defl = deflection(geom, dlms[0], None, 0, dclm=dlms[1], epsilon=1e-7)
+        defl = deflection(geom, dlms[0], None, 0, dclm=dlms[1], epsilon=1e-5)
         if gclm[1] is None:
             gclm[1] = np.zeros_like(gclm[0])
         return defl.gclm2lenmap(gclm, None, spin, False)
