@@ -10,13 +10,8 @@ except:
     pass
 from lenspyx import utils
 from lenspyx import angles
-try:
-    from lenscarf.utils_scarf import Geom, pbdGeometry, pbounds
-    from lenspyx.remapping.deflection import deflection
-
-except:
-    print("lensing.py::Could not load scarf modules")
-    pass
+from lenspyx.remapping.utils_geom import Geom
+from lenspyx.remapping.deflection import deflection
 
 def alm2lenmap(alm, dlms, nside, facres=0, nband=8, verbose=True, experimental=True):
     r"""Computes a deflected spin-0 healpix map from its alm and deflection field alm.
@@ -51,8 +46,7 @@ def alm2lenmap(alm, dlms, nside, facres=0, nband=8, verbose=True, experimental=T
     if experimental:
         #FIXME: here dlms must be healpy array
         geom = Geom.get_healpix_geometry(nside)
-        pbgeom = pbdGeometry(geom, pbounds(0., 2 * np.pi))
-        defl = deflection(pbgeom, dlms[0], None, 0, dclm=dlms[1], epsilon=1e-7)
+        defl = deflection(geom, dlms[0], None, 0, dclm=dlms[1], epsilon=1e-7)
         return defl.gclm2lenmap(alm, None, 0, False)
     return _lens_gclm_sym_timed(0, dlms[0], -alm, nside, dclm=dlms[1], nband=nband, facres=facres, verbose=verbose)
 
@@ -94,8 +88,7 @@ def alm2lenmap_spin(gclm, dlms, nside, spin, nband=8, facres=-1, verbose=True, e
     if experimental:
         #FIXME: here dlms must be healpy array
         geom = Geom.get_healpix_geometry(nside)
-        pbgeom = pbdGeometry(geom, pbounds(0., 2 * np.pi))
-        defl = deflection(pbgeom, dlms[0], None, 0, dclm=dlms[1], epsilon=1e-7)
+        defl = deflection(geom, dlms[0], None, 0, dclm=dlms[1], epsilon=1e-7)
         if gclm[1] is None:
             gclm[1] = np.zeros_like(gclm[0])
         return defl.gclm2lenmap(gclm, None, spin, False)
