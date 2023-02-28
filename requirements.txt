@@ -1,3 +1,2 @@
 numpy
-healpy
-pyfftw
+numexpr
