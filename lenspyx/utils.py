@@ -1,7 +1,7 @@
 import time
 import numpy as np
 import sys
-from lenscarf.utils_hp import Alm
+from lenspyx.utils_hp import Alm
 import json
 
 class timer:

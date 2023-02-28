@@ -1,7 +1,10 @@
 from __future__ import print_function
 
 import numpy as np
-import healpy as hp
+try:
+    import healpy as hp
+except:
+    print('lensing.py: did not load healpy')
 try :
     from lenspyx.shts import shts
     from lenspyx.bicubic import bicubic
@@ -42,7 +45,7 @@ def alm2lenmap(alm, dlms, nside, facres=0, nband=8, verbose=True, experimental=T
 
     """
     assert len(dlms) == 2
-    if not np.iscomplexobj(dlms[0]): assert dlms[0].size == dlms[1].size and dlms[0].size == hp.nside2npix(nside)
+    if not np.iscomplexobj(dlms[0]): assert dlms[0].size == dlms[1].size and dlms[0].size == 12 * nside ** 2
     if experimental:
         #FIXME: here dlms must be healpy array
         geom = Geom.get_healpix_geometry(nside)
@@ -84,7 +87,7 @@ def alm2lenmap_spin(gclm, dlms, nside, spin, nband=8, facres=-1, verbose=True, e
     """
     assert len(gclm) == 2
     assert len(dlms) == 2
-    if not np.iscomplexobj(dlms[0]): assert dlms[0].size == dlms[1].size and dlms[0].size == hp.nside2npix(nside)
+    if not np.iscomplexobj(dlms[0]): assert dlms[0].size == dlms[1].size and dlms[0].size == 12 * nside ** 2
     if experimental:
         #FIXME: here dlms must be healpy array
         geom = Geom.get_healpix_geometry(nside)
