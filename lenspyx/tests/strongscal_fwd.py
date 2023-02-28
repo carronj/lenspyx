@@ -6,7 +6,7 @@ from lenspyx.tests.helper import syn_ffi_ducc, syn_ffi_ducc_29, cls_unl
 import healpy as hp, numpy as np
 
 USE29 =False
-spin = 0
+spin = 2
 def binit(cl, d=10):
     ret = cl.copy()
     for l in range(d, ret.size -d):
@@ -41,7 +41,7 @@ if __name__ == '__main__':
     ebunl = np.atleast_2d(ebunl[:1 + (spin > 0)])
     import multiprocessing
     cpu_count = min(multiprocessing.cpu_count(), 36)
-    for tentative in [1, 2]:
+    for tentative in [1, 2, 3, 4]:
         for nt in [4]:
             os.environ['OMP_NUM_THREADS'] = str(nt)
             print('doing %s_%s'%(nt, tentative))

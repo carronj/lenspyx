@@ -44,7 +44,7 @@ if __name__ == '__main__':
     for tentative in [1, 2, 3]:
         ffi = get_ffi(dlmax_gl, False, nthreads=4)
         ptg = ffi._get_ptg()
-        for nt in [4]:
+        for nt in [1]:
             os.environ['OMP_NUM_THREADS'] = str(nt)
             print('doing %s_%s'%(nt, tentative))
             ffi = get_ffi(dlmax_gl, False, nthreads=nt)

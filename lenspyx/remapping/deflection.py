@@ -45,7 +45,7 @@ rtype = {np.dtype(np.complex64): np.float32,
 
 class deflection:
     def __init__(self, lens_geom:Geom, dglm, mmax_dlm:int or None, numthreads:int=0,
-                 cacher:cachers.cacher or None=None, dclm:np.ndarray or None=None, epsilon=1e-5, verbosity=0):
+                 cacher:cachers.cacher or None=None, dclm:np.ndarray or None=None, epsilon=1e-5, verbosity=0, single_prec=True):
         """Deflection field object than can be used to lens several maps with forward or backward deflection
 
             Args:
@@ -98,7 +98,7 @@ class deflection:
         if verbosity:
             print(" DUCC totalconvolve deflection instantiated", self.epsilon)
 
-        self.single_prec = True # Uses single precision arithmetic in some places
+        self.single_prec = single_prec # Uses single precision arithmetic in some places
         self.single_prec_ptg = False
         self.tim = timer(False, 'deflection instance timer')
 
@@ -178,7 +178,7 @@ class deflection:
     def change_dlm(self, dlm:list or np.ndarray, mmax_dlm:int or None, cacher:cachers.cacher or None=None):
         assert len(dlm) == 2, (len(dlm), 'gradient and curl mode (curl can be none)')
         return deflection(self.geom, dlm[0], mmax_dlm, self.sht_tr, cacher, dlm[1],
-                          verbosity=self.verbosity, epsilon=self.epsilon)
+                          verbosity=self.verbosity, epsilon=self.epsilon, single_prec=self.single_prec)
 
     def change_geom(self, lens_geom:Geom, cacher:cachers.cacher or None=None):
         """Returns a deflection instance with a different position-space geometry

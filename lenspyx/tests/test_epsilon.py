@@ -2,14 +2,13 @@
 
 
 """
-import os.path
 import os
 
-from lenspyx.tests.helper import  cls_unl, cls_len
-from lenspyx.tests.helper import syn_ffi_ducc
+from lenspyx.tests.helper import  cls_unl
 from lenspyx.tests.helper import syn_ffi_ducc_29 as syn_ffi_ducc
-from lenscarf import cachers
-import healpy as hp, numpy as np
+from lenspyx import cachers
+from lenspyx.utils_hp import synalm
+import numpy as np
 import pylab as pl
 from time import time
 import matplotlib
@@ -40,8 +39,8 @@ ffi_ducc.single_prec = False
 #ffi_ducc_opti, ref_geom = syn_ffi_ducc(lmax_len=lmax_len, dlmax=dlmax, target_res=res, nside=nside, dlm_fac=dlm_fac,
 #                                  nthreads=nthreads, thingauss=thingauss, optiversion=True)
 ffi_ducc.verbosity = 0
-eblm = np.array([hp.synalm(cls_unl['ee'][:lmax_unl+1]),
-                 hp.synalm(cls_unl['bb'][:lmax_unl+1])])
+eblm = np.array([synalm(cls_unl['ee'][:lmax_unl+1], lmax_unl, mmax_unl),
+                 synalm(cls_unl['bb'][:lmax_unl+1], lmax_unl, mmax_unl)])
 Pexs = [] # exact pol.
 pixels = []
 phis = []
