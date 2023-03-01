@@ -5,12 +5,13 @@ try:
     import healpy as hp
 except:
     print('lensing.py: did not load healpy')
+
 try :
     from lenspyx.shts import shts
     from lenspyx.bicubic import bicubic
 except:
-    print('lensing.py::Could not load fortran modules')
     pass
+
 from lenspyx import utils
 from lenspyx import angles
 from lenspyx.remapping.utils_geom import Geom
