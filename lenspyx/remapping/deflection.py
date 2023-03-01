@@ -94,17 +94,17 @@ class deflection:
         self.epsilon = epsilon # accuracy of the totalconvolve interpolation result
         self.ofactor = 1.5  # upsampling grid factor
 
-        if verbosity:
-            print(" DUCC totalconvolve deflection instantiated", self.epsilon)
 
-        self.single_prec = single_prec # Uses single precision arithmetic in some places
+
+        self.single_prec = single_prec * (epsilon > 1e-6) # Uses single precision arithmetic in some places
         self.single_prec_ptg = False
         self.tim = timer(False, 'deflection instance timer')
 
         if HAS_NUMEXPR:
             os.environ['NUMEXPR_MAX_THREADS'] = str(numthreads)
             os.environ['NUMEXPR_NUM_THREADS'] = str(numthreads)
-
+        if verbosity:
+            print(" DUCC totalconvolve deflection instantiated" + self.single_prec * '(single prec)', self.epsilon)
         self._totalconvolves0 = False
 
     def _get_ptg(self):
