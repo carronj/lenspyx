@@ -25,13 +25,7 @@ def get_ffi(dlmax_gl, USE29, nthreads=4, dlmax=1024, epsilon=1e-5):
 if __name__ == '__main__':
     import argparse, os, time, json
     parser = argparse.ArgumentParser(description='test FFP10-like fwd building')
-    if os.path.exists('SCRATCH'):
-        DIR = os.environ['SCRATCH'] + '/lenspyx/'
-    else:
-        #local ?
-        DIR = os.environ['ONED'] + '/ducclens/Tex/figs/MacOSlocal'
-    if not os.path.exists(DIR):
-        os.makedirs(DIR)
+
     args = parser.parse_args()
     spin, epsilon = 0, 1e-7
     single_prec = epsilon >= 1e-6
@@ -57,6 +51,13 @@ if __name__ == '__main__':
             S1 = ffi.gclm2lenmap(ebunl, mmax_unl, spin, False, polrot=False)
             ffi.tim.keys['lensgclm (total, lmax_unl %s )'%lmax_unl] = time.time() - t0
             print('28 fwd: %.3f'%(time.time() - t0))
+
+            ffi._totalconvolves0 = True
+            t0 = time.time()
+            S1 = ffi.gclm2lenmap(ebunl, mmax_unl, spin, False, polrot=False)
+            ffi.tim.keys['lensgclm (total, lmax_unl %s )' % lmax_unl] = time.time() - t0
+            print('28 fwd (total convolve): %.3f' % (time.time() - t0))
+
             #print(ffi.tim)
             ffi29 = get_ffi(dlmax_gl, True, nthreads=nt, epsilon=epsilon)
             ffi29.verbosity = 0
@@ -72,6 +73,12 @@ if __name__ == '__main__':
             t0 = time.time()
             S4 = ffi.lenmap2gclm(Sc, spin, lmax_len, mmax_len)
             print('28 bwd: %.3f'%(time.time() - t0))
+
+            ffi._totalconvolves0 = True
+            t0 = time.time()
+            S4 = ffi.lenmap2gclm(Sc, spin, lmax_len, mmax_len)
+            print('28 bwd: %.3f'%(time.time() - t0))
+
             ffi29.verbosity = 1
             t0 = time.time()
             S3 = ffi29.lenmap2gclm(Sc, spin, lmax_len, mmax_len)
