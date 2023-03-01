@@ -237,13 +237,14 @@ class deflection:
             blm_T = blm_gauss(0, lmax_unl, 0)
             self.tim.add('blm_gauss')
             if ptg is None:
-                ptg = self._get_ptg()
+                ptg = self._build_angles()
             self.tim.add('ptg')
+            assert mmax == lmax_unl
             # FIXME: this might only accept doubple prec input
             inter_I = ducc0.totalconvolve.Interpolator(gclm, blm_T, separate=False, lmax=lmax_unl,
                                                        kmax=0,
                                                        epsilon=self.epsilon, ofactor=self.ofactor,
-                                                       nthreads=self.sht_tr, mmax=mmax)
+                                                       nthreads=self.sht_tr)
             self.tim.add('interp. setup')
             ret = inter_I.interpol(ptg).squeeze()
             self.tim.add('interpolation')
@@ -308,7 +309,7 @@ class deflection:
             print(self.tim)
         return values.real if spin == 0 else (values.real, values.imag)
 
-    def lenmap2gclm(self, points:np.ndarray[complex], spin:int, lmax:int, mmax:int):
+    def lenmap2gclm(self, points:np.ndarray[complex or float], spin:int, lmax:int, mmax:int):
         """
             Note:
                 points mst be already quadrature-weigthed, and be complex
@@ -319,7 +320,9 @@ class deflection:
         """
         self.tim.start('lenmap2gclm')
         self.tim.reset()
-        assert points.ndim == 1 and np.iscomplexobj(points), (points.ndim, points.dtype)
+        assert points.ndim == 1, (points.ndim, points.dtype)
+        if spin == 0 and not np.iscomplexobj(points):
+            points = points.astype(ctype[points.dtype])
 
         ptg = self._get_ptg()
         self.tim.add('_get_ptg')
@@ -425,7 +428,6 @@ class deflection:
                 self.tim.close('lengclm ' + 'bwd' * backwards + 'fwd' * (not backwards))
                 return ret
             if spin == 0:
-                # make complex if necessary
                 lmax_unl = Alm.getlmax(gclm.size, mmax)
                 points = self.geom.synthesis(gclm, spin, lmax_unl, mmax, self.sht_tr).squeeze()
                 self.tim.add('points')
@@ -461,8 +463,7 @@ class deflection:
                 points[ofs:ofs + nph] *= w
             self.tim.add('weighting')
             # make complex if necessary
-            points2 = points.astype(ctype[points.dtype]) if spin == 0 else points
-            slm = self.lenmap2gclm(points2, spin, lmax_out, mmax_out)
+            slm = self.lenmap2gclm(points, spin, lmax_out, mmax_out)
             self.tim.close(stri)
             if self.verbosity:
                 print(self.tim)

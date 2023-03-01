@@ -40,7 +40,7 @@ if __name__ == '__main__':
     cpu_count = min(multiprocessing.cpu_count(), 36)
     for tentative in [1, 2, 3]:
         ffi = get_ffi(dlmax_gl, False, nthreads=4)
-        ptg = ffi._get_ptg()
+        ptg = ffi._build_angles()
         for nt in [4]:
             os.environ['OMP_NUM_THREADS'] = str(nt)
             print('doing %s_%s'%(nt, tentative))
@@ -54,7 +54,7 @@ if __name__ == '__main__':
 
             ffi._totalconvolves0 = True
             t0 = time.time()
-            S1 = ffi.gclm2lenmap(ebunl, mmax_unl, spin, False, polrot=False)
+            S3 = ffi.gclm2lenmap(ebunl, mmax_unl, spin, False, polrot=False)
             ffi.tim.keys['lensgclm (total, lmax_unl %s )' % lmax_unl] = time.time() - t0
             print('28 fwd (total convolve): %.3f' % (time.time() - t0))
 
@@ -68,6 +68,8 @@ if __name__ == '__main__':
             print('29 fwd: %.3f'%(time.time() - t0))
             #print(ffi.tim)
             print(np.max(np.abs(S1 - S2)))
+            print(np.max(np.abs(S1 - S3)))
+
             #--------
             Sc = S2[0] +  (1j * S1[1] if spin > 0 else 0.)
             t0 = time.time()
