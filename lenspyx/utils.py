@@ -238,3 +238,26 @@ def camb_clfile(fname, lmax=None):
             we = w(ell)
         cls[k][ell[idc]] = cols[i + 1][idc] / we[idc]
     return cls
+
+
+class Drop:
+    def __init__(self, a=0., b=1):
+        """Smooth fct that drops from 1 at a to zero at b"""
+        assert b > a, (a, b)
+        self.a = a
+        self.extent = b - a
+
+    def x2eps(self, x):
+        return (x - self.a) / self.extent
+
+    def eval(self, x):
+        eps = self.x2eps(x)
+        if np.isscalar(x):
+            if eps >= 1: return 0.
+            if eps <= 0: return 1.
+            return np.exp(1 - 1. / (1 - eps ** 2))
+        ret = np.zeros_like(eps)
+        ret[np.where(eps <= 0.)] = 1.
+        ii = np.where( (eps > 0) & (eps < 1))
+        ret[ii] = np.exp(1 - 1. / (1 - eps[ii] ** 2))
+        return ret
