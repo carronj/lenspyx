@@ -30,7 +30,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    spin, epsilon = args.spin, 10 ** (-args.eps)
+    spin, epsilon = args.spin, 10 ** (-args.epsilon)
     single_prec = epsilon >= 1e-6
     lmax_len, mmax_len, dlmax = 4096, 4096, 1024
     lmax_unl = lmax_len + dlmax
