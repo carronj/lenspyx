@@ -39,6 +39,8 @@ if __name__ == '__main__':
     ebunl = np.array([hp.synalm(cls_unl['ee'][:lmax_unl + 1]),
                       hp.synalm(cls_unl['bb'][:lmax_unl + 1])])
     ebunl = ebunl[0:1 + (spin > 0)]
+    if single_prec:
+        ebunl = ebunl.astype(np.complex64)
     import multiprocessing
     cpu_count = min(multiprocessing.cpu_count(), 36)
     ffi_ref = get_ffi(dlmax_gl, False, nthreads=cpu_count, epsilon=1e-11)
