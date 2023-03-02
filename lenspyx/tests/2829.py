@@ -28,7 +28,7 @@ if __name__ == '__main__':
     parser.add_argument('-s', dest='spin', type=int, default=2, help='spin to test')
     parser.add_argument('-eps', dest='epsilon', type=float, default=7., help='-log10 of lensing accuracy')
     parser.add_argument('-lmaxlen', dest='lmax_len', type=int, default=4096, help='lmax of lensed CMBs')
-    parser.add_argument('-lmaxunl', dest='lmax_len', type=int, default=5120, help='lmax of unlensed CMBs')
+    parser.add_argument('-lmaxunl', dest='lmax_unl', type=int, default=5120, help='lmax of unlensed CMBs')
 
     args = parser.parse_args()
 
