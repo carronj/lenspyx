@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import numpy as np
 from lenspyx.utils_hp import Alm
+from lenspyx import cachers
 from lenspyx.remapping import deflection as deflection_28
 from ducc0.sht.experimental import adjoint_synthesis_general, synthesis_general
 
@@ -95,4 +96,9 @@ class deflection(deflection_28.deflection):
         ret = adjoint_synthesis_general(lmax=lmax, mmax=mmax, map=points2, loc=ptg, spin=spin, epsilon=self.epsilon, nthreads=self.sht_tr)
         self.tim.add('adjoint_synthesis_general')
         self.tim.close('lenmap2gclm')
-        return ret
+        return ret.squeeze()
+
+    def change_dlm(self, dlm:list or np.ndarray, mmax_dlm:int or None, cacher:cachers.cacher or None=None):
+        assert len(dlm) == 2, (len(dlm), 'gradient and curl mode (curl can be none)')
+        return deflection(self.geom, dlm[0], mmax_dlm, self.sht_tr, cacher, dlm[1],
+                          verbosity=self.verbosity, epsilon=self.epsilon, single_prec=self.single_prec)
