@@ -27,13 +27,15 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='test FFP10-like fwd building')
     parser.add_argument('-s', dest='spin', type=int, default=2, help='spin to test')
     parser.add_argument('-eps', dest='epsilon', type=float, default=7., help='-log10 of lensing accuracy')
+    parser.add_argument('-lmaxlen', dest='lmax_len', type=int, default=4096, help='lmax of lensed CMBs')
+    parser.add_argument('-lmaxunl', dest='lmax_len', type=int, default=5120, help='lmax of unlensed CMBs')
 
     args = parser.parse_args()
 
     spin, epsilon = args.spin, 10 ** (-args.epsilon)
     single_prec = epsilon >= 1e-6
-    lmax_len, mmax_len, dlmax = 4096, 4096, 1024
-    lmax_unl = lmax_len + dlmax
+    lmax_len, mmax_len= args.lmax_len, args.lmax_len
+    lmax_unl = args.lmax_unl
     mmax_unl = lmax_unl
     dlmax_gl = 1024
     ebunl = np.array([hp.synalm(cls_unl['ee'][:lmax_unl + 1]),
