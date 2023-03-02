@@ -307,7 +307,8 @@ class deflection:
         self.tim.close('gclm2lenmap')
         if self.verbosity:
             print(self.tim)
-        return values.real if spin == 0 else (values.real, values.imag)
+        # Return real array of shape (2, npix) for spin > 0
+        return values.real if spin == 0 else values.view(rtype[values.dtype]).reshape((values.size, 2)).T
 
     def lenmap2gclm(self, points:np.ndarray[complex or float], spin:int, lmax:int, mmax:int):
         """

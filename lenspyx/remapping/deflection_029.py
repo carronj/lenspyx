@@ -4,7 +4,7 @@ from __future__ import annotations
 import numpy as np
 from lenspyx.utils_hp import Alm
 from lenspyx.remapping import deflection as deflection_28
-import ducc0
+from ducc0.sht.experimental import adjoint_synthesis_general, synthesis_general
 
 try:
     from lenscarf.fortran import remapping as fremap
@@ -56,7 +56,7 @@ class deflection(deflection_28.deflection):
             ptg = ptg.astype(np.float64)
             self.tim.add('float type conversion')
         if spin == 0:
-            values = ducc0.sht.experimental.synthesis_general(lmax=lmax_unl, mmax=mmax, alm=gclm, loc=ptg, spin=spin,
+            values = synthesis_general(lmax=lmax_unl, mmax=mmax, alm=gclm, loc=ptg, spin=spin,
                                                           epsilon=self.epsilon, nthreads=self.sht_tr)
             self.tim.add('synthesis general')
         else:
@@ -64,7 +64,7 @@ class deflection(deflection_28.deflection):
             # This is a trick with two views of the same array to get complex values as output to multiply by the phase
             valuesc = np.empty((npix,), dtype=np.complex64 if self.single_prec else np.complex128)
             values = valuesc.view(np.float32 if self.single_prec else np.float64).reshape((npix, 2)).T
-            ducc0.sht.experimental.synthesis_general(map=values, lmax=lmax_unl, mmax=mmax, alm=gclm, loc=ptg,
+            synthesis_general(map=values, lmax=lmax_unl, mmax=mmax, alm=gclm, loc=ptg,
                                                               spin=spin, epsilon=self.epsilon, nthreads=self.sht_tr)
             self.tim.add('synthesis general')
 
@@ -84,7 +84,7 @@ class deflection(deflection_28.deflection):
 
     def lenmap2gclm(self, points:np.ndarray[complex or float], spin:int, lmax:int, mmax:int):
         assert points.ndim == 1
-        assert np.iscomplexobj(points) if spin > 0 else not np.iscomplexobj(points), (spin, points.ndim, points.dtype)
+        assert np.iscomplexobj(points) == (spin > 0), (spin, points.ndim, points.dtype)
         self.tim.start('lenmap2gclm')
         self.tim.reset()
         ptg = self._get_ptg()
@@ -92,7 +92,7 @@ class deflection(deflection_28.deflection):
         # Use a view instead to turn complex array into real:
         points2 = points.view(rtype[points.dtype]).reshape(points.size, 2).T if spin > 0 else np.atleast_2d(points)
         self.tim.add('_refactoring to real')
-        ret = ducc0.sht.experimental.adjoint_synthesis_general(lmax=lmax, mmax=mmax, map=points2, loc=ptg, spin=spin, epsilon=self.epsilon, nthreads=self.sht_tr)
+        ret = adjoint_synthesis_general(lmax=lmax, mmax=mmax, map=points2, loc=ptg, spin=spin, epsilon=self.epsilon, nthreads=self.sht_tr)
         self.tim.add('adjoint_synthesis_general')
         self.tim.close('lenmap2gclm')
         return ret

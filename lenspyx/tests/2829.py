@@ -25,9 +25,12 @@ def get_ffi(dlmax_gl, USE29, nthreads=4, dlmax=1024, epsilon=1e-5):
 if __name__ == '__main__':
     import argparse, os, time, json
     parser = argparse.ArgumentParser(description='test FFP10-like fwd building')
+    parser.add_argument('-s', dest='spin', type=int, default=0, help='spin to test')
+    parser.add_argument('-eps', dest='epsilon', type=float, default=5., help='-log10 of lensing accuracy')
 
     args = parser.parse_args()
-    spin, epsilon = 0, 1e-7
+
+    spin, epsilon = args.spin, 10 ** (-args.eps)
     single_prec = epsilon >= 1e-6
     lmax_len, mmax_len, dlmax = 4096, 4096, 1024
     lmax_unl = lmax_len + dlmax
@@ -38,24 +41,25 @@ if __name__ == '__main__':
     ebunl = ebunl[0:1 + (spin > 0)]
     import multiprocessing
     cpu_count = min(multiprocessing.cpu_count(), 36)
+    ffi_ref = get_ffi(dlmax_gl, False, nthreads=cpu_count, epsilon=1e-11)
+    ptg = ffi_ref._build_angles()
+    Sref = ffi_ref.gclm2lenmap(ebunl, mmax_unl, spin, False,   polrot=False)
     for tentative in [1, 2, 3]:
         ffi = get_ffi(dlmax_gl, False, nthreads=4)
-        ptg = ffi._build_angles()
         for nt in [4]:
             os.environ['OMP_NUM_THREADS'] = str(nt)
+
             print('doing %s_%s'%(nt, tentative))
-            ffi = get_ffi(dlmax_gl, False, nthreads=nt, epsilon=epsilon)
+            ffi = get_ffi(dlmax_gl, False, nthreads=cpu_count, epsilon=epsilon)
             ffi.verbosity = 0
             ffi.cacher.cache('ptg', ptg.copy())
             t0 = time.time()
             S1 = ffi.gclm2lenmap(ebunl, mmax_unl, spin, False, polrot=False)
-            ffi.tim.keys['lensgclm (total, lmax_unl %s )'%lmax_unl] = time.time() - t0
             print('28 fwd: %.3f'%(time.time() - t0))
 
             ffi._totalconvolves0 = True
             t0 = time.time()
             S3 = ffi.gclm2lenmap(ebunl, mmax_unl, spin, False, polrot=False)
-            ffi.tim.keys['lensgclm (total, lmax_unl %s )' % lmax_unl] = time.time() - t0
             print('28 fwd (total convolve): %.3f' % (time.time() - t0))
 
             #print(ffi.tim)
@@ -64,11 +68,11 @@ if __name__ == '__main__':
             ffi29.cacher.cache('ptg', ptg.copy())
             t0 = time.time()
             S2 = ffi29.gclm2lenmap(ebunl, mmax_unl, spin, False,  polrot=False)
-            ffi.tim.keys['lensgclm (total, lmax_unl %s )'%lmax_unl] = time.time() - t0
             print('29 fwd: %.3f'%(time.time() - t0))
             #print(ffi.tim)
-            print(np.max(np.abs(S1 - S2)))
-            print(np.max(np.abs(S1 - S3)))
+            print(np.max(np.abs(Sref - S1)), '28 ', np.mean(np.abs(Sref - S1))/np.std(Sref))
+            print(np.max(np.abs(Sref - S2)), '29', np.mean(np.abs(Sref - S2))/np.std(Sref))
+            print(np.max(np.abs(Sref - S3)), '28 (tconvolve)', np.mean(np.abs(Sref - S3))/np.std(Sref))
 
             #--------
             Sc = S2[0] +  (1j * S1[1] if spin > 0 else 0.)
