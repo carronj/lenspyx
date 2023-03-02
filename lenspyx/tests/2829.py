@@ -25,8 +25,8 @@ def get_ffi(dlmax_gl, USE29, nthreads=4, dlmax=1024, epsilon=1e-5):
 if __name__ == '__main__':
     import argparse, os, time, json
     parser = argparse.ArgumentParser(description='test FFP10-like fwd building')
-    parser.add_argument('-s', dest='spin', type=int, default=0, help='spin to test')
-    parser.add_argument('-eps', dest='epsilon', type=float, default=5., help='-log10 of lensing accuracy')
+    parser.add_argument('-s', dest='spin', type=int, default=2, help='spin to test')
+    parser.add_argument('-eps', dest='epsilon', type=float, default=7., help='-log10 of lensing accuracy')
 
     args = parser.parse_args()
 
@@ -45,14 +45,14 @@ if __name__ == '__main__':
     cpu_count = min(multiprocessing.cpu_count(), 36)
     ffi_ref = get_ffi(dlmax_gl, False, nthreads=cpu_count, epsilon=1e-11)
     ptg = ffi_ref._build_angles()
+    assert ptg.dtype == np.float64
     Sref = ffi_ref.gclm2lenmap(ebunl.astype(np.complex128), mmax_unl, spin, False,   polrot=False)
     for tentative in [1, 2, 3]:
-        ffi = get_ffi(dlmax_gl, False, nthreads=4)
         for nt in [4]:
             os.environ['OMP_NUM_THREADS'] = str(nt)
 
             print('doing %s_%s'%(nt, tentative))
-            ffi = get_ffi(dlmax_gl, False, nthreads=cpu_count, epsilon=epsilon)
+            ffi = get_ffi(dlmax_gl, False, nthreads=nt, epsilon=epsilon)
             ffi.verbosity = 0
             ffi.cacher.cache('ptg', ptg.copy())
             t0 = time.time()
