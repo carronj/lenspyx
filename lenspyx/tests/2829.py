@@ -45,7 +45,7 @@ if __name__ == '__main__':
     cpu_count = min(multiprocessing.cpu_count(), 36)
     ffi_ref = get_ffi(dlmax_gl, False, nthreads=cpu_count, epsilon=1e-11)
     ptg = ffi_ref._build_angles()
-    Sref = ffi_ref.gclm2lenmap(ebunl, mmax_unl, spin, False,   polrot=False)
+    Sref = ffi_ref.gclm2lenmap(ebunl.astype(np.complex128), mmax_unl, spin, False,   polrot=False)
     for tentative in [1, 2, 3]:
         ffi = get_ffi(dlmax_gl, False, nthreads=4)
         for nt in [4]:
