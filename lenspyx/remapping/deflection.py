@@ -44,7 +44,8 @@ rtype = {np.dtype(np.complex64): np.float32,
 
 class deflection:
     def __init__(self, lens_geom:Geom, dglm, mmax_dlm:int or None, numthreads:int=0,
-                 cacher:cachers.cacher or None=None, dclm:np.ndarray or None=None, epsilon=1e-5, verbosity=0, single_prec=True):
+                 cacher:cachers.cacher or None=None, dclm:np.ndarray or None=None,
+                 epsilon=1e-5, verbosity=0, single_prec=True, planned=False):
         """Deflection field object than can be used to lens several maps with forward or backward deflection
 
             Args:
@@ -99,6 +100,9 @@ class deflection:
         self.single_prec = single_prec * (epsilon > 1e-6) # Uses single precision arithmetic in some places
         self.single_prec_ptg = False
         self.tim = timer(False, 'deflection instance timer')
+
+        self.planned = planned
+        self.plans = {}
 
         if HAS_NUMEXPR:
             os.environ['NUMEXPR_MAX_THREADS'] = str(numthreads)
@@ -174,6 +178,20 @@ class deflection:
                 print(self.tim)
             return thp_phip_mgamma
         return self.cacher.load(fn)
+
+    def make_plan(self, lmax, spin):
+        if lmax not in self.plans:
+            print("(NB: plan independent of spin)")
+            self.tim.start('planning %s'%lmax)
+            ntheta = ducc0.fft.good_size(lmax + 2)
+            nphihalf = ducc0.fft.good_size(lmax + 1)
+            nphi = 2 * nphihalf
+            ptg = self._get_ptg()
+            plan = ducc0.nufft.plan(nu2u=False, coord=ptg, grid_shape=(2 * ntheta - 2, nphi), epsilon=self.epsilon,
+                                        nthreads=self.sht_tr, periodicity=2 * np.pi, fft_order=True)
+            self.plans[lmax] = plan
+            self.tim.close('planning %s'%lmax)
+        return self.plans[lmax]
 
     def change_dlm(self, dlm:list or np.ndarray, mmax_dlm:int or None, cacher:cachers.cacher or None=None):
         assert len(dlm) == 2, (len(dlm), 'gradient and curl mode (curl can be none)')
@@ -284,15 +302,21 @@ class deflection:
             map_dfs = ducc0.fft.c2c(map_dfs, axes=(0, 1), inorm=2, nthreads=self.sht_tr, out=map_dfs)
         self.tim.add('map_dfs 2DFFT')
 
-        # perform NUFFT
-        if ptg is None:
-            ptg = self._get_ptg()
-        self.tim.add('get ptg')
-        # perform NUFFT
-        values = ducc0.nufft.u2nu(grid=map_dfs, coord=ptg, forward=False,
-                                  epsilon=self.epsilon, nthreads=self.sht_tr,
-                                  verbosity=self.verbosity, periodicity=2 * np.pi, fft_order=True)
-        self.tim.add('u2nu')
+        if self.planned: # planned nufft
+            assert ptg is None
+            plan = self.make_plan(lmax_unl, spin)
+            values = plan.u2nu(grid=map_dfs, forward=False, verbosity=self.verbosity)
+            self.tim.add('planned u2nu')
+        else:
+            # perform NUFFT
+            if ptg is None:
+                ptg = self._get_ptg()
+            self.tim.add('get ptg')
+            # perform NUFFT
+            values = ducc0.nufft.u2nu(grid=map_dfs, coord=ptg, forward=False,
+                                      epsilon=self.epsilon, nthreads=self.sht_tr,
+                                      verbosity=self.verbosity, periodicity=2 * np.pi, fft_order=True)
+            self.tim.add('u2nu')
 
         if spin * polrot: #TODO: at some point get rid of these exp(arctan...)
                           # maybe simplest to cache cis g and multpily in place a couple of times
@@ -332,12 +356,17 @@ class deflection:
         nphihalf = ducc0.fft.good_size(lmax + 1)
         nphi = 2 * nphihalf
         map_dfs = np.empty((2 * ntheta - 2, nphi), dtype=points.dtype)
+        if self.planned:
+            plan = self.make_plan(lmax, spin)
+            map_dfs = plan.nu2u(points=points, out=map_dfs, forward=True, verbosity=self.verbosity)
+            self.tim.add('planned nu2u')
 
-        # perform NUFFT
-        map_dfs = ducc0.nufft.nu2u(points=points, coord=ptg, out=map_dfs, forward=True,
-                                   epsilon=self.epsilon, nthreads=self.sht_tr, verbosity=self.verbosity,
-                                   periodicity=2 * np.pi, fft_order=True)
-        self.tim.add('map_dfs')
+        else:
+            # perform NUFFT
+            map_dfs = ducc0.nufft.nu2u(points=points, coord=ptg, out=map_dfs, forward=True,
+                                       epsilon=self.epsilon, nthreads=self.sht_tr, verbosity=self.verbosity,
+                                       periodicity=2 * np.pi, fft_order=True)
+            self.tim.add('nu2u')
         # go to position space
         map_dfs = ducc0.fft.c2c(map_dfs, axes=(0, 1), forward=False, inorm=2, nthreads=self.sht_tr, out=map_dfs)
         self.tim.add('c2c FFT')
