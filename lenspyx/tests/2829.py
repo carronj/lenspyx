@@ -60,7 +60,12 @@ if __name__ == '__main__':
             t0 = time.time()
             S1 = ffi.gclm2lenmap(ebunl, mmax_unl, spin, False, polrot=False)
             print('28 fwd: %.3f'%(time.time() - t0))
-
+            ffi.planned = True
+            ffi.make_plan(lmax_unl, spin)
+            t0 = time.time()
+            S4 = ffi.gclm2lenmap(ebunl, mmax_unl, spin, False, polrot=False)
+            print('28 fwd (planned nuFFT): %.3f'%(time.time() - t0))
+            ffi.planned = False
             ffi._totalconvolves0 = True
             t0 = time.time()
             S3 = ffi.gclm2lenmap(ebunl, mmax_unl, spin, False, polrot=False)
@@ -77,6 +82,7 @@ if __name__ == '__main__':
             print(np.max(np.abs(Sref - S1)), '28 ', np.mean(np.abs(Sref - S1))/np.std(Sref))
             print(np.max(np.abs(Sref - S2)), '29', np.mean(np.abs(Sref - S2))/np.std(Sref))
             print(np.max(np.abs(Sref - S3)), '28 (tconvolve)', np.mean(np.abs(Sref - S3))/np.std(Sref))
+            print(np.max(np.abs(Sref - S4)), '28 (planned u2u)', np.mean(np.abs(Sref - S3))/np.std(Sref))
 
             #--------
             Sc = S2[0] +  (1j * S1[1] if spin > 0 else 0.)
@@ -84,10 +90,17 @@ if __name__ == '__main__':
             S4 = ffi.lenmap2gclm(Sc, spin, lmax_len, mmax_len)
             print('28 bwd: %.3f'%(time.time() - t0))
 
+            ffi.planned = True
+            ffi.make_plan(lmax_len, spin)
+            t0 = time.time()
+            S4 = ffi.lenmap2gclm(Sc, spin, lmax_len, mmax_len)
+            print('28 bwd (planned nuFFT): %.3f'%(time.time() - t0))
+
+            ffi.planned = False
             ffi._totalconvolves0 = True
             t0 = time.time()
             S4 = ffi.lenmap2gclm(Sc, spin, lmax_len, mmax_len)
-            print('28 bwd: %.3f'%(time.time() - t0))
+            print('28 bwd (total convolve): %.3f'%(time.time() - t0))
 
             ffi29.verbosity = 1
             t0 = time.time()
