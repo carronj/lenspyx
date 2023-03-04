@@ -45,7 +45,7 @@ rtype = {np.dtype(np.complex64): np.float32,
 class deflection:
     def __init__(self, lens_geom:Geom, dglm, mmax_dlm:int or None, numthreads:int=0,
                  cacher:cachers.cacher or None=None, dclm:np.ndarray or None=None,
-                 epsilon=1e-5, verbosity=0, single_prec=True, planned=False):
+                 epsilon=1e-5, verbosity=0, single_prec=True, planned=True):
         """Deflection field object than can be used to lens several maps with forward or backward deflection
 
             Args:
@@ -93,7 +93,6 @@ class deflection:
 
         self.verbosity = verbosity
         self.epsilon = epsilon # accuracy of the totalconvolve interpolation result
-        self.ofactor = 1.5  # upsampling grid factor
 
 
 
@@ -110,6 +109,7 @@ class deflection:
         if verbosity:
             print(" DUCC totalconvolve deflection instantiated" + self.single_prec * '(single prec)', self.epsilon)
         self._totalconvolves0 = False
+        self.ofactor = 1.5  # upsampling grid factor (only used if _totalconvolves is set)
 
     def _get_ptg(self):
         # TODO improve this and fwd angles
@@ -209,7 +209,7 @@ class deflection:
         """
         print("**** change_geom, DO YOU REALLY WANT THIS??")
         return deflection(lens_geom, self.dlm, self.mmax_dlm, self.sht_tr, cacher, self.dclm,
-                          verbosity=self.verbosity, epsilon=self.epsilon)
+                          verbosity=self.verbosity, epsilon=self.epsilon, planned=self.planned)
 
     def gclm2lenpixs(self, gclm:np.ndarray, mmax:int or None, spin:int, pixs:np.ndarray[int], polrot=True):
         """Produces the remapped field on the required lensing geometry pixels 'exactly', by brute-force calculation
@@ -545,6 +545,42 @@ class deflection:
             #                 -      (   cos 2b * g1 + sin 2b * g2 )
         self.tim.close('dlm2A')
         return A.squeeze()
+
+    def _make_angles(self):
+        self.tim.start('_make_angles')
+        dgclm = np.empty((2, self.dlm.size), dtype=self.dlm.dtype)
+        dgclm[0] = self.dlm
+        dgclm[1] = np.zeros_like(self.dlm) if self.dclm is None else self.dclm
+        atp = self.geom.synthesis(dgclm, 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr)
+        del dgclm
+        self.tim.start('vec proper')
+        #from scipy.special import spherical_jn as jn
+        d = np.sqrt(np.sum(atp ** 2, axis=0))
+        sindd = np.sin(d) / d
+        cosd = np.cos(d)
+
+        atp *= sindd
+        at = atp[0]
+
+        ret = np.empty((3, self.geom.npix()))
+        ret[1] = atp[1]
+        arg = self.geom.argsort
+        sts = np.sin(self.geom.theta[arg])
+        cts = np.cos(self.geom.theta[arg])
+        for ir, ct, st, ofs, nph in zip(arg, cts, sts, self.geom.ofs[arg], self.geom.nph[arg]):  # We must follow the ordering of scarf position-space map
+            sli = slice(ofs, ofs+nph)
+            ret[0, sli] = st * cosd[sli] + ct * at[sli]
+            ret[2, sli] = ct * cosd[sli] - st * at[sli]
+        self.tim.close('vec proper')
+        self.tim.start('vec2ang')
+        angs = ducc0.healpix.vec2ang(ret.T, nthreads=self.sht_tr)
+        del ret
+        self.tim.close('vec2ang')
+        for ir, nph, phi0 in zip(arg, self.geom.nph[arg], self.geom.phi0[arg]):  # We must follow the ordering of scarf position-space map
+            dpix = np.arange(nph, dtype=int)
+            angs[self.geom.ofs[ir]:self.geom.ofs[ir] + nph, 1] += (phi0 + dpix * ((2 * np.pi) / nph))
+        self.tim.close('_make_angles')
+        return angs # no need to modulo 2 pi for ducc routines (?)
 
 def get_spin_raise(s, lmax):
     r"""Response coefficient of spin-s spherical harmonic to spin raising operator.
