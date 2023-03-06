@@ -45,7 +45,7 @@ rtype = {np.dtype(np.complex64): np.float32,
 class deflection:
     def __init__(self, lens_geom:Geom, dglm, mmax_dlm:int or None, numthreads:int=0,
                  cacher:cachers.cacher or None=None, dclm:np.ndarray or None=None,
-                 epsilon=1e-5, verbosity=0, single_prec=True, planned=True):
+                 epsilon=1e-5, verbosity=0, single_prec=True, planned=False):
         """Deflection field object than can be used to lens several maps with forward or backward deflection
 
             Args:
@@ -180,6 +180,11 @@ class deflection:
         return self.cacher.load(fn)
 
     def make_plan(self, lmax, spin):
+        """Builds nuFFT plan for slightly faster transforms
+
+            Useful if many remapping operations will be done from the same deflection field
+
+        """
         if lmax not in self.plans:
             print("(NB: plan independent of spin)")
             self.tim.start('planning %s'%lmax)

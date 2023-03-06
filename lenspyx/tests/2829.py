@@ -82,7 +82,7 @@ if __name__ == '__main__':
             print(np.max(np.abs(Sref - S1)), '28 ', np.mean(np.abs(Sref - S1))/np.std(Sref))
             print(np.max(np.abs(Sref - S2)), '29', np.mean(np.abs(Sref - S2))/np.std(Sref))
             print(np.max(np.abs(Sref - S3)), '28 (tconvolve)', np.mean(np.abs(Sref - S3))/np.std(Sref))
-            print(np.max(np.abs(Sref - S4)), '28 (planned u2u)', np.mean(np.abs(Sref - S3))/np.std(Sref))
+            print(np.max(np.abs(Sref - S4)), '28 (planned u2u)', np.mean(np.abs(Sref - S4))/np.std(Sref))
 
             #--------
             Sc = S2[0] +  (1j * S1[1] if spin > 0 else 0.)
