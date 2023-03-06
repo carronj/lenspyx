@@ -29,6 +29,7 @@ if __name__ == '__main__':
     parser.add_argument('-eps', dest='epsilon', type=float, default=7., help='-log10 of lensing accuracy')
     parser.add_argument('-lmaxlen', dest='lmax_len', type=int, default=4096, help='lmax of lensed CMBs')
     parser.add_argument('-lmaxunl', dest='lmax_unl', type=int, default=5120, help='lmax of unlensed CMBs')
+    parser.add_argument('-dlmaxgl', dest='dlmax_gl', type=int, default=1024, help='buffer to GL grid')
 
     args = parser.parse_args()
 
@@ -37,7 +38,7 @@ if __name__ == '__main__':
     lmax_len, mmax_len= args.lmax_len, args.lmax_len
     lmax_unl = args.lmax_unl
     mmax_unl = lmax_unl
-    dlmax_gl = 1024
+    dlmax_gl = args.dlmax_gl
     ebunl = np.array([hp.synalm(cls_unl['ee'][:lmax_unl + 1]),
                       hp.synalm(cls_unl['bb'][:lmax_unl + 1])])
     ebunl = ebunl[0:1 + (spin > 0)]
@@ -47,6 +48,7 @@ if __name__ == '__main__':
     cpu_count = min(multiprocessing.cpu_count(), 36)
     ffi_ref = get_ffi(dlmax_gl, False, nthreads=cpu_count, epsilon=1e-11)
     ptg = ffi_ref._build_angles()
+    print(ffi_ref.tim)
     assert ptg.dtype == np.float64
     Sref = ffi_ref.gclm2lenmap(ebunl.astype(np.complex128), mmax_unl, spin, False,   polrot=False)
     for tentative in [1, 2, 3]:
@@ -78,7 +80,7 @@ if __name__ == '__main__':
             t0 = time.time()
             S2 = ffi29.gclm2lenmap(ebunl, mmax_unl, spin, False,  polrot=False)
             print('29 fwd: %.3f'%(time.time() - t0))
-            #print(ffi.tim)
+            print(ffi29.tim)
             print(np.max(np.abs(Sref - S1)), '28 ', np.mean(np.abs(Sref - S1))/np.std(Sref))
             print(np.max(np.abs(Sref - S2)), '29', np.mean(np.abs(Sref - S2))/np.std(Sref))
             print(np.max(np.abs(Sref - S3)), '28 (tconvolve)', np.mean(np.abs(Sref - S3))/np.std(Sref))
