@@ -3,7 +3,7 @@ import numpy as np
 import ducc0
 from ducc0.misc import GL_thetas, GL_weights
 from ducc0.fft import good_size
-from ducc0.sht.experimental import synthesis, adjoint_synthesis
+from ducc0.sht.experimental import synthesis, adjoint_synthesis, synthesis_deriv1
 
 
 def st2mmax(spin, tht, lmax):
@@ -36,13 +36,14 @@ class Geom:
         for arr in [phi0, nphi, ringstart, w]:
             assert arr.size == theta.size
 
-        self.theta = theta.astype(np.float64)
-        self.weight = w.astype(np.float64)
-        self.phi0 = phi0.astype(np.float64)
-        self.nph = nphi.astype(np.uint64)
-        self.ofs = ringstart.astype(np.uint64)
+        argsort = np.argsort(nphi)[::-1] # We sort the rings by decreasing nphi
+        self.theta = theta[argsort].astype(np.float64)
+        self.weight = w[argsort].astype(np.float64)
+        self.phi0 = phi0[argsort].astype(np.float64)
+        self.nph = nphi[argsort].astype(np.uint64)
+        self.ofs = ringstart[argsort].astype(np.uint64)
 
-        self.argsort = np.argsort(self.ofs)
+        self.sorted = True
 
     def npix(self):
         """Number of pixels
@@ -66,6 +67,13 @@ class Geom:
         return synthesis(alm=gclm, theta=self.theta, lmax=lmax, mmax=mmax, nphi=self.nph, spin=spin, phi0=self.phi0,
                          nthreads=nthreads, ringstart=self.ofs)
 
+    def synthesis_deriv1(self, alm: np.ndarray, lmax:int, mmax:int, nthreads:int):
+        """Wrapper to ducc synthesis_deriv1
+
+        """
+        return synthesis_deriv1(alm=alm, theta=self.theta, lmax=lmax, mmax=mmax, nphi=self.nph, phi0=self.phi0,
+                         nthreads=nthreads, ringstart=self.ofs)
+
     def adjoint_synthesis(self, m: np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int):
         """Wrapper to ducc backward SHT
 
@@ -76,7 +84,7 @@ class Geom:
 
         """
         m = np.atleast_2d(m)
-        for of, w, npi in zip(self.ofs[self.argsort], self.weight[self.argsort], self.nph[self.argsort]):
+        for of, w, npi in zip(self.ofs, self.weight, self.nph):
             m[:, of:of + npi] *= w
         return adjoint_synthesis(map=m, theta=self.theta, lmax=lmax, mmax=mmax, nphi=self.nph, spin=spin, phi0=self.phi0,
                                  nthreads=nthreads, ringstart=self.ofs)
