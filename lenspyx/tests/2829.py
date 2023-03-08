@@ -45,14 +45,17 @@ if __name__ == '__main__':
     if single_prec:
         ebunl = ebunl.astype(np.complex64)
     import multiprocessing
+
+    POLROT = True
     cpu_count = min(multiprocessing.cpu_count(), 36)
-    ffi_ref = get_ffi(dlmax_gl, False, nthreads=cpu_count, epsilon=1e-11)
+    nts = range(1, cpu_count+ 1)
+    ffi_ref = get_ffi(dlmax_gl, False, nthreads=nts[-1], epsilon=1e-11)
     ptg = ffi_ref._build_angles()
     print(ffi_ref.tim)
     assert ptg.dtype == np.float64
-    Sref = ffi_ref.gclm2lenmap(ebunl.astype(np.complex128), mmax_unl, spin, False,   polrot=False)
-    for tentative in [1, 2, 3]:
-        for nt in [4]:
+    Sref = ffi_ref.gclm2lenmap(ebunl.astype(np.complex128), mmax_unl, spin, False,   polrot=POLROT)
+    for tentative in [1]:
+        for nt in nts:
             os.environ['OMP_NUM_THREADS'] = str(nt)
 
             print('doing %s_%s'%(nt, tentative))
@@ -60,26 +63,26 @@ if __name__ == '__main__':
             ffi.verbosity = 0
             ffi.cacher.cache('ptg', ptg.copy())
             t0 = time.time()
-            S1 = ffi.gclm2lenmap(ebunl, mmax_unl, spin, False, polrot=False)
-            print('28 fwd: %.3f'%(time.time() - t0))
+            S1 = ffi.gclm2lenmap(ebunl, mmax_unl, spin, False, polrot=POLROT)
+            print('28 fwd %s threads: %.3f'%(ffi.sht_tr, time.time() - t0))
             ffi.planned = True
             ffi.make_plan(lmax_unl, spin)
             t0 = time.time()
-            S4 = ffi.gclm2lenmap(ebunl, mmax_unl, spin, False, polrot=False)
-            print('28 fwd (planned nuFFT): %.3f'%(time.time() - t0))
+            S4 = ffi.gclm2lenmap(ebunl, mmax_unl, spin, False, polrot=POLROT)
+            print('28 fwd %s (planned nuFFT): %.3f'%(ffi.sht_tr,time.time() - t0))
             ffi.planned = False
             ffi._totalconvolves0 = True
             t0 = time.time()
-            S3 = ffi.gclm2lenmap(ebunl, mmax_unl, spin, False, polrot=False)
-            print('28 fwd (total convolve): %.3f' % (time.time() - t0))
+            S3 = ffi.gclm2lenmap(ebunl, mmax_unl, spin, False, polrot=POLROT)
+            print('28 fwd %s (total convolve): %.3f' % (ffi.sht_tr,time.time() - t0))
 
             #print(ffi.tim)
             ffi29 = get_ffi(dlmax_gl, True, nthreads=nt, epsilon=epsilon)
             ffi29.verbosity = 0
             ffi29.cacher.cache('ptg', ptg.copy())
             t0 = time.time()
-            S2 = ffi29.gclm2lenmap(ebunl, mmax_unl, spin, False,  polrot=False)
-            print('29 fwd: %.3f'%(time.time() - t0))
+            S2 = ffi29.gclm2lenmap(ebunl, mmax_unl, spin, False,  polrot=POLROT)
+            print('29 fwd %s: %.3f'%(ffi29.sht_tr, time.time() - t0))
             print(ffi29.tim)
             print(np.max(np.abs(Sref - S1)), '28 ', np.mean(np.abs(Sref - S1))/np.std(Sref))
             print(np.max(np.abs(Sref - S2)), '29', np.mean(np.abs(Sref - S2))/np.std(Sref))
