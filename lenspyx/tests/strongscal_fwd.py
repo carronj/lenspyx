@@ -41,8 +41,8 @@ if __name__ == '__main__':
     ebunl = np.atleast_2d(ebunl[:1 + (spin > 0)])
     import multiprocessing
     cpu_count = min(multiprocessing.cpu_count(), 36)
-    for tentative in [1, 2, 3, 4]:
-        for nt in [4]:
+    for tentative in [1]:
+        for nt in range(6):
             os.environ['OMP_NUM_THREADS'] = str(nt)
             print('doing %s_%s'%(nt, tentative))
             json_file = DIR + '/sscal_fwd_%s%s_%s_sgl.json'%('v29_'*USE29, nt, tentative)

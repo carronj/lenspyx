@@ -112,7 +112,7 @@ class deflection:
         self.ofactor = 1.5  # upsampling grid factor (only used if _totalconvolves is set)
 
     def _get_ptg(self):
-        # TODO improve this and fwd angles
+        # TODO improve this and fwd angles, e.g. this is computed twice for gamma if no cacher
         return self._build_angles()[:, 0:2]  # -gamma in third argument
 
     def _get_mgamma(self):
@@ -128,20 +128,29 @@ class deflection:
         if not self.cacher.is_cached(fn):
             self.tim.start('_build_angles')
             self.tim.reset()
-            assert np.all(self.geom.theta > 0.) and np.all(self.geom.theta < np.pi), 'fix this (cotangent below)'
-            dgclm = np.empty((2, self.dlm.size), dtype=self.dlm.dtype)
-            dgclm[0] = self.dlm
-            dgclm[1] = np.zeros_like(self.dlm) if self.dclm is None else self.dclm
-            red, imd = self.geom.synthesis(dgclm, 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr)
+            if False and self.dclm:
+                # undo p2d to use
+                # FIXME: open this if plm is input
+                p2d = np.sqrt(np.arange(self.lmax_dlm + 1) * np.arange(1, self.lmax_dlm + 2))
+                p2d[0] = 1.
+                plm = almxfl(self.dlm, 1. / p2d, self.mmax_dlm, False)
+                red, imd = self.geom.synthesis_deriv1(np.atleast_2d(plm), self.lmax_dlm, self.mmax_dlm, self.sht_tr)
+                self.tim.add('d1 synthesis_deriv1')
+            else:
+                #FIXME: want to do that only once
+                dgclm = np.empty((2, self.dlm.size), dtype=self.dlm.dtype)
+                dgclm[0] = self.dlm
+                dgclm[1] = self.dclm if self.dclm is not None else 0.
+                red, imd = self.geom.synthesis(dgclm, 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr)
+                self.tim.add('d1 alm2map_spin')
             # Probably want to keep red, imd double precision for the calc?
             npix = Geom.npix(self.geom)
-            self.tim.add('d1 alm2map_spin')
             if fortran and HAS_FORTRAN and (np.abs(self.geom.fsky() - 1.) < 1e-5):
                 tht, phi0, nph, ofs = self.geom.theta, self.geom.phi0, self.geom.nph, self.geom.ofs
                 if self.single_prec_ptg:
                     thp_phip_mgamma = fremap.remapping.fpointing(red, imd, tht, phi0, nph, ofs)
                 else:
-                    thp_phip_mgamma = fremap.remapping.pointing(red, imd, tht, phi0, nph, ofs)
+                    thp_phip_mgamma = fremap.remapping.pointing(red, imd, tht, phi0, nph, ofs, self.sht_tr)
                 self.tim.add('thts, phis and gammas  (fortran)')
                 # I think this just trivially turns the F-array into a C-contiguous array:
                 self.cacher.cache(fn, thp_phip_mgamma.transpose())
@@ -153,6 +162,7 @@ class deflection:
                 print('Cant use fortran pointing building since import failed. Falling back on python impl.')
             thp_phip_mgamma = np.empty((3, npix), dtype=float)  # (-1) gamma in last arguement
             startpix = 0
+            assert np.all(self.geom.theta > 0.) and np.all(self.geom.theta < np.pi), 'fix this (cotangent below)'
             for ir in np.argsort(self.geom.ofs): # We must follow the ordering of scarf position-space map
                 pixs = Geom.rings2pix(self.geom, [ir])
                 if pixs.size > 0:
@@ -551,39 +561,54 @@ class deflection:
         self.tim.close('dlm2A')
         return A.squeeze()
 
-    def _make_angles(self):
+    def _make_angles(self, version=0):
         self.tim.start('_make_angles')
+        self.tim.start('_spin 1 synthesis')
         dgclm = np.empty((2, self.dlm.size), dtype=self.dlm.dtype)
         dgclm[0] = self.dlm
         dgclm[1] = np.zeros_like(self.dlm) if self.dclm is None else self.dclm
         atp = self.geom.synthesis(dgclm, 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr)
         del dgclm
+        self.tim.close('_spin 1 synthesis')
         self.tim.start('vec proper')
         #from scipy.special import spherical_jn as jn
         d = np.sqrt(np.sum(atp ** 2, axis=0))
         sindd = np.sin(d) / d
         cosd = np.cos(d)
-
         atp *= sindd
         at = atp[0]
 
         ret = np.empty((3, self.geom.npix()))
         ret[1] = atp[1]
-        arg = self.geom.argsort
-        sts = np.sin(self.geom.theta[arg])
-        cts = np.cos(self.geom.theta[arg])
-        for ir, ct, st, ofs, nph in zip(arg, cts, sts, self.geom.ofs[arg], self.geom.nph[arg]):  # We must follow the ordering of scarf position-space map
+        sts = np.sin(self.geom.theta)
+        cts = np.cos(self.geom.theta)
+        self.tim.start('_rotation')
+        for ir, (ct, st, ofs, nph) in enumerate(zip(cts, sts, self.geom.ofs, self.geom.nph)):  # We must follow the ordering of scarf position-space map
             sli = slice(ofs, ofs+nph)
             ret[0, sli] = st * cosd[sli] + ct * at[sli]
             ret[2, sli] = ct * cosd[sli] - st * at[sli]
+        self.tim.close('_rotation')
         self.tim.close('vec proper')
-        self.tim.start('vec2ang')
-        angs = ducc0.healpix.vec2ang(ret.T, nthreads=self.sht_tr)
-        del ret
-        self.tim.close('vec2ang')
-        for ir, nph, phi0 in zip(arg, self.geom.nph[arg], self.geom.phi0[arg]):  # We must follow the ordering of scarf position-space map
-            dpix = np.arange(nph, dtype=int)
-            angs[self.geom.ofs[ir]:self.geom.ofs[ir] + nph, 1] += (phi0 + dpix * ((2 * np.pi) / nph))
+        if version == 0:
+            self.tim.start('vec2ang (ducc)')
+            angs = ducc0.healpix.vec2ang(ret.T, nthreads=self.sht_tr)
+            del ret
+            self.tim.close('vec2ang (ducc)')
+        elif version == 1:
+            self.tim.start('vec2ang (python)')
+            angs = np.empty( (self.geom.npix(), 2),  dtype=float)
+            angs[:, 0] = np.arccos(ret[2])
+            angs[:, 1] = np.arctan2(ret[1], ret[0])
+            self.tim.close('vec2ang (python)')
+        else:
+            assert 0
+        self.tim.start('adding dphi')
+
+        assert self.geom.sorted
+        dpix2pi = np.arange(self.geom.nph[0], dtype=int) * (2 * np.pi)
+        for ir, (nph, phi0) in enumerate(zip(self.geom.nph, self.geom.phi0)):  # We must follow the ordering of scarf position-space map
+            angs[self.geom.ofs[ir]:self.geom.ofs[ir] + nph, 1] += (phi0 + dpix2pi[:nph] / nph)
+        self.tim.close('adding dphi')
         self.tim.close('_make_angles')
         return angs # no need to modulo 2 pi for ducc routines (?)
 

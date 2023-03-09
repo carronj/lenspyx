@@ -111,10 +111,11 @@ module remapping
         end if
     end subroutine ang2d_scal
 
-    subroutine fpointing(npix, nring, red, imd, thts, phi0s, nphis, ptg, ofs)
+    subroutine fpointing(npix, nring, red, imd, thts, phi0s, nphis, ptg, ofs, nthreads)
         ! output angles in single precision
+        use OMP_LIB
         implicit none
-        integer, intent(in) :: npix, nring
+        integer, intent(in) :: npix, nring, nthreads
         integer, intent(in) :: nphis(nring), ofs(nring)
         double precision, intent(in) :: red(npix), imd(npix), thts(nring), phi0s(nring)
         real, intent(out) :: ptg(3, npix)
@@ -122,6 +123,8 @@ module remapping
         double precision phi, dphi, sint, cost, cott, d, sind_d, e_t, e_d, e_tp, costp, sintp
         double precision :: PI2 = DPI * 2d0
         integer ir, ip, pix, version
+
+        call OMP_SET_NUM_THREADS(nthreads)
         !$OMP PARALLEL DO DEFAULT(NONE)&
         !$OMP SHARED(PI2, thts, red, imd, ptg, nphis, phi0s, npix, nring, ofs)&
         !$OMP PRIVATE(ip, thtp, phip,gamma, e_t, sint, cost, cott, e_d, e_tp, costp, sintp, pix, phi, dphi, version, d, sind_d)
@@ -200,10 +203,10 @@ module remapping
         end do
         !$OMP END PARALLEL DO
     end subroutine fpointing
-    subroutine pointing(npix, nring, red, imd, thts, phi0s, nphis, ptg, ofs)
-        ! output angles in single precision
+    subroutine pointing(npix, nring, red, imd, thts, phi0s, nphis, ptg, ofs, nthreads)
+        use OMP_LIB
         implicit none
-        integer, intent(in) :: npix, nring
+        integer, intent(in) :: npix, nring, nthreads
         integer, intent(in) :: nphis(nring), ofs(nring)
         double precision, intent(in) :: red(npix), imd(npix), thts(nring), phi0s(nring)
         double precision, intent(out) :: ptg(3, npix)
@@ -212,6 +215,7 @@ module remapping
         double precision :: PI2 = DPI * 2d0
         integer ir, ip, pix, version
 
+        call OMP_SET_NUM_THREADS(nthreads)
         !$OMP PARALLEL DO DEFAULT(NONE)&
         !$OMP SHARED(PI2, thts, red, imd, ptg, nphis, phi0s, npix, nring, ofs)&
         !$OMP PRIVATE(ip, thtp, phip,gamma, e_t, sint, cost, cott, e_d, e_tp, costp, sintp, pix, phi, dphi, version, d, sind_d)
@@ -292,4 +296,55 @@ module remapping
         end do
         !$OMP END PARALLEL DO
     end subroutine pointing
+    subroutine pointingv2(npix, nring, red, imd, thts, phi0s, nphis, ptg, ofs, nthreads)
+        use OMP_LIB
+        implicit none
+        integer, intent(in) :: npix, nring, nthreads
+        integer, intent(in) :: nphis(nring), ofs(nring)
+        double precision, intent(in) :: red(npix), imd(npix), thts(nring), phi0s(nring)
+        double precision, intent(out) :: ptg(3, npix)
+        real thtp, phip, gamma
+        double precision phi, dphi, sint, cost, cott, d, sind_d, cosd, sind, at, ap
+        double precision :: PI2 = DPI * 2d0
+        integer ir, ip, pix
+
+        call OMP_SET_NUM_THREADS(nthreads)
+        !$OMP PARALLEL DO DEFAULT(NONE)&
+        !$OMP SHARED(PI2, thts, red, imd, ptg, nphis, phi0s, npix, nring, ofs)&
+        !$OMP PRIVATE(ip, thtp, phip,gamma, at, sint, cost, cott, cosd, sind, ap, pix, phi, dphi, d, sind_d)
+        do ir = 1, nring
+            sint = dsin(thts(ir))
+            cost = dcos(thts(ir))
+            cott = cost / sint
+            pix = ofs(ir) + 1
+            phi = phi0s(ir)
+            dphi =  PI2  / nphis(ir)
+            do ip = 1, nphis(ir)
+                d = red(pix) * red(pix) + imd(pix) * imd(pix)
+                !sind_d = 1d0 - d / 6d0 * (1d0 - d / 20d0 * (1d0 - d / 42d0))
+                !d = dsqrt(d)
+                if (d > 0d0) then
+                    d = dsqrt(d)
+                    sind = dsin(d)
+                    sind_d = dsin(d) / d
+                    cosd = dcos(d)
+                else
+                    sind = 0d0
+                    sind_d = 1d0
+                    cosd = 1d0
+                end if
+                at = red(pix) * sind_d
+                ap = imd(pix) * sind_d
+                thtp = dacos(cost * cosd - sint * at)
+                phip = modulo(phi + datan2(ap, cost * at + sint * cosd), PI2)
+                gamma = datan2(ap, at) - datan2(ap, sind * sind * cott + at * cosd)
+                ptg(1, pix) = thtp
+                ptg(2, pix) = phip
+                ptg(3, pix) = -gamma
+                pix = pix + 1
+                phi = phi  + dphi
+            end do
+        end do
+        !$OMP END PARALLEL DO
+    end subroutine pointingv2
 end module remapping
