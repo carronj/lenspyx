@@ -148,7 +148,7 @@ class deflection:
             if fortran and HAS_FORTRAN and (np.abs(self.geom.fsky() - 1.) < 1e-5):
                 tht, phi0, nph, ofs = self.geom.theta, self.geom.phi0, self.geom.nph, self.geom.ofs
                 if self.single_prec_ptg:
-                    thp_phip_mgamma = fremap.remapping.fpointing(red, imd, tht, phi0, nph, ofs)
+                    thp_phip_mgamma = fremap.remapping.fpointing(red, imd, tht, phi0, nph, ofs, self.sht_tr)
                 else:
                     thp_phip_mgamma = fremap.remapping.pointing(red, imd, tht, phi0, nph, ofs, self.sht_tr)
                 self.tim.add('thts, phis and gammas  (fortran)')
