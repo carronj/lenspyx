@@ -90,7 +90,7 @@ class deflection:
         self.geom = lens_geom
         self.pbgeom = pbdGeometry(lens_geom, pbounds(0., 2 * np.pi))
 
-        print("deflection: I set numthreads to " + str(cpu_count()))
+        print("deflection: I set numthreads to " + str(numthreads))
         self.sht_tr = numthreads
         self.verbosity = verbosity
         self.epsilon = epsilon # accuracy of the totalconvolve interpolation result

@@ -8,6 +8,8 @@ with open("README.md", "r") as fh:
 
 def configuration(parent_package='', top_path=''):
     config = Configuration('', parent_package, top_path)
+    config.add_extension('lenspyx.shts.fsht', ['lenspyx/shts/shts.f90'],
+                extra_link_args=['-lgomp'],libraries=['gomp'], extra_f90_compile_args=['-fopenmp', '-w'])
     config.add_extension('lenspyx.fortran.remapping', ['lenspyx/fortran/remapping.f90'],
                 extra_link_args=['-lgomp'],libraries=['gomp'], extra_f90_compile_args=['-fopenmp', '-w', '-O3', '-ffast-math'])
     return config

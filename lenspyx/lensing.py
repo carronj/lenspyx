@@ -12,12 +12,13 @@ try :
 except:
     pass
 
+from os import cpu_count
 from lenspyx import utils
 from lenspyx import angles
 from lenspyx.remapping.utils_geom import Geom
 from lenspyx.remapping.deflection_029 import deflection
 
-def alm2lenmap(alm, dlms, nside, epsilon=1e-7, facres=0, nband=8, verbose=True, experimental=True):
+def alm2lenmap(alm, dlms, nside, epsilon=1e-7, facres=0, nband=8, verbose=True, experimental=True, nthreads:int=0):
     r"""Computes a deflected spin-0 healpix map from its alm and deflection field alm.
 
         Args:
@@ -39,6 +40,7 @@ def alm2lenmap(alm, dlms, nside, epsilon=1e-7, facres=0, nband=8, verbose=True, 
             nband(optional): To avoid dealing with too many large maps in memory, the operations is split in bands.
             verbose(optional): If set, prints a bunch of timing and other info. Defaults to true.
             experimental(optional): well, that's experimental
+            nthreads(optional): number of threads to use (defaults to os.cpu_count())
 
         Returns:
             Deflected healpy map at resolution nside.
@@ -47,14 +49,16 @@ def alm2lenmap(alm, dlms, nside, epsilon=1e-7, facres=0, nband=8, verbose=True, 
     """
     assert len(dlms) == 2
     if not np.iscomplexobj(dlms[0]): assert dlms[0].size == dlms[1].size and dlms[0].size == 12 * nside ** 2
+    if nthreads <= 0:
+        nthreads = cpu_count()
     if experimental:
         #FIXME: here dlms must be healpy array
         geom = Geom.get_healpix_geometry(nside)
-        defl = deflection(geom, dlms[0], None, 0, dclm=dlms[1], epsilon=epsilon)
+        defl = deflection(geom, dlms[0], None, dclm=dlms[1], epsilon=epsilon, numthreads=nthreads)
         return defl.gclm2lenmap(alm, None, 0, False)
-    return _lens_gclm_sym_timed(0, dlms[0], -alm, nside, dclm=dlms[1], nband=nband, facres=facres, verbose=verbose)
+    return _lens_gclm_sym_timed(0, dlms[0], -alm, nside, nthreads, dclm=dlms[1], nband=nband, facres=facres, verbose=verbose)
 
-def alm2lenmap_spin(gclm, dlms, nside, spin, epsilon=1e-7, nband=8, facres=-1, verbose=True, experimental=True):
+def alm2lenmap_spin(gclm, dlms, nside, spin, epsilon=1e-7, nband=8, facres=-1, verbose=True, experimental=True, nthreads:int=0):
     r"""Computes a deflected spin-weight Healpix map from its gradient and curl modes and deflection field alm.
 
         Args:
@@ -79,6 +83,7 @@ def alm2lenmap_spin(gclm, dlms, nside, spin, epsilon=1e-7, nband=8, facres=-1, v
             nband(optional): To avoid dealing with too many large maps in memory, the operations is split in bands.
             verbose(optional): If set, prints a bunch of timing and other info. Defaults to true.
             experimental(optional): well, that's experimental
+            nthreads(optional): number of threads to use (defaults to os.cpu_count())
 
 
         Returns:
@@ -89,18 +94,20 @@ def alm2lenmap_spin(gclm, dlms, nside, spin, epsilon=1e-7, nband=8, facres=-1, v
     assert len(gclm) == 2
     assert len(dlms) == 2
     if not np.iscomplexobj(dlms[0]): assert dlms[0].size == dlms[1].size and dlms[0].size == 12 * nside ** 2
+    if nthreads <= 0:
+        nthreads = cpu_count()
     if experimental:
         #FIXME: here dlms must be healpy array
         geom = Geom.get_healpix_geometry(nside)
-        defl = deflection(geom, dlms[0], None, 0, dclm=dlms[1], epsilon=epsilon)
+        defl = deflection(geom, dlms[0], None, dclm=dlms[1], epsilon=epsilon, numthreads=nthreads)
         if gclm[1] is None:
             gclm[1] = np.zeros_like(gclm[0])
         return defl.gclm2lenmap(gclm, None, spin, False)
-    ret = _lens_gclm_sym_timed(spin, dlms[0], gclm[0], nside,
+    ret = _lens_gclm_sym_timed(spin, dlms[0], gclm[0], nside, nthreads,
                                 clm=gclm[1], dclm=dlms[1], nband=nband, facres=facres, verbose=verbose)
     return ret.real, ret.imag
 
-def _lens_gclm_sym_timed(spin, dlm, glm, nside, nband=8, facres=0, clm=None, dclm=None, verbose=True):
+def _lens_gclm_sym_timed(spin, dlm, glm, nside, nthreads, nband=8, facres=0, clm=None, dclm=None, verbose=True):
     """Performs the deflection by splitting the full latitude range into distinct bands which are done one at a time.
 
         See *_lens_gcband_sym* for the single band (north and south hemispheres) lensing.
@@ -148,7 +155,7 @@ def _lens_gclm_sym_timed(spin, dlm, glm, nside, nband=8, facres=0, clm=None, dcl
         dth_patch = (th2 - th1) / (nt_perband -1)
         if verbose: print("cell (theta,phi) in amin (%.3f,%.3f)" % (dth_patch / np.pi * 60. * 180, dphi_patch / np.pi * 60. * 180))
         times.add('defl. angles calc.')
-        len_nr, len_ni, len_sr, len_si = _lens_gcband_sym(spin, glm, th1, th2, nt_perband, nphi, thtp, phipn, thtps, phips,
+        len_nr, len_ni, len_sr, len_si = _lens_gcband_sym(spin, glm, th1, th2, nt_perband, nphi, thtp, phipn, thtps, phips, nthreads,
                                                          clm=clm, times=times)
         if spin == 0:
             ret[pixn] = len_nr
@@ -163,7 +170,7 @@ def _lens_gclm_sym_timed(spin, dlm, glm, nside, nband=8, facres=0, clm=None, dcl
     return ret
 
 
-def _lens_gcband_sym(spin, glm, th1, th2, nt, nphi, thtpn, phipn, thtps, phips, clm=None, times=None):
+def _lens_gcband_sym(spin, glm, th1, th2, nt, nphi, thtpn, phipn, thtps, phips, nthreads, clm=None, times=None):
     r"""Returns deflected maps between a co-latitude range in the North Hemisphere and its South hemisphere counterpart.
 
         This routine performs the deflection only, and not the rotation sourced by the local axes //-transport.
@@ -192,9 +199,9 @@ def _lens_gcband_sym(spin, glm, th1, th2, nt, nphi, thtpn, phipn, thtps, phips, 
 
     tgrid = utils.thgrid(th1, th2).mktgrid(nt)
     if spin == 0:
-        vtm = shts.glm2vtm_sym(0, utils.thgrid.th2colat(tgrid), glm)
+        vtm = shts.glm2vtm_sym(0, utils.thgrid.th2colat(tgrid), glm, nthreads)
     else:
-        vtm = shts.vlm2vtm_sym(spin, utils.thgrid.th2colat(tgrid), utils.alm2vlm(glm, clm=clm))
+        vtm = shts.vlm2vtm_sym(spin, utils.thgrid.th2colat(tgrid), utils.alm2vlm(glm, clm=clm), nthreads)
     times.add('vtm')
 
     # Band on north hemisphere

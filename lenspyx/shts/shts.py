@@ -72,19 +72,19 @@ def vtm2map(spin, vtm, Nphi, pfftwthreads=None, bicubic_prefilt=False, phiflip=(
     return retmap
 
 
-def glm2vtm_sym(s, tht, glm):
+def glm2vtm_sym(s, tht, glm, nthreads):
     r"""This produces :math:`\sum_l _s\Lambda_{lm} v_{lm}` for pure gradient input for a range of colatitudes"""
 
     if s == 0:
         lmax = utils.nlm2lmax(len(glm))
         ret = np.empty((2 * len(tht), 2 * lmax + 1), dtype=complex)
-        ret[:, lmax:] = fsht.glm2vtm_s0sym(lmax, tht, -glm)
+        ret[:, lmax:] = fsht.glm2vtm_s0sym(lmax, tht, -glm, nthreads)
         ret[:, 0:lmax] = (ret[:, slice(2 * lmax + 1, lmax, -1)]).conjugate()
         return ret
-    return vlm2vtm_sym(s, tht, utils.alm2vlm(glm))
+    return vlm2vtm_sym(s, tht, utils.alm2vlm(glm), nthreads)
 
 
-def vlm2vtm_sym(s, tht, vlm):
+def vlm2vtm_sym(s, tht, vlm, nthreads):
     r"""This produces :math:`\sum_l _s\Lambda_{lm} v_{lm}` for a range of colatitudes"""
     assert s >= 0
     tht = np.array(tht)
@@ -92,13 +92,13 @@ def vlm2vtm_sym(s, tht, vlm):
     assert (len(vlm) == (lmax + 1) ** 2)
     if s == 0:
         print("Consider using glm2vtm_sym for spin 0 for factor of 2 speed-up")
-        return fsht.vlm2vtm_sym(lmax, s, tht, vlm)
+        return fsht.vlm2vtm_sym(lmax, s, tht, vlm, nthreads)
     else:
         #: resolving poles, since fsht implementation does not handle them.
         north = np.where(tht <= 0.)[0]
         south = np.where(tht >= np.pi)[0]
         if len(north) == 0 and len(south) == 0:
-            return fsht.vlm2vtm_sym(lmax, s, tht, vlm)
+            return fsht.vlm2vtm_sym(lmax, s, tht, vlm, nthreads)
         else:
             nt = len(tht)
             ret = np.zeros( (2 * nt, 2 * lmax + 1), dtype=complex)
@@ -110,7 +110,7 @@ def vlm2vtm_sym(s, tht, vlm):
                 ret[nt + south] = _vlm2vtm_northpole(s, vlm)
             if len(north) + len(south) < len(tht):
                 others = np.where( (tht < np.pi) & (tht > 0.))[0]
-                vtm =  fsht.vlm2vtm_sym(lmax, s, tht[others], vlm)
+                vtm =  fsht.vlm2vtm_sym(lmax, s, tht[others], vlm, nthreads)
                 ret[others] = vtm[:len(others)]
                 ret[nt + others] = vtm[len(others):]
             return ret
