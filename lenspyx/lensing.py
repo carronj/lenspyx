@@ -15,7 +15,7 @@ except:
 from lenspyx import utils
 from lenspyx import angles
 from lenspyx.remapping.utils_geom import Geom
-from lenspyx.remapping.deflection import deflection
+from lenspyx.remapping.deflection_029 import deflection
 
 def alm2lenmap(alm, dlms, nside, epsilon=1e-7, facres=0, nband=8, verbose=True, experimental=True):
     r"""Computes a deflected spin-0 healpix map from its alm and deflection field alm.

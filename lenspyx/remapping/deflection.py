@@ -13,7 +13,7 @@ from lenspyx.utils_hp import Alm, alm2cl, almxfl, alm_copy
 from lenspyx import cachers
 from lenspyx.utils import timer, blm_gauss
 from lenspyx.remapping.utils_geom import Geom, pbdGeometry, pbounds
-
+from multiprocessing import cpu_count
 try:
     from lenspyx.fortran import remapping as fremap
     HAS_FORTRAN = True
@@ -66,7 +66,8 @@ class deflection:
             mmax_dlm = lmax
         if cacher is None:
             cacher = cachers.cacher_none()
-
+        if numthreads <= 0:
+            numthreads = cpu_count()
 
         # std deviation of deflection:
         s2_d = np.sum(alm2cl(dglm, dglm, lmax, mmax_dlm, lmax) * (2 * np.arange(lmax + 1) + 1)) / (4 * np.pi)
@@ -89,11 +90,10 @@ class deflection:
         self.geom = lens_geom
         self.pbgeom = pbdGeometry(lens_geom, pbounds(0., 2 * np.pi))
 
+        print("deflection: I set numthreads to " + str(cpu_count()))
         self.sht_tr = numthreads
-
         self.verbosity = verbosity
         self.epsilon = epsilon # accuracy of the totalconvolve interpolation result
-
 
 
         self.single_prec = single_prec * (epsilon > 1e-6) # Uses single precision arithmetic in some places
@@ -107,7 +107,7 @@ class deflection:
             os.environ['NUMEXPR_MAX_THREADS'] = str(numthreads)
             os.environ['NUMEXPR_NUM_THREADS'] = str(numthreads)
         if verbosity:
-            print(" DUCC totalconvolve deflection instantiated" + self.single_prec * '(single prec)', self.epsilon)
+            print(" DUCC totalconvolve %s threads deflection instantiated"%self.sht_tr + self.single_prec * '(single prec)', self.epsilon)
         self._totalconvolves0 = False
         self.ofactor = 1.5  # upsampling grid factor (only used if _totalconvolves is set)
 
