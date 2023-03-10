@@ -7,6 +7,7 @@ from lenspyx import lensing
 import multiprocessing
 import argparse
 import time
+from lenspyx.utils import timer
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='test FFP10-like fwd building')
@@ -27,23 +28,28 @@ if __name__ == '__main__':
     nrings = ffi.geom.theta.size
     eblm = np.array([hp.synalm(cls_unl['ee'][:lmax_unl + 1]),
                      hp.synalm(cls_unl['bb'][:lmax_unl + 1])])[0:1 + (args.spin != 0)]
-    t0 = time.time()
-    ffi._build_angles()
-    t1 = time.time()
+    #t0 = time.time()
+    #ffi._build_angles()
+    #t1 = time.time()
     for nthreads in [args.nt]:
         ffi.sht_tr = nthreads
         os.environ['NUMEXPR_MAX_THREADS'] = str(nthreads)
         os.environ['NUMEXPR_NUM_THREADS'] = str(nthreads)
-        ffi.tim.keys = {}
+        print("-----------------------")
+        print('GL grid results: ')
+        print(" %s threads, lmax %s, nrings %s, Mpix %s:"%(ffi.sht_tr, ffi.lmax_dlm, nrings, str(npix / 1e6)))
+        ffi.tim = timer(False, 'deflection instance timer')
         t2 = time.time()
         len_tlm1 = ffi.gclm2lenmap(eblm, mmax_unl, args.spin, False)
         t3 = time.time()
-        print(" %s threads, lmax %s, nrings %s npix %s:"%(ffi.sht_tr, ffi.lmax_dlm, nrings, npix))
+        print(ffi.tim)
         print('            calc: %.3f Mpix/s, total %.3f sec'%(npix / (t3 - t2) / 1e6, t3 - t2))
-        #print(ffi.tim.keys)
         # Now healpix grid (nrings is 4 * nside or so)
+        nside = args.lmax_len
+        print("-----------------------")
+        print('Healpix grid results: ')
+        print(" %s threads, lmax %s, nrings %s, Mpix %s:"%(ffi.sht_tr, ffi.lmax_dlm, 4 * nside, str(12 * nside ** 2 / 1e6)))
         t4 = time.time()
-        len_tlm2 = lensing.alm2lenmap_spin(eblm, [ffi.dlm, None], 4096, args.spin, epsilon=1e-7, verbose=True, experimental=True, nthreads=ffi.sht_tr)
+        len_tlm2 = lensing.alm2lenmap_spin(eblm, [ffi.dlm, None], nside, args.spin, epsilon=1e-7, verbose=True, experimental=True, nthreads=ffi.sht_tr)
         t5 = time.time()
-        print(" %s threads, lmax %s, nrings %s npix %s:"%(ffi.sht_tr, ffi.lmax_dlm, 4 * 4096, 12 * 4096 ** 2))
-        print('            calc: %.3f Mpix/s, total %.3f sec'%(12 * 4096 ** 2 / (t5 - t4) / 1e6, t5 - t4))
+        print('            calc: %.3f Mpix/s, total %.3f sec'%(12 * nside ** 2 / (t5 - t4) / 1e6, t5 - t4))

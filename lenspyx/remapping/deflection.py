@@ -126,7 +126,7 @@ class deflection:
         """
         fn = 'ptg'
         if not self.cacher.is_cached(fn):
-            self.tim.start('_build_angles')
+            self.tim.start('build_angles')
             self.tim.reset()
             if False and self.dclm:
                 # undo p2d to use
@@ -135,14 +135,14 @@ class deflection:
                 p2d[0] = 1.
                 plm = almxfl(self.dlm, 1. / p2d, self.mmax_dlm, False)
                 red, imd = self.geom.synthesis_deriv1(np.atleast_2d(plm), self.lmax_dlm, self.mmax_dlm, self.sht_tr)
-                self.tim.add('d1 synthesis_deriv1')
+                self.tim.add('build angles <- synthesis_deriv1')
             else:
                 #FIXME: want to do that only once
                 dgclm = np.empty((2, self.dlm.size), dtype=self.dlm.dtype)
                 dgclm[0] = self.dlm
                 dgclm[1] = self.dclm if self.dclm is not None else 0.
                 red, imd = self.geom.synthesis(dgclm, 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr)
-                self.tim.add('d1 alm2map_spin')
+                self.tim.add('build angles <- d1 alm2map_spin')
             # Probably want to keep red, imd double precision for the calc?
             npix = Geom.npix(self.geom)
             if fortran and HAS_FORTRAN and (np.abs(self.geom.fsky() - 1.) < 1e-5):
@@ -151,10 +151,10 @@ class deflection:
                     thp_phip_mgamma = fremap.remapping.fpointing(red, imd, tht, phi0, nph, ofs, self.sht_tr)
                 else:
                     thp_phip_mgamma = fremap.remapping.pointing(red, imd, tht, phi0, nph, ofs, self.sht_tr)
-                self.tim.add('thts, phis and gammas  (fortran)')
+                self.tim.add('build angles <- th-phi-gm (ftn)')
                 # I think this just trivially turns the F-array into a C-contiguous array:
                 self.cacher.cache(fn, thp_phip_mgamma.transpose())
-                self.tim.close('_build_angles')
+                self.tim.close('build_angles')
                 if self.verbosity:
                     print(self.tim)
                 return thp_phip_mgamma.transpose()
@@ -182,7 +182,7 @@ class deflection:
             self.tim.add('thts, phis and gammas  (python)')
             thp_phip_mgamma = thp_phip_mgamma.transpose()
             self.cacher.cache(fn, thp_phip_mgamma)
-            self.tim.close('_build_angles')
+            self.tim.close('build_angles')
             assert startpix == npix, (startpix, npix)
             if self.verbosity:
                 print(self.tim)

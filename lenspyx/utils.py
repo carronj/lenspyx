@@ -1,4 +1,5 @@
 import time
+from datetime import timedelta
 import numpy as np
 import sys
 from lenspyx.utils_hp import Alm
@@ -44,19 +45,13 @@ class timer:
     def __str__(self):
         if len(self.keys) == 0:
             return r""
+        maxlen = np.max([len(k) for k in self.keys])
+        dt_tot = time.time() - self.ti
         s = ""
+        ts = "\r  {0:%s}" % (str(maxlen) + "s")
         for k in self.keys:
-            dt = self.keys[k]
-            dh = np.floor(dt / 3600.)
-            dm = np.floor(np.mod(dt, 3600.) / 60.)
-            ds = np.floor(np.mod(dt, 60))
-            #s +=  "%24s: %.1f"%(k, self.keys[k]) + '\n'
-            s += "\r  %24s:  [" % k + ('%02d:%02d:%02d' % (dh, dm, ds)) + "] " + "\n"
-        dt = time.time() - self.ti
-        dh = np.floor(dt / 3600.)
-        dm = np.floor(np.mod(dt, 3600.) / 60.)
-        ds = np.floor(np.mod(dt, 60))
-        s += "\r  %24s:  [" % 'Total' + ('%02d:%02d:%02d' % (dh, dm, ds)) + "] "
+            s += ts.format(k) + ":  [" + str(timedelta(seconds=self.keys[k])) + "] " + "(%.1f%%)  \n"%(100 * self.keys[k]/dt_tot)
+        s += ts.format("Total") + ":  [" + str(timedelta(seconds=dt_tot)) + "] " + "d:h:m:s:mus"
         return s
 
     def add(self, label):

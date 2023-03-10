@@ -101,11 +101,14 @@ def alm2lenmap_spin(gclm, dlms, nside, spin, epsilon=1e-7, nband=8, facres=-1, v
     if experimental:
         #FIXME: here dlms must be healpy array
         geom = Geom.get_healpix_geometry(nside)
-        defl = deflection(geom, dlms[0], None, dclm=dlms[1], epsilon=epsilon, numthreads=nthreads, verbosity=verbose,
+        defl = deflection(geom, dlms[0], None, dclm=dlms[1], epsilon=epsilon, numthreads=nthreads, verbosity=0,
                           cacher=cachers.cacher_mem(safe=False))
         if gclm[1] is None:
             gclm[1] = np.zeros_like(gclm[0])
-        return defl.gclm2lenmap(gclm, None, spin, False)
+        ret = defl.gclm2lenmap(gclm, None, spin, False)
+        if verbose:
+            print(defl.tim)
+        return ret
     ret = _lens_gclm_sym_timed(spin, dlms[0], gclm[0], nside, nthreads,
                                 clm=gclm[1], dclm=dlms[1], nband=nband, facres=facres, verbose=verbose)
     return ret.real, ret.imag
