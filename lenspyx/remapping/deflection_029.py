@@ -39,7 +39,7 @@ class deflection(deflection_28.deflection):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self._cis = False # Testing this
+        self._cis =  False # Testing this
 
     def gclm2lenmap(self, gclm:np.ndarray, mmax:int or None, spin, backwards:bool, polrot=True, ptg=None):
         assert not backwards, 'backward 2lenmap not implemented at this moment'

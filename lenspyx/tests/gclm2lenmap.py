@@ -3,10 +3,11 @@ import os
 import numpy as np
 import healpy as hp
 from lenspyx.tests.helper import syn_ffi_ducc_29, syn_ffi_ducc, cls_unl
-from lenspyx import lensing
+from lenspyx import lensing, cachers
 import multiprocessing
 import argparse
 import time
+from lenspyx.remapping import utils_geom
 from lenspyx.utils import timer
 
 if __name__ == '__main__':
@@ -17,6 +18,7 @@ if __name__ == '__main__':
     parser.add_argument('-dlmax', dest='dlmax', type=int, default=1024, help='buffer to lensed alms')
     parser.add_argument('-n', dest='nt', type=int, default=4, help='number of threads')
     parser.add_argument('-eps', dest='epsilon', type=float, default=7, help='-log10 of nufft accuracy')
+    parser.add_argument('-cis', dest='cis', action='store_true', help='test cis action')
 
     args = parser.parse_args()
     cpu_count = multiprocessing.cpu_count()
@@ -27,7 +29,7 @@ if __name__ == '__main__':
 
     npix = geom.npix()
     nrings = ffi.geom.theta.size
-    eblm = np.array([hp.synalm(cls_unl['ee'][:lmax_unl + 1]),
+    eblm = np.array([hp.synalm(cls_unl['ee' if args.spin > 0 else 'tt'][:lmax_unl + 1]),
                      hp.synalm(cls_unl['bb'][:lmax_unl + 1])])[0:1 + (args.spin != 0)]
     #t0 = time.time()
     #ffi._build_angles()
@@ -47,10 +49,15 @@ if __name__ == '__main__':
         print('            calc: %.3f Mpix/s, total %.3f sec'%(npix / (t3 - t2) / 1e6, t3 - t2))
         # Now healpix grid (nrings is 4 * nside or so)
         nside = args.lmax_len
+        ffi.geom = utils_geom.Geom.get_healpix_geometry(nside)
+        ffi.cacher = cachers.cacher_mem(safe=False)
+        ffi._cis = args.cis
+        ffi.tim = timer(False, 'deflection instance timer')
         print("-----------------------")
         print('Healpix grid results: ')
-        print(" %s threads, lmax %s, nrings %s, Mpix %s:"%(ffi.sht_tr, ffi.lmax_dlm, 4 * nside, str(12 * nside ** 2 / 1e6)))
+        print(" %s threads, lmax=nside=%s, nrings %s, Mpix %s:"%(ffi.sht_tr, ffi.lmax_dlm, ffi.geom.theta.size, str(12 * nside ** 2 / 1e6)))
         t4 = time.time()
-        len_tlm2 = lensing.alm2lenmap_spin(eblm, [ffi.dlm, None], nside, args.spin, epsilon=10 ** (-args.epsilon) , verbose=True, experimental=True, nthreads=ffi.sht_tr)
+        len_tlm2 = ffi.gclm2lenmap(eblm, mmax_unl, args.spin, False)
         t5 = time.time()
+        print(ffi.tim)
         print('            calc: %.3f Mpix/s, total %.3f sec'%(12 * nside ** 2 / (t5 - t4) / 1e6, t5 - t4))

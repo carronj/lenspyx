@@ -28,7 +28,7 @@ class Geom:
                     theta: rings co-latitudes in radians
                     phi0: longitude offset of first point in each ring
                     nphi: number of points in each ring
-                    ofs: offsets of each ring in real space map
+                    ringstart: offsets of each ring in real space map
                     w: quadrature weight for each ring
 
 

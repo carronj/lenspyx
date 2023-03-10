@@ -59,7 +59,7 @@ class deflection:
                 epsilon: desired accuracy on remapping
 
 
-
+        #FIXME: make input a (ncom, ?) array that can be complex or real (1d)
         """
         lmax = Alm.getlmax(dglm.size, mmax_dlm)
         if mmax_dlm is None:
@@ -86,6 +86,14 @@ class deflection:
         self.lmax_dlm = lmax
         self.mmax_dlm = mmax_dlm
 
+        if dclm is None: # FIXME
+            # FIXME:  plm is input?
+            p2d = np.sqrt(np.arange(self.lmax_dlm + 1) * np.arange(1, self.lmax_dlm + 2))
+            p2d[0] = 1.
+            self.plm = np.atleast_2d(almxfl(self.dlm, 1. / p2d, self.mmax_dlm, False))
+        else:
+            self.plm = None
+
         self.cacher = cacher
         self.geom = lens_geom
         self.pbgeom = pbdGeometry(lens_geom, pbounds(0., 2 * np.pi))
@@ -107,7 +115,7 @@ class deflection:
             os.environ['NUMEXPR_MAX_THREADS'] = str(numthreads)
             os.environ['NUMEXPR_NUM_THREADS'] = str(numthreads)
         if verbosity:
-            print(" DUCC totalconvolve %s threads deflection instantiated"%self.sht_tr + self.single_prec * '(single prec)', self.epsilon)
+            print(" DUCC %s threads deflection instantiated"%self.sht_tr + self.single_prec * '(single prec)', self.epsilon)
         self._totalconvolves0 = False
         self.ofactor = 1.5  # upsampling grid factor (only used if _totalconvolves is set)
 
@@ -126,6 +134,20 @@ class deflection:
         self._build_angles() if not self._cis else self._build_angleseig()
         return self.cacher.load('mgamma')
 
+    def _build_d1(self):
+        if self.dclm is None:
+            # undo p2d to use
+            d1 = self.geom.synthesis_deriv1(self.plm, self.lmax_dlm, self.mmax_dlm, self.sht_tr)
+            self.tim.add('build angles <- synthesis_deriv1')
+        else:
+            # FIXME: want to do that only once
+            dgclm = np.empty((2, self.dlm.size), dtype=self.dlm.dtype)
+            dgclm[0] = self.dlm
+            dgclm[1] = self.dclm if self.dclm is not None else 0.
+            d1 = self.geom.synthesis(dgclm, 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr)
+            self.tim.add('build angles <- d1 alm2map_spin')
+        return d1
+
     def _build_angles(self, fortran=True):
         """Builds deflected positions and angles
 
@@ -135,25 +157,10 @@ class deflection:
         fn_ptg, fn_mgamma = 'ptg', 'mgamma'
         if not self.cacher.is_cached(fn_ptg) or not self.cacher.is_cached(fn_mgamma) :
             self.tim.start('build_angles')
-            self.tim.reset()
-            if False and self.dclm:
-                # undo p2d to use
-                # FIXME: open this if plm is input
-                p2d = np.sqrt(np.arange(self.lmax_dlm + 1) * np.arange(1, self.lmax_dlm + 2))
-                p2d[0] = 1.
-                plm = almxfl(self.dlm, 1. / p2d, self.mmax_dlm, False)
-                red, imd = self.geom.synthesis_deriv1(np.atleast_2d(plm), self.lmax_dlm, self.mmax_dlm, self.sht_tr)
-                self.tim.add('build angles <- synthesis_deriv1')
-            else:
-                #FIXME: want to do that only once
-                dgclm = np.empty((2, self.dlm.size), dtype=self.dlm.dtype)
-                dgclm[0] = self.dlm
-                dgclm[1] = self.dclm if self.dclm is not None else 0.
-                red, imd = self.geom.synthesis(dgclm, 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr)
-                self.tim.add('build angles <- d1 alm2map_spin')
+            red, imd = self._build_d1()
             # Probably want to keep red, imd double precision for the calc?
             npix = Geom.npix(self.geom)
-            if fortran and HAS_FORTRAN and (np.abs(self.geom.fsky() - 1.) < 1e-5):
+            if fortran and HAS_FORTRAN:
                 tht, phi0, nph, ofs = self.geom.theta, self.geom.phi0, self.geom.nph, self.geom.ofs
                 if self.single_prec_ptg:
                     thp_phip_mgamma = fremap.remapping.fpointing(red, imd, tht, phi0, nph, ofs, self.sht_tr)
@@ -208,22 +215,7 @@ class deflection:
         if not self.cacher.is_cached(fn_ptg) or not self.cacher.is_cached(fn_cischi):
             self.tim.start('build_angles')
             self.tim.reset()
-            if False and self.dclm:
-                # undo p2d to use
-                # FIXME: open this if plm is input
-                p2d = np.sqrt(np.arange(self.lmax_dlm + 1) * np.arange(1, self.lmax_dlm + 2))
-                p2d[0] = 1.
-                plm = almxfl(self.dlm, 1. / p2d, self.mmax_dlm, False)
-                red, imd = self.geom.synthesis_deriv1(np.atleast_2d(plm), self.lmax_dlm, self.mmax_dlm, self.sht_tr)
-                self.tim.add('build angles <- synthesis_deriv1')
-            else:
-                #FIXME: want to do that only once
-                dgclm = np.empty((2, self.dlm.size), dtype=self.dlm.dtype)
-                dgclm[0] = self.dlm
-                dgclm[1] = self.dclm if self.dclm is not None else 0.
-                red, imd = self.geom.synthesis(dgclm, 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr)
-                del dgclm
-                self.tim.add('build angles <- d1 alm2map_spin')
+            red, imd = self._build_d1()
             # Probably want to keep red, imd double precision for the calc?
             npix = Geom.npix(self.geom)
             if HAS_FORTRAN:
@@ -579,6 +571,7 @@ class deflection:
 
         """
         self.tim.start('dlm2A')
+        #FIXME:self.dlm
         geom, lmax, mmax, tr = self.geom, self.lmax_dlm, self.mmax_dlm, self.sht_tr
         dgclm = np.empty((2, self.dlm.size), dtype=self.dlm.dtype)
         dgclm[0] = self.dlm
@@ -622,11 +615,7 @@ class deflection:
         #FIXME: make a get_d1 with plm ?
         self.tim.start('_make_angles')
         self.tim.start('_spin 1 synthesis')
-        dgclm = np.empty((2, self.dlm.size), dtype=self.dlm.dtype)
-        dgclm[0] = self.dlm
-        dgclm[1] = np.zeros_like(self.dlm) if self.dclm is None else self.dclm
-        atp = self.geom.synthesis(dgclm, 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr)
-        del dgclm
+        atp = self._build_d1()
         self.tim.close('_spin 1 synthesis')
         self.tim.start('vec proper')
         #from scipy.special import spherical_jn as jn
@@ -670,11 +659,7 @@ class deflection:
         return angs # no need to modulo 2 pi for ducc routines (?)
 
     def get_eigamma(self):
-        #FIXME: make a get_d1 with plm ?
-        dgclm = np.empty((2, self.dlm.size), dtype=self.dlm.dtype)
-        dgclm[0] = self.dlm
-        dgclm[1] = np.zeros_like(self.dlm) if self.dclm is None else self.dclm
-        red, imd = self.geom.synthesis(dgclm, 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr)
+        red, imd = self._build_d1()
         eig = np.empty(self.geom.npix(), dtype=complex)
         self.geom.sort(self.geom.ofs)
         for ir, (nph, phi0, tht, of) in enumerate(zip(self.geom.nph, self.geom.phi0, self.geom.theta, self.geom.ofs)):

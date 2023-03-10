@@ -55,9 +55,12 @@ def alm2lenmap(alm, dlms, nside, epsilon=1e-7, facres=0, nband=8, verbose=True, 
     if experimental:
         #FIXME: here dlms must be healpy array
         geom = Geom.get_healpix_geometry(nside)
-        defl = deflection(geom, dlms[0], None, dclm=dlms[1], epsilon=epsilon, numthreads=nthreads, verbosity=verbose,
+        defl = deflection(geom, dlms[0], None, dclm=dlms[1], epsilon=epsilon, numthreads=nthreads, verbosity=0,
                           cacher=cachers.cacher_mem(safe=False))
-        return defl.gclm2lenmap(alm, None, 0, False)
+        ret = defl.gclm2lenmap(alm, None, 0, False)
+        if verbose:
+            print(defl.tim)
+        return ret
     return _lens_gclm_sym_timed(0, dlms[0], -alm, nside, nthreads, dclm=dlms[1], nband=nband, facres=facres, verbose=verbose)
 
 def alm2lenmap_spin(gclm, dlms, nside, spin, epsilon=1e-7, nband=8, facres=-1, verbose=True, experimental=True, nthreads:int=0):
@@ -93,6 +96,9 @@ def alm2lenmap_spin(gclm, dlms, nside, spin, epsilon=1e-7, nband=8, facres=-1, v
 
 
     """
+    if spin == 0:
+        return alm2lenmap(gclm, dlms, nside, epsilon=epsilon, nband=nband, facres=facres, verbose=verbose,
+                          experimental=experimental, nthreads=nthreads)
     assert len(gclm) == 2
     assert len(dlms) == 2
     if not np.iscomplexobj(dlms[0]): assert dlms[0].size == dlms[1].size and dlms[0].size == 12 * nside ** 2
