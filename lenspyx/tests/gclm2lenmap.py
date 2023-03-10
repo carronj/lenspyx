@@ -16,6 +16,7 @@ if __name__ == '__main__':
     parser.add_argument('-dlmaxgl', dest='dlmax_gl', type=int, default=1024, help='buffer to GL grid')
     parser.add_argument('-dlmax', dest='dlmax', type=int, default=1024, help='buffer to lensed alms')
     parser.add_argument('-n', dest='nt', type=int, default=4, help='number of threads')
+    parser.add_argument('-eps', dest='epsilon', type=float, default=7, help='-log10 of nufft accuracy')
 
     args = parser.parse_args()
     cpu_count = multiprocessing.cpu_count()
@@ -50,6 +51,6 @@ if __name__ == '__main__':
         print('Healpix grid results: ')
         print(" %s threads, lmax %s, nrings %s, Mpix %s:"%(ffi.sht_tr, ffi.lmax_dlm, 4 * nside, str(12 * nside ** 2 / 1e6)))
         t4 = time.time()
-        len_tlm2 = lensing.alm2lenmap_spin(eblm, [ffi.dlm, None], nside, args.spin, epsilon=1e-7, verbose=True, experimental=True, nthreads=ffi.sht_tr)
+        len_tlm2 = lensing.alm2lenmap_spin(eblm, [ffi.dlm, None], nside, args.spin, epsilon=10 ** (-args.epsilon) , verbose=True, experimental=True, nthreads=ffi.sht_tr)
         t5 = time.time()
         print('            calc: %.3f Mpix/s, total %.3f sec'%(12 * nside ** 2 / (t5 - t4) / 1e6, t5 - t4))

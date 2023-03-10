@@ -189,6 +189,47 @@ class deflection:
             return thp_phip_mgamma
         return self.cacher.load(fn)
 
+    def _build_angleseig(self):
+        """Builds deflected positions and angles
+
+            Returns (npix, 3) array with new tht, phi and -gamma
+
+        """
+        fn = 'ptgeig'
+        if not self.cacher.is_cached(fn):
+            self.tim.start('build_angles')
+            self.tim.reset()
+            if False and self.dclm:
+                # undo p2d to use
+                # FIXME: open this if plm is input
+                p2d = np.sqrt(np.arange(self.lmax_dlm + 1) * np.arange(1, self.lmax_dlm + 2))
+                p2d[0] = 1.
+                plm = almxfl(self.dlm, 1. / p2d, self.mmax_dlm, False)
+                red, imd = self.geom.synthesis_deriv1(np.atleast_2d(plm), self.lmax_dlm, self.mmax_dlm, self.sht_tr)
+                self.tim.add('build angles <- synthesis_deriv1')
+            else:
+                #FIXME: want to do that only once
+                dgclm = np.empty((2, self.dlm.size), dtype=self.dlm.dtype)
+                dgclm[0] = self.dlm
+                dgclm[1] = self.dclm if self.dclm is not None else 0.
+                red, imd = self.geom.synthesis(dgclm, 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr)
+                self.tim.add('build angles <- d1 alm2map_spin')
+            # Probably want to keep red, imd double precision for the calc?
+            npix = Geom.npix(self.geom)
+            if HAS_FORTRAN:
+                tht, phi0, nph, ofs = self.geom.theta, self.geom.phi0, self.geom.nph, self.geom.ofs
+                thp_phip_mgamma = fremap.remapping.pointingeig(red, imd, tht, phi0, nph, ofs, self.sht_tr)
+                self.tim.add('build angles <- th-phi-gm (ftn)')
+                # I think this just trivially turns the F-array into a C-contiguous array:
+                self.cacher.cache(fn, thp_phip_mgamma.transpose())
+                self.tim.close('build_angles')
+                if self.verbosity:
+                    print(self.tim)
+                return thp_phip_mgamma.transpose()
+            else:
+                assert 0
+        return self.cacher.load(fn)
+
     def make_plan(self, lmax, spin):
         """Builds nuFFT plan for slightly faster transforms
 
@@ -562,6 +603,7 @@ class deflection:
         return A.squeeze()
 
     def _make_angles(self, version=0):
+        #FIXME: make a get_d1 with plm ?
         self.tim.start('_make_angles')
         self.tim.start('_spin 1 synthesis')
         dgclm = np.empty((2, self.dlm.size), dtype=self.dlm.dtype)
@@ -604,13 +646,33 @@ class deflection:
             assert 0
         self.tim.start('adding dphi')
 
-        assert self.geom.sorted
-        dpix2pi = np.arange(self.geom.nph[0], dtype=int) * (2 * np.pi)
-        for ir, (nph, phi0) in enumerate(zip(self.geom.nph, self.geom.phi0)):  # We must follow the ordering of scarf position-space map
+        dpix2pi = np.arange(np.max(self.geom.nph), dtype=int) * (2 * np.pi)
+        for ir, (nph, phi0) in enumerate(zip(self.geom.nph, self.geom.phi0)):
             angs[self.geom.ofs[ir]:self.geom.ofs[ir] + nph, 1] += (phi0 + dpix2pi[:nph] / nph)
         self.tim.close('adding dphi')
         self.tim.close('_make_angles')
         return angs # no need to modulo 2 pi for ducc routines (?)
+
+    def get_eigamma(self):
+        #FIXME: make a get_d1 with plm ?
+        dgclm = np.empty((2, self.dlm.size), dtype=self.dlm.dtype)
+        dgclm[0] = self.dlm
+        dgclm[1] = np.zeros_like(self.dlm) if self.dclm is None else self.dclm
+        red, imd = self.geom.synthesis(dgclm, 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr)
+        eig = np.empty(self.geom.npix(), dtype=complex)
+        self.geom.sort(self.geom.ofs)
+        for ir, (nph, phi0, tht, of) in enumerate(zip(self.geom.nph, self.geom.phi0, self.geom.theta, self.geom.ofs)):
+            sint = np.sin(tht)
+            cost = np.cos(tht)
+            sli = slice(of, of + nph)
+            d = np.sqrt(red[sli] ** 2 + imd[sli] ** 2)
+            sind = np.sin(d)
+            cosd = np.cos(d)
+            # FIXME
+            eig[sli] = sint + (sint * red[sli] / d * (cosd - 1.) + cost * sind) * (red[sli] + 1j * imd[sli]) / d
+
+        eig /= np.abs(eig)
+        return eig
 
 def get_spin_raise(s, lmax):
     r"""Response coefficient of spin-s spherical harmonic to spin raising operator.

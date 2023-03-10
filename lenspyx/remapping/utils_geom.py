@@ -36,14 +36,12 @@ class Geom:
         for arr in [phi0, nphi, ringstart, w]:
             assert arr.size == theta.size
 
-        argsort = np.argsort(nphi)[::-1] # We sort the rings by decreasing nphi
+        argsort = np.argsort(ringstart) # We sort here the rings by order in the maps
         self.theta = theta[argsort].astype(np.float64)
         self.weight = w[argsort].astype(np.float64)
         self.phi0 = phi0[argsort].astype(np.float64)
         self.nph = nphi[argsort].astype(np.uint64)
         self.ofs = ringstart[argsort].astype(np.uint64)
-
-        self.sorted = True
 
     def npix(self):
         """Number of pixels
@@ -56,6 +54,12 @@ class Geom:
 
         """
         return np.sum(self.weight * self.nph) / (4 * np.pi)
+
+    def sort(self, arr:np.ndarray):
+        assert arr.size == self.theta.size, (arr.size, self.theta.size)
+        argsort = np.argsort(arr) # We sort here the rings by order in the maps
+        for ar in [self.theta, self.weight, self.phi0, self.nph, self.ofs]:
+            ar[:] = ar[argsort]
 
     def synthesis(self, gclm: np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int):
         """Wrapper to ducc forward SHT
