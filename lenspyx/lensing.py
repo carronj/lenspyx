@@ -17,6 +17,7 @@ from lenspyx import utils
 from lenspyx import angles
 from lenspyx.remapping.utils_geom import Geom
 from lenspyx.remapping.deflection_029 import deflection
+from lenspyx import cachers
 
 def alm2lenmap(alm, dlms, nside, epsilon=1e-7, facres=0, nband=8, verbose=True, experimental=True, nthreads:int=0):
     r"""Computes a deflected spin-0 healpix map from its alm and deflection field alm.
@@ -54,7 +55,8 @@ def alm2lenmap(alm, dlms, nside, epsilon=1e-7, facres=0, nband=8, verbose=True, 
     if experimental:
         #FIXME: here dlms must be healpy array
         geom = Geom.get_healpix_geometry(nside)
-        defl = deflection(geom, dlms[0], None, dclm=dlms[1], epsilon=epsilon, numthreads=nthreads)
+        defl = deflection(geom, dlms[0], None, dclm=dlms[1], epsilon=epsilon, numthreads=nthreads, verbosity=verbose,
+                          cacher=cachers.cacher_mem(safe=False))
         return defl.gclm2lenmap(alm, None, 0, False)
     return _lens_gclm_sym_timed(0, dlms[0], -alm, nside, nthreads, dclm=dlms[1], nband=nband, facres=facres, verbose=verbose)
 
@@ -99,7 +101,8 @@ def alm2lenmap_spin(gclm, dlms, nside, spin, epsilon=1e-7, nband=8, facres=-1, v
     if experimental:
         #FIXME: here dlms must be healpy array
         geom = Geom.get_healpix_geometry(nside)
-        defl = deflection(geom, dlms[0], None, dclm=dlms[1], epsilon=epsilon, numthreads=nthreads)
+        defl = deflection(geom, dlms[0], None, dclm=dlms[1], epsilon=epsilon, numthreads=nthreads, verbosity=verbose,
+                          cacher=cachers.cacher_mem(safe=False))
         if gclm[1] is None:
             gclm[1] = np.zeros_like(gclm[0])
         return defl.gclm2lenmap(gclm, None, spin, False)
