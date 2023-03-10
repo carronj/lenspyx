@@ -2,7 +2,7 @@
 import os
 import numpy as np
 import healpy as hp
-from lenspyx.tests.helper import syn_ffi_ducc_29, cls_unl
+from lenspyx.tests.helper import syn_ffi_ducc_29, syn_ffi_ducc, cls_unl
 from lenspyx import lensing
 import multiprocessing
 import argparse

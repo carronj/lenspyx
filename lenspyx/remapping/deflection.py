@@ -65,7 +65,7 @@ class deflection:
         if mmax_dlm is None:
             mmax_dlm = lmax
         if cacher is None:
-            cacher = cachers.cacher_none()
+            cacher = cachers.cacher_mem(safe=False)
         if numthreads <= 0:
             numthreads = cpu_count()
 
@@ -111,12 +111,20 @@ class deflection:
         self._totalconvolves0 = False
         self.ofactor = 1.5  # upsampling grid factor (only used if _totalconvolves is set)
 
+        self._cis = False
+
     def _get_ptg(self):
         # TODO improve this and fwd angles, e.g. this is computed twice for gamma if no cacher
-        return self._build_angles()[:, 0:2]  # -gamma in third argument
+        self._build_angles() if not self._cis else self._build_angleseig()
+        return self.cacher.load('ptg')
+
+    def _get_cischi(self):
+        self._build_angles() if not self._cis else self._build_angleseig()
+        return self.cacher.load('cischi')
 
     def _get_mgamma(self):
-        return self._build_angles()[:, 2]
+        self._build_angles() if not self._cis else self._build_angleseig()
+        return self.cacher.load('mgamma')
 
     def _build_angles(self, fortran=True):
         """Builds deflected positions and angles
@@ -124,8 +132,8 @@ class deflection:
             Returns (npix, 3) array with new tht, phi and -gamma
 
         """
-        fn = 'ptg'
-        if not self.cacher.is_cached(fn):
+        fn_ptg, fn_mgamma = 'ptg', 'mgamma'
+        if not self.cacher.is_cached(fn_ptg) or not self.cacher.is_cached(fn_mgamma) :
             self.tim.start('build_angles')
             self.tim.reset()
             if False and self.dclm:
@@ -153,11 +161,12 @@ class deflection:
                     thp_phip_mgamma = fremap.remapping.pointing(red, imd, tht, phi0, nph, ofs, self.sht_tr)
                 self.tim.add('build angles <- th-phi-gm (ftn)')
                 # I think this just trivially turns the F-array into a C-contiguous array:
-                self.cacher.cache(fn, thp_phip_mgamma.transpose())
+                self.cacher.cache(fn_ptg, thp_phip_mgamma.transpose()[:, 0:2])
+                self.cacher.cache(fn_mgamma, thp_phip_mgamma.transpose()[:, 2])
                 self.tim.close('build_angles')
                 if self.verbosity:
                     print(self.tim)
-                return thp_phip_mgamma.transpose()
+                return
             elif fortran and not HAS_FORTRAN:
                 print('Cant use fortran pointing building since import failed. Falling back on python impl.')
             thp_phip_mgamma = np.empty((3, npix), dtype=float)  # (-1) gamma in last arguement
@@ -181,13 +190,13 @@ class deflection:
                     startpix += len(pixs)
             self.tim.add('thts, phis and gammas  (python)')
             thp_phip_mgamma = thp_phip_mgamma.transpose()
-            self.cacher.cache(fn, thp_phip_mgamma)
+            self.cacher.cache(fn_ptg, thp_phip_mgamma[:, 0:2])
+            self.cacher.cache(fn_mgamma, thp_phip_mgamma[:, 2])
             self.tim.close('build_angles')
             assert startpix == npix, (startpix, npix)
             if self.verbosity:
                 print(self.tim)
-            return thp_phip_mgamma
-        return self.cacher.load(fn)
+            return
 
     def _build_angleseig(self):
         """Builds deflected positions and angles
@@ -195,8 +204,8 @@ class deflection:
             Returns (npix, 3) array with new tht, phi and -gamma
 
         """
-        fn = 'ptgeig'
-        if not self.cacher.is_cached(fn):
+        fn_ptg, fn_cischi = 'ptg', 'cischi'
+        if not self.cacher.is_cached(fn_ptg) or not self.cacher.is_cached(fn_cischi):
             self.tim.start('build_angles')
             self.tim.reset()
             if False and self.dclm:
@@ -213,22 +222,22 @@ class deflection:
                 dgclm[0] = self.dlm
                 dgclm[1] = self.dclm if self.dclm is not None else 0.
                 red, imd = self.geom.synthesis(dgclm, 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr)
+                del dgclm
                 self.tim.add('build angles <- d1 alm2map_spin')
             # Probably want to keep red, imd double precision for the calc?
             npix = Geom.npix(self.geom)
             if HAS_FORTRAN:
                 tht, phi0, nph, ofs = self.geom.theta, self.geom.phi0, self.geom.nph, self.geom.ofs
-                thp_phip_mgamma = fremap.remapping.pointingeig(red, imd, tht, phi0, nph, ofs, self.sht_tr)
-                self.tim.add('build angles <- th-phi-gm (ftn)')
+                thp_phip_cischi = fremap.remapping.pointingeig(red, imd, tht, phi0, nph, ofs, self.sht_tr)
+                self.tim.add('build angles <- th-phi-cischi (ftn)')
                 # I think this just trivially turns the F-array into a C-contiguous array:
-                self.cacher.cache(fn, thp_phip_mgamma.transpose())
+                self.cacher.cache(fn_ptg, thp_phip_cischi.transpose()[:, 0:2])
+                self.cacher.cache(fn_cischi,thp_phip_cischi[2] + 1j * thp_phip_cischi[3])
                 self.tim.close('build_angles')
                 if self.verbosity:
                     print(self.tim)
-                return thp_phip_mgamma.transpose()
             else:
                 assert 0
-        return self.cacher.load(fn)
 
     def make_plan(self, lmax, spin):
         """Builds nuFFT plan for slightly faster transforms
@@ -374,9 +383,13 @@ class deflection:
                                       verbosity=self.verbosity, periodicity=2 * np.pi, fft_order=True)
             self.tim.add('u2nu')
 
-        if spin * polrot: #TODO: at some point get rid of these exp(arctan...)
-                          # maybe simplest to cache cis g and multpily in place a couple of times
-            if HAS_NUMEXPR:
+        if polrot * spin:
+            if self._cis:
+                cis = self._get_cischi()
+                for i in range(polrot * abs(spin)):
+                    values *= cis
+                self.tim.add('polrot (cis)')
+            elif HAS_NUMEXPR:
                 mg = self._get_mgamma()
                 js = - 1j * spin
                 values *= numexpr.evaluate("exp(js * mg)")
@@ -532,7 +545,10 @@ class deflection:
                     self.tim.add('nomagn')
                 if polrot * spin:#TODO: at some point get rid of these exp(atan2)...
                           # maybe simplest to save cis gamma and twice multiply in place...
-                    if HAS_NUMEXPR:
+                    if self._cis:
+                        cis = self._get_cischi()
+                        assert 0, 'fix this complex view and in place application?'
+                    elif HAS_NUMEXPR:
                         re, im = points
                         mg = self._get_mgamma()
                         js = + 1j * spin

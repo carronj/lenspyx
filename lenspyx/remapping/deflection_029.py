@@ -36,9 +36,10 @@ rtype = {np.dtype(np.complex64): np.float32,
          np.longcomplex: np.longfloat}
 
 class deflection(deflection_28.deflection):
-    def __int__(self, *args, **kwargs):
-        super().init(*args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
+        self._cis = False # Testing this
 
     def gclm2lenmap(self, gclm:np.ndarray, mmax:int or None, spin, backwards:bool, polrot=True, ptg=None):
         assert not backwards, 'backward 2lenmap not implemented at this moment'
@@ -70,7 +71,12 @@ class deflection(deflection_28.deflection):
             self.tim.add('synthesis general')
 
             if polrot * spin:
-                if HAS_NUMEXPR:
+                if self._cis:
+                    cis = self._get_cischi()
+                    for i in range(abs(spin)):
+                        valuesc *= cis
+                    self.tim.add('polrot (cis)')
+                elif HAS_NUMEXPR:
                     mg = self._get_mgamma()
                     js = - 1j * spin
                     valuesc *= numexpr.evaluate("exp(js * mg)")
