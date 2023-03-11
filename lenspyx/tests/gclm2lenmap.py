@@ -55,7 +55,7 @@ if __name__ == '__main__':
         ffi.tim = timer(False, 'deflection instance timer')
         print("-----------------------")
         print('Healpix grid results: ')
-        print(" %s threads, lmax=nside=%s, nrings %s, Mpix %s:"%(ffi.sht_tr, ffi.lmax_dlm, ffi.geom.theta.size, str(12 * nside ** 2 / 1e6)))
+        print(" %s threads, lmax %s nside %s, nrings %s, Mpix %s:"%(ffi.sht_tr, ffi.lmax_dlm,nside, ffi.geom.theta.size, str(12 * nside ** 2 / 1e6)))
         t4 = time.time()
         len_tlm2 = ffi.gclm2lenmap(eblm, mmax_unl, args.spin, False)
         t5 = time.time()
