@@ -19,7 +19,7 @@ if __name__ == '__main__':
     parser.add_argument('-n', dest='nt', type=int, default=4, help='number of threads')
     parser.add_argument('-eps', dest='epsilon', type=float, default=7, help='-log10 of nufft accuracy')
     parser.add_argument('-cis', dest='cis', action='store_true', help='test cis action')
-
+    parser.add_argument('-HL', dest='HL', action='store_true', help='also test Healpix pixelization with this nside')
     args = parser.parse_args()
     cpu_count = multiprocessing.cpu_count()
 
@@ -47,17 +47,18 @@ if __name__ == '__main__':
         t3 = time.time()
         print(ffi.tim)
         print('            calc: %.3f Mpix/s, total %.3f sec'%(npix / (t3 - t2) / 1e6, t3 - t2))
-        # Now healpix grid (nrings is 4 * nside or so)
-        nside = args.lmax_len
-        ffi.geom = utils_geom.Geom.get_healpix_geometry(nside)
-        ffi.cacher = cachers.cacher_mem(safe=False)
-        ffi._cis = args.cis
-        ffi.tim = timer(False, 'deflection instance timer')
-        print("-----------------------")
-        print('Healpix grid results: ')
-        print(" %s threads, lmax %s nside %s, nrings %s, Mpix %s:"%(ffi.sht_tr, ffi.lmax_dlm,nside, ffi.geom.theta.size, str(12 * nside ** 2 / 1e6)))
-        t4 = time.time()
-        len_tlm2 = ffi.gclm2lenmap(eblm, mmax_unl, args.spin, False)
-        t5 = time.time()
-        print(ffi.tim)
-        print('            calc: %.3f Mpix/s, total %.3f sec'%(12 * nside ** 2 / (t5 - t4) / 1e6, t5 - t4))
+        if args.HL:
+            # Now healpix grid (nrings is 4 * nside or so)
+            nside = args.lmax_len
+            ffi.geom = utils_geom.Geom.get_healpix_geometry(nside)
+            ffi.cacher = cachers.cacher_mem(safe=False)
+            ffi._cis = args.cis
+            ffi.tim = timer(False, 'deflection instance timer')
+            print("-----------------------")
+            print('Healpix grid results: ')
+            print(" %s threads, lmax %s nside %s, nrings %s, Mpix %s:"%(ffi.sht_tr, ffi.lmax_dlm,nside, ffi.geom.theta.size, str(12 * nside ** 2 / 1e6)))
+            t4 = time.time()
+            len_tlm2 = ffi.gclm2lenmap(eblm, mmax_unl, args.spin, False)
+            t5 = time.time()
+            print(ffi.tim)
+            print('            calc: %.3f Mpix/s, total %.3f sec'%(12 * nside ** 2 / (t5 - t4) / 1e6, t5 - t4))

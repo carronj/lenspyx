@@ -77,12 +77,12 @@ class deflection(deflection_28.deflection):
                         valuesc *= cis
                     self.tim.add('polrot (cis)')
                 elif HAS_NUMEXPR:
-                    mg = self._get_mgamma()
-                    js = - 1j * spin
+                    mg = self._get_gamma()
+                    js = 1j * spin
                     valuesc *= numexpr.evaluate("exp(js * mg)")
                     self.tim.add('polrot (numexpr)')
                 else:
-                    valuesc *= np.exp((-1j * spin) * self._get_mgamma())  # polrot. last entry is -gamma
+                    valuesc *= np.exp((1j * spin) * self._get_gamma())
                     self.tim.add('polrot (python)')
         self.tim.close('gclm2lenmap')
         if self.verbosity:

@@ -151,7 +151,7 @@ module remapping
                     gamma = datan2(imd(pix), red(pix)) - datan2(imd(pix), d * sind_d * d * cott + red(pix) * dcos(d))
                     ptg(1, pix) = thtp
                     ptg(2, pix) = phip
-                    ptg(3, pix) = -gamma
+                    ptg(3, pix) = gamma
                     pix = pix + 1
                     phi = phi  + dphi
                 end do
@@ -173,7 +173,7 @@ module remapping
                     gamma = datan2(imd(pix), red(pix)) - datan2(imd(pix), d * sind_d * d * cott + red(pix) * dcos(d))
                     ptg(1, pix) = thtp
                     ptg(2, pix) = phip
-                    ptg(3, pix) = -gamma
+                    ptg(3, pix) = gamma
                     pix = pix + 1
                     phi = phi  + dphi
                 end do
@@ -195,7 +195,7 @@ module remapping
                     gamma = datan2(imd(pix), red(pix)) - datan2(imd(pix), d * sind_d * d * cott + red(pix) * dcos(d))
                     ptg(1, pix) = thtp
                     ptg(2, pix) = phip
-                    ptg(3, pix) = -gamma
+                    ptg(3, pix) = gamma
                     pix = pix + 1
                     phi = phi  + dphi
                 end do
@@ -244,7 +244,7 @@ module remapping
                     gamma = datan2(imd(pix), red(pix)) - datan2(imd(pix), d * sind_d * d * cott + red(pix) * dcos(d))
                     ptg(1, pix) = thtp
                     ptg(2, pix) = phip
-                    ptg(3, pix) = -gamma
+                    ptg(3, pix) = gamma
                     pix = pix + 1
                     phi = phi  + dphi
                 end do
@@ -266,7 +266,7 @@ module remapping
                     gamma = datan2(imd(pix), red(pix)) - datan2(imd(pix), d * sind_d * d * cott + red(pix) * dcos(d))
                     ptg(1, pix) = thtp
                     ptg(2, pix) = phip
-                    ptg(3, pix) = -gamma
+                    ptg(3, pix) = gamma
                     pix = pix + 1
                     phi = phi  + dphi
                 end do
@@ -288,7 +288,7 @@ module remapping
                     gamma = datan2(imd(pix), red(pix)) - datan2(imd(pix), d * sind_d * d * cott + red(pix) * dcos(d))
                     ptg(1, pix) = thtp
                     ptg(2, pix) = phip
-                    ptg(3, pix) = -gamma
+                    ptg(3, pix) = gamma
                     pix = pix + 1
                     phi = phi  + dphi
                 end do
@@ -340,7 +340,7 @@ module remapping
                 gamma = datan2(ap, at) - datan2(ap, sind * sind * cott + at * cosd)
                 ptg(1, pix) = thtp
                 ptg(2, pix) = phip
-                ptg(3, pix) = -gamma
+                ptg(3, pix) = gamma
                 pix = pix + 1
                 phi = phi  + dphi
             end do

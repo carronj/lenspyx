@@ -18,7 +18,6 @@ try:
     from lenspyx.fortran import remapping as fremap
     HAS_FORTRAN = True
 except:
-    print('deflection.py: could not load fortran module')
     HAS_FORTRAN = False
 
 try:
@@ -26,7 +25,12 @@ try:
     HAS_NUMEXPR = True
 except:
     HAS_NUMEXPR = False
-    print("deflection.py::could not load numexpr, falling back on python impl.")
+
+try:
+    from ducc0.misc import get_deflected_angles
+    HAS_DUCCPOINTING = True
+except:
+    HAS_DUCCPOINTING = False
 
 
 ctype = {np.dtype(np.float32): np.complex64,
@@ -130,17 +134,23 @@ class deflection:
         self._build_angles() if not self._cis else self._build_angleseig()
         return self.cacher.load('cischi')
 
-    def _get_mgamma(self):
+    #def _get_mgamma(self):
+    #    self._build_angles() if not self._cis else self._build_angleseig()
+    #    return self.cacher.load('mgamma')
+
+    def _get_gamma(self):
         self._build_angles() if not self._cis else self._build_angleseig()
-        return self.cacher.load('mgamma')
+        return self.cacher.load('gamma')
 
     def _build_d1(self):
         if self.dclm is None:
             # undo p2d to use
+            self.tim.reset()
             d1 = self.geom.synthesis_deriv1(self.plm, self.lmax_dlm, self.mmax_dlm, self.sht_tr)
             self.tim.add('build angles <- synthesis_deriv1')
         else:
             # FIXME: want to do that only once
+            self.tim.reset()
             dgclm = np.empty((2, self.dlm.size), dtype=self.dlm.dtype)
             dgclm[0] = self.dlm
             dgclm[1] = self.dclm if self.dclm is not None else 0.
@@ -154,31 +164,42 @@ class deflection:
             Returns (npix, 3) array with new tht, phi and -gamma
 
         """
-        fn_ptg, fn_mgamma = 'ptg', 'mgamma'
-        if not self.cacher.is_cached(fn_ptg) or not self.cacher.is_cached(fn_mgamma) :
+        fn_ptg, fn_gamma = 'ptg', 'gamma'
+        if not self.cacher.is_cached(fn_ptg) or not self.cacher.is_cached(fn_gamma) :
             self.tim.start('build_angles')
-            red, imd = self._build_d1()
+            d1 = self._build_d1()
             # Probably want to keep red, imd double precision for the calc?
+            if HAS_DUCCPOINTING:
+                tht, phi0, nph, ofs = self.geom.theta, self.geom.phi0, self.geom.nph, self.geom.ofs
+                tht_phip_gamma = get_deflected_angles(theta=tht, phi0=phi0, nphi=nph, ringstart=ofs, deflect=d1.T,
+                                                      calc_rotation=True, nthreads=self.sht_tr)
+                self.tim.add('build angles <- th-phi-gm (ducc)')
+                self.cacher.cache(fn_ptg, tht_phip_gamma[:, 0:2])
+                self.cacher.cache(fn_gamma, tht_phip_gamma[:, 2])
+                self.tim.close('build_angles')
+                return
             npix = Geom.npix(self.geom)
             if fortran and HAS_FORTRAN:
+                red, imd = d1
                 tht, phi0, nph, ofs = self.geom.theta, self.geom.phi0, self.geom.nph, self.geom.ofs
                 if self.single_prec_ptg:
-                    thp_phip_mgamma = fremap.remapping.fpointing(red, imd, tht, phi0, nph, ofs, self.sht_tr)
+                    thp_phip_gamma = fremap.remapping.fpointing(red, imd, tht, phi0, nph, ofs, self.sht_tr)
                 else:
-                    thp_phip_mgamma = fremap.remapping.pointing(red, imd, tht, phi0, nph, ofs, self.sht_tr)
+                    thp_phip_gamma = fremap.remapping.pointing(red, imd, tht, phi0, nph, ofs, self.sht_tr)
                 self.tim.add('build angles <- th-phi-gm (ftn)')
                 # I think this just trivially turns the F-array into a C-contiguous array:
-                self.cacher.cache(fn_ptg, thp_phip_mgamma.transpose()[:, 0:2])
-                self.cacher.cache(fn_mgamma, thp_phip_mgamma.transpose()[:, 2])
+                self.cacher.cache(fn_ptg, thp_phip_gamma.transpose()[:, 0:2])
+                self.cacher.cache(fn_gamma, thp_phip_gamma.transpose()[:, 2])
                 self.tim.close('build_angles')
                 if self.verbosity:
                     print(self.tim)
                 return
             elif fortran and not HAS_FORTRAN:
                 print('Cant use fortran pointing building since import failed. Falling back on python impl.')
-            thp_phip_mgamma = np.empty((3, npix), dtype=float)  # (-1) gamma in last arguement
+            thp_phip_gamma = np.empty((3, npix), dtype=float)  # (-1) gamma in last arguement
             startpix = 0
             assert np.all(self.geom.theta > 0.) and np.all(self.geom.theta < np.pi), 'fix this (cotangent below)'
+            red, imd = d1
             for ir in np.argsort(self.geom.ofs): # We must follow the ordering of scarf position-space map
                 pixs = Geom.rings2pix(self.geom, [ir])
                 if pixs.size > 0:
@@ -189,16 +210,15 @@ class deflection:
                     thts = self.geom.theta[ir] * np.ones(pixs.size)
                     thtp_, phip_ = d2ang(t_red, i_imd, thts , phis, int(np.round(np.cos(self.geom.theta[ir]))))
                     sli = slice(startpix, startpix + len(pixs))
-                    thp_phip_mgamma[0, sli] = thtp_
-                    thp_phip_mgamma[1, sli] = phip_
+                    thp_phip_gamma[0, sli] = thtp_
+                    thp_phip_gamma[1, sli] = phip_
                     cot = np.cos(self.geom.theta[ir]) / np.sin(self.geom.theta[ir])
                     d = np.sqrt(t_red ** 2 + i_imd ** 2)
-                    thp_phip_mgamma[2, sli] = -np.arctan2(i_imd, t_red ) + np.arctan2(i_imd, d * np.sin(d) * cot + t_red  * np.cos(d))
+                    thp_phip_gamma[2, sli] = np.arctan2(i_imd, t_red ) - np.arctan2(i_imd, d * np.sin(d) * cot + t_red  * np.cos(d))
                     startpix += len(pixs)
             self.tim.add('thts, phis and gammas  (python)')
-            thp_phip_mgamma = thp_phip_mgamma.transpose()
-            self.cacher.cache(fn_ptg, thp_phip_mgamma[:, 0:2])
-            self.cacher.cache(fn_mgamma, thp_phip_mgamma[:, 2])
+            self.cacher.cache(fn_ptg, thp_phip_gamma.T[:, 0:2])
+            self.cacher.cache(fn_gamma, thp_phip_gamma.T[:, 2])
             self.tim.close('build_angles')
             assert startpix == npix, (startpix, npix)
             if self.verbosity:
@@ -281,7 +301,7 @@ class deflection:
         assert spin >= 0, spin
         gclm = np.atleast_2d(gclm)
         ptg = self._get_ptg()
-        thts, phis, gamma = ptg[pixs, 0], ptg[pixs, 1], self._get_mgamma()[pixs] * (-1.)
+        thts, phis, gamma = ptg[pixs, 0], ptg[pixs, 1], self._get_gamma()[pixs]
         nph = 2 * np.ones(thts.size, dtype=np.uint64)  # I believe at least 2 points per ring
         ofs = 2 * np.arange(thts.size, dtype=np.uint64)
         wt = np.ones(thts.size, dtype=float)
@@ -382,12 +402,12 @@ class deflection:
                     values *= cis
                 self.tim.add('polrot (cis)')
             elif HAS_NUMEXPR:
-                mg = self._get_mgamma()
-                js = - 1j * spin
+                g = self._get_gamma()
+                js = 1j * spin
                 values *= numexpr.evaluate("exp(js * mg)")
                 self.tim.add('polrot (numexpr)')
             else:
-                values *= np.exp((-1j * spin) * self._get_mgamma())  # polrot. last entry is -gamma
+                values *= np.exp((1j * spin) * self._get_gamma())  # polrot. last entry is -gamma
                 self.tim.add('polrot (python)')
         self.tim.close('gclm2lenmap')
         if self.verbosity:
@@ -542,12 +562,12 @@ class deflection:
                         assert 0, 'fix this complex view and in place application?'
                     elif HAS_NUMEXPR:
                         re, im = points
-                        mg = self._get_mgamma()
-                        js = + 1j * spin
+                        g = self._get_gamma()
+                        js = - 1j * spin
                         points = numexpr.evaluate("(re + 1j * im) * exp(js * mg)")
                         self.tim.add('polrot (numexpr)')
                     else:
-                        points = (points[0] + 1j * points[1]) * np.exp((1j * spin) * self._get_mgamma())
+                        points = (points[0] + 1j * points[1]) * np.exp((-1j * spin) * self._get_gamma())
                         self.tim.add('polrot (python)')
                 else:
                     points = points[0] + 1j * points[1]
@@ -610,53 +630,6 @@ class deflection:
             #                 -      (   cos 2b * g1 + sin 2b * g2 )
         self.tim.close('dlm2A')
         return A.squeeze()
-
-    def _make_angles(self, version=0):
-        #FIXME: make a get_d1 with plm ?
-        self.tim.start('_make_angles')
-        self.tim.start('_spin 1 synthesis')
-        atp = self._build_d1()
-        self.tim.close('_spin 1 synthesis')
-        self.tim.start('vec proper')
-        #from scipy.special import spherical_jn as jn
-        d = np.sqrt(np.sum(atp ** 2, axis=0))
-        sindd = np.sin(d) / d
-        cosd = np.cos(d)
-        atp *= sindd
-        at = atp[0]
-
-        ret = np.empty((3, self.geom.npix()))
-        ret[1] = atp[1]
-        sts = np.sin(self.geom.theta)
-        cts = np.cos(self.geom.theta)
-        self.tim.start('_rotation')
-        for ir, (ct, st, ofs, nph) in enumerate(zip(cts, sts, self.geom.ofs, self.geom.nph)):  # We must follow the ordering of scarf position-space map
-            sli = slice(ofs, ofs+nph)
-            ret[0, sli] = st * cosd[sli] + ct * at[sli]
-            ret[2, sli] = ct * cosd[sli] - st * at[sli]
-        self.tim.close('_rotation')
-        self.tim.close('vec proper')
-        if version == 0:
-            self.tim.start('vec2ang (ducc)')
-            angs = ducc0.healpix.vec2ang(ret.T, nthreads=self.sht_tr)
-            del ret
-            self.tim.close('vec2ang (ducc)')
-        elif version == 1:
-            self.tim.start('vec2ang (python)')
-            angs = np.empty( (self.geom.npix(), 2),  dtype=float)
-            angs[:, 0] = np.arccos(ret[2])
-            angs[:, 1] = np.arctan2(ret[1], ret[0])
-            self.tim.close('vec2ang (python)')
-        else:
-            assert 0
-        self.tim.start('adding dphi')
-
-        dpix2pi = np.arange(np.max(self.geom.nph), dtype=int) * (2 * np.pi)
-        for ir, (nph, phi0) in enumerate(zip(self.geom.nph, self.geom.phi0)):
-            angs[self.geom.ofs[ir]:self.geom.ofs[ir] + nph, 1] += (phi0 + dpix2pi[:nph] / nph)
-        self.tim.close('adding dphi')
-        self.tim.close('_make_angles')
-        return angs # no need to modulo 2 pi for ducc routines (?)
 
     def get_eigamma(self):
         red, imd = self._build_d1()
