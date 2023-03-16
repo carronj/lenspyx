@@ -9,6 +9,8 @@ import argparse
 import time
 from lenspyx.remapping import utils_geom
 from lenspyx.utils import timer
+import ducc0
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='test FFP10-like fwd building')
@@ -21,7 +23,15 @@ if __name__ == '__main__':
     parser.add_argument('-cis', dest='cis', action='store_true', help='test cis action')
     parser.add_argument('-gonly', dest='gonly', action='store_true', help='grad-only SHTs')
     parser.add_argument('-HL', dest='HL', action='store_true', help='also test Healpix pixelization with this nside')
+    parser.add_argument('-alloc', dest='alloc',  type=int, default=0, help='tries pre-allocating ''alloc'' GB of memory')
     args = parser.parse_args()
+
+    if args.alloc:
+        if ducc0.misc.preallocate_memory(args.alloc):
+            print('gclm2lenmap: allocated %s GB'%args.alloc)
+        else:
+            print('gclm2lenmap: allocation of %s GB failed'%args.alloc)
+
     cpu_count = multiprocessing.cpu_count()
 
     ffi, geom = syn_ffi_ducc_29(lmax_len=args.lmax_len, dlmax=args.dlmax, dlmax_gl=args.dlmax_gl, nthreads=args.nt,

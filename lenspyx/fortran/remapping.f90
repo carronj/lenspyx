@@ -313,6 +313,22 @@ module remapping
         end do
         !$OMP END PARALLEL DO
     end subroutine apply_inplace
+    subroutine apply_inplace_simd(npix, values, gamma, spin, nthreads)
+        use OMP_LIB
+        implicit none
+        double precision, intent(in) :: gamma(npix)
+        integer, intent(in) :: npix, spin, nthreads
+        double complex, intent(inout) :: values(npix)
+        integer i
+
+        call OMP_SET_NUM_THREADS(nthreads)
+        !$OMP PARALLEL DO SIMD SCHEDULE(SIMD:STATIC)
+        ! spin must be 'shared' here for things to work, no idea why
+        do i = 1, npix
+            values(i) = values(i) * cdexp(dcmplx(0d0, spin * gamma(i)))
+        end do
+        !$OMP END PARALLEL DO SIMD
+    end subroutine apply_inplace_simd
     subroutine apply_inplacef(npix, values, gamma, spin, nthreads)
         use OMP_LIB
         implicit none

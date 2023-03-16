@@ -128,7 +128,7 @@ class Geom:
         return np.concatenate([Geom.phis(geom, ir) for ir in rings])
 
     @staticmethod
-    def get_thingauss_geometry(lmax:int, smax:int, zbounds:tuple[float, float]=(-1., 1.)):
+    def get_thingauss_geometry(lmax:int, smax:int, zbounds:tuple[float, float]=(-1., 1.), good_size_real=True):
         """Build a 'thinned' Gauss-Legendre geometry
 
             This uses polar optimization to reduce the number of points away from the equator
@@ -137,6 +137,7 @@ class Geom:
                 lmax: band-limit (or desired band-limit) on the equator
                 smax: maximal intended spin-value (this changes the m-truncation by an amount ~smax)
                 zbounds: pixels outside of provided cos-colatitude bounds will be discarded
+                good_size_real(optional): picks slightly larger longitudes more suited for real FFTs if set (see ducc)
 
             Note:
                 'thinning' saves memory but hardly any computational time for the same latitude range
@@ -153,7 +154,7 @@ class Geom:
         nlat = tht.size
         phi0 = np.zeros(nlat, dtype=float)
         mmax = np.minimum(np.maximum(st2mmax(smax, tht, lmax), st2mmax(-smax, tht, lmax)), np.ones(nlat) * lmax)
-        nph = np.array([good_size(int(np.ceil(2 * m + 1))) for m in mmax])
+        nph = np.array([good_size(int(np.ceil(2 * m + 1)), good_size_real) for m in mmax])
         ofs = np.insert(np.cumsum(nph[:-1]), 0, 0)
         return Geom(tht, phi0, nph, ofs, wt / nph)
 
