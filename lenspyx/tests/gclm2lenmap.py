@@ -19,18 +19,19 @@ if __name__ == '__main__':
     parser.add_argument('-n', dest='nt', type=int, default=4, help='number of threads')
     parser.add_argument('-eps', dest='epsilon', type=float, default=7, help='-log10 of nufft accuracy')
     parser.add_argument('-cis', dest='cis', action='store_true', help='test cis action')
+    parser.add_argument('-gonly', dest='gonly', action='store_true', help='grad-only SHTs')
     parser.add_argument('-HL', dest='HL', action='store_true', help='also test Healpix pixelization with this nside')
     args = parser.parse_args()
     cpu_count = multiprocessing.cpu_count()
 
     ffi, geom = syn_ffi_ducc_29(lmax_len=args.lmax_len, dlmax=args.dlmax, dlmax_gl=args.dlmax_gl, nthreads=args.nt,
-                             verbosity=0)
+                             verbosity=0, epsilon=10 ** (-args.epsilon))
     lmax_unl, mmax_unl = args.lmax_len + args.dlmax, args.lmax_len + args.dlmax
 
     npix = geom.npix()
     nrings = ffi.geom.theta.size
     eblm = np.array([hp.synalm(cls_unl['ee' if args.spin > 0 else 'tt'][:lmax_unl + 1]),
-                     hp.synalm(cls_unl['bb'][:lmax_unl + 1])])[0:1 + (args.spin != 0)]
+                     hp.synalm(cls_unl['bb'][:lmax_unl + 1])])[0:1 + (args.spin != 0) * (not args.gonly)]
     #t0 = time.time()
     #ffi._build_angles()
     #t1 = time.time()

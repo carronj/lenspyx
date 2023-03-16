@@ -8,7 +8,7 @@ from lenspyx.remapping import deflection as deflection_28
 from ducc0.sht.experimental import adjoint_synthesis_general, synthesis_general
 
 try:
-    from lenscarf.fortran import remapping as fremap
+    from lenspyx.fortran.remapping import remapping as fremap
     HAS_FORTRAN = True
 except:
     HAS_FORTRAN = False
@@ -19,6 +19,7 @@ try:
 except:
     HAS_NUMEXPR = False
     print("deflection.py::could not load numexpr, falling back on python impl.")
+HAS_DUCCGRADONLY = 'mode:' in synthesis_general.__doc__
 
 # some helper functions
 
@@ -66,9 +67,15 @@ class deflection(deflection_28.deflection):
             # This is a trick with two views of the same array to get complex values as output to multiply by the phase
             valuesc = np.empty((npix,), dtype=np.complex64 if self.single_prec else np.complex128)
             values = valuesc.view(np.float32 if self.single_prec else np.float64).reshape((npix, 2)).T
-            synthesis_general(map=values, lmax=lmax_unl, mmax=mmax, alm=gclm, loc=ptg,
-                                                              spin=spin, epsilon=self.epsilon, nthreads=self.sht_tr)
-            self.tim.add('synthesis general')
+            if (gclm[0].size == gclm.size) and HAS_DUCCGRADONLY:
+                synthesis_general(map=values, lmax=lmax_unl, mmax=mmax, alm=gclm, loc=ptg,
+                                    spin=spin, epsilon=self.epsilon, nthreads=self.sht_tr, mode='GRAD_ONLY')
+                self.tim.add('synthesis general (GRAD_ONLY)')
+
+            else:
+                synthesis_general(map=values, lmax=lmax_unl, mmax=mmax, alm=gclm, loc=ptg,
+                                  spin=spin, epsilon=self.epsilon, nthreads=self.sht_tr)
+                self.tim.add('synthesis general')
 
             if polrot * spin:
                 if self._cis:
@@ -76,14 +83,18 @@ class deflection(deflection_28.deflection):
                     for i in range(abs(spin)):
                         valuesc *= cis
                     self.tim.add('polrot (cis)')
-                elif HAS_NUMEXPR:
-                    mg = self._get_gamma()
-                    js = 1j * spin
-                    valuesc *= numexpr.evaluate("exp(js * mg)")
-                    self.tim.add('polrot (numexpr)')
                 else:
-                    valuesc *= np.exp((1j * spin) * self._get_gamma())
-                    self.tim.add('polrot (python)')
+                    func = fremap.apply_inplace if valuesc.dtype == np.complex128 else fremap.apply_inplacef
+                    func(valuesc, self._get_gamma(), spin, self.sht_tr)
+                    self.tim.add('polrot (fortran)')
+                #elif HAS_NUMEXPR:
+                #    mg = self._get_gamma()
+                #    js = 1j * spin
+                #    valuesc *= numexpr.evaluate("exp(js * mg)")
+                #    self.tim.add('polrot (numexpr)')
+                #else:
+                #    valuesc *= np.exp((1j * spin) * self._get_gamma())
+                #    self.tim.add('polrot (python)')
         self.tim.close('gclm2lenmap')
         if self.verbosity:
             print(self.tim)

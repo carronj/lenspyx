@@ -61,7 +61,7 @@ class Geom:
         for ar in [self.theta, self.weight, self.phi0, self.nph, self.ofs]:
             ar[:] = ar[argsort]
 
-    def synthesis(self, gclm: np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int):
+    def synthesis(self, gclm: np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int, **kwargs):
         """Wrapper to ducc forward SHT
 
             Return a map or a pair of map for spin non-zero, with the same type as gclm
@@ -69,16 +69,16 @@ class Geom:
         """
         gclm = np.atleast_2d(gclm)
         return synthesis(alm=gclm, theta=self.theta, lmax=lmax, mmax=mmax, nphi=self.nph, spin=spin, phi0=self.phi0,
-                         nthreads=nthreads, ringstart=self.ofs)
+                         nthreads=nthreads, ringstart=self.ofs, **kwargs)
 
-    def synthesis_deriv1(self, alm: np.ndarray, lmax:int, mmax:int, nthreads:int):
+    def synthesis_deriv1(self, alm: np.ndarray, lmax:int, mmax:int, nthreads:int, **kwargs):
         """Wrapper to ducc synthesis_deriv1
 
         """
         return synthesis_deriv1(alm=alm, theta=self.theta, lmax=lmax, mmax=mmax, nphi=self.nph, phi0=self.phi0,
-                         nthreads=nthreads, ringstart=self.ofs)
+                         nthreads=nthreads, ringstart=self.ofs, **kwargs)
 
-    def adjoint_synthesis(self, m: np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int):
+    def adjoint_synthesis(self, m: np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int, **kwargs):
         """Wrapper to ducc backward SHT
 
             Return an array with leading dimension 1 for spin-0 or 2 for spin non-zero
@@ -91,27 +91,27 @@ class Geom:
         for of, w, npi in zip(self.ofs, self.weight, self.nph):
             m[:, of:of + npi] *= w
         return adjoint_synthesis(map=m, theta=self.theta, lmax=lmax, mmax=mmax, nphi=self.nph, spin=spin, phi0=self.phi0,
-                                 nthreads=nthreads, ringstart=self.ofs)
+                                 nthreads=nthreads, ringstart=self.ofs, **kwargs)
 
-    def alm2map_spin(self, gclm:np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int, zbounds=(-1., 1.)):
+    def alm2map_spin(self, gclm:np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int, zbounds=(-1., 1.), **kwargs):
         # FIXME: method only here for backwards compatiblity
         assert zbounds[0] == -1 and zbounds[1] == 1., zbounds
-        return self.synthesis(gclm, spin, lmax, mmax, nthreads)
+        return self.synthesis(gclm, spin, lmax, mmax, nthreads, **kwargs)
 
-    def map2alm_spin(self, m:np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int, zbounds=(-1., 1.)):
+    def map2alm_spin(self, m:np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int, zbounds=(-1., 1.), **kwargs):
         # FIXME: method only here for backwards compatiblity
         assert zbounds[0] == -1 and zbounds[1] == 1., zbounds
-        return self.adjoint_synthesis(m, spin, lmax, mmax, nthreads)
+        return self.adjoint_synthesis(m, spin, lmax, mmax, nthreads, **kwargs)
 
-    def alm2map(self, gclm:np.ndarray, lmax:int, mmax:int, nthreads:int, zbounds=(-1., 1.)):
+    def alm2map(self, gclm:np.ndarray, lmax:int, mmax:int, nthreads:int, zbounds=(-1., 1.), **kwargs):
         # FIXME: method only here for backwards compatiblity
         assert zbounds[0] == -1 and zbounds[1] == 1., zbounds
-        return self.synthesis(gclm, 0, lmax, mmax, nthreads).squeeze()
+        return self.synthesis(gclm, 0, lmax, mmax, nthreads, **kwargs).squeeze()
 
-    def map2alm(self, m:np.ndarray, lmax:int, mmax:int, nthreads:int, zbounds=(-1., 1.)):
+    def map2alm(self, m:np.ndarray, lmax:int, mmax:int, nthreads:int, zbounds=(-1., 1.), **kwargs):
         # FIXME: method only here for backwards compatiblity
         assert zbounds[0] == -1 and zbounds[1] == 1., zbounds
-        return self.adjoint_synthesis(m, 0, lmax, mmax, nthreads).squeeze()
+        return self.adjoint_synthesis(m, 0, lmax, mmax, nthreads, **kwargs).squeeze()
 
     @staticmethod
     def rings2pix(geom:Geom, rings:np.ndarray[int]):

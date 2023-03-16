@@ -296,117 +296,44 @@ module remapping
         end do
         !$OMP END PARALLEL DO
     end subroutine pointing
-    subroutine pointingv2(npix, nring, red, imd, thts, phi0s, nphis, ptg, ofs, nthreads)
+    subroutine apply_inplace(npix, values, gamma, spin, nthreads)
         use OMP_LIB
         implicit none
-        integer, intent(in) :: npix, nring, nthreads
-        integer, intent(in) :: nphis(nring), ofs(nring)
-        double precision, intent(in) :: red(npix), imd(npix), thts(nring), phi0s(nring)
-        double precision, intent(out) :: ptg(3, npix)
-        real thtp, phip, gamma
-        double precision phi, dphi, sint, cost, cott, d, sind_d, cosd, sind, at, ap
-        double precision :: PI2 = DPI * 2d0
-        integer ir, ip, pix
+        double precision, intent(in) :: gamma(npix)
+        integer, intent(in) :: npix, spin, nthreads
+        double complex, intent(inout) :: values(npix)
+        integer i
 
         call OMP_SET_NUM_THREADS(nthreads)
-        !$OMP PARALLEL DO DEFAULT(NONE)&
-        !$OMP SHARED(PI2, thts, red, imd, ptg, nphis, phi0s, npix, nring, ofs)&
-        !$OMP PRIVATE(ip, thtp, phip,gamma, at, sint, cost, cott, cosd, sind, ap, pix, phi, dphi, d, sind_d)
-        do ir = 1, nring
-            sint = dsin(thts(ir))
-            cost = dcos(thts(ir))
-            cott = cost / sint
-            pix = ofs(ir) + 1
-            phi = phi0s(ir)
-            dphi =  PI2  / nphis(ir)
-            do ip = 1, nphis(ir)
-                d = red(pix) * red(pix) + imd(pix) * imd(pix)
-                !sind_d = 1d0 - d / 6d0 * (1d0 - d / 20d0 * (1d0 - d / 42d0))
-                !d = dsqrt(d)
-                if (d > 0d0) then
-                    d = dsqrt(d)
-                    sind = dsin(d)
-                    sind_d = dsin(d) / d
-                    cosd = dcos(d)
-                else
-                    sind = 0d0
-                    sind_d = 1d0
-                    cosd = 1d0
-                end if
-                at = red(pix) * sind_d
-                ap = imd(pix) * sind_d
-                thtp = dacos(cost * cosd - sint * at)
-                phip = modulo(phi + datan2(ap, cost * at + sint * cosd), PI2)
-                gamma = datan2(ap, at) - datan2(ap, sind * sind * cott + at * cosd)
-                ptg(1, pix) = thtp
-                ptg(2, pix) = phip
-                ptg(3, pix) = gamma
-                pix = pix + 1
-                phi = phi  + dphi
-            end do
+        !$OMP PARALLEL DO SCHEDULE(STATIC)&
+        !$OMP SHARED(values, gamma, npix)
+        ! spin must be 'shared' here for things to work, no idea why
+        do i = 1, npix
+            values(i) = values(i) * cdexp(dcmplx(0d0, spin * gamma(i)))
         end do
         !$OMP END PARALLEL DO
-    end subroutine pointingv2
-    subroutine pointingeig(npix, nring, red, imd, thts, phi0s, nphis, ptg, ofs, nthreads)
+    end subroutine apply_inplace
+    subroutine apply_inplacef(npix, values, gamma, spin, nthreads)
         use OMP_LIB
         implicit none
-        integer, intent(in) :: npix, nring, nthreads
-        integer, intent(in) :: nphis(nring), ofs(nring)
-        double precision, intent(in) :: red(npix), imd(npix), thts(nring), phi0s(nring)
-        double precision, intent(out) :: ptg(4, npix)
-        double precision thtp, gamma
-        double precision phi, dphi, sint, cost, d, sind_d, cosd, sind, at, ap, sintp, costp, hsind, temp
-        double precision :: PI2 = DPI * 2d0
-        integer ir, ip, pix
+        double precision, intent(in) :: gamma(npix)
+        integer, intent(in) :: npix, spin, nthreads
+        complex, intent(inout) :: values(npix)
+        integer i
 
         call OMP_SET_NUM_THREADS(nthreads)
-        !$OMP PARALLEL DO DEFAULT(NONE)&
-        !$OMP SHARED(PI2, thts, red, imd, ptg, nphis, phi0s, npix, nring, ofs)&
-        !$OMP PRIVATE(ip, thtp, gamma, at,sint,cost,cosd,sind,sintp,costp,ap,pix,phi,dphi,d,sind_d,hsind,temp)
-        do ir = 1, nring
-            sint = dsin(thts(ir))
-            cost = dcos(thts(ir))
-            pix = ofs(ir) + 1
-            phi = phi0s(ir)
-            dphi =  PI2  / nphis(ir)
-            do ip = 1, nphis(ir)
-                d = red(pix) * red(pix) + imd(pix) * imd(pix)
-                !sind_d = 1d0 - d / 6d0 * (1d0 - d / 20d0 * (1d0 - d / 42d0))
-                !d = dsqrt(d)
-                if (d > 0d0) then
-                    d = dsqrt(d)
-                    sind = dsin(d)
-                    sind_d = dsin(d) / d
-                    cosd = dcos(d)
-                    hsind = 2d0 * dsin( 0.5d0 * d) ** 2
-                else
-                    sind = 0d0
-                    sind_d = 1d0
-                    cosd = 1d0
-                    hsind = 0d0
-                end if
-                at = red(pix) * sind_d
-                ap = imd(pix) * sind_d
-                costp = cost * cosd - sint * at
-                sintp = dsqrt(dmax1(1d0 - costp * costp, 0d0)) !FIXME
-                ptg(1, pix) = datan2(sintp, costp) !FIXME
-                ptg(2, pix) = modulo(phi + datan2(ap, cost * at + sint * cosd), PI2) ! phi'
-                temp = (sint * red(pix) * hsind / (sind * sind) + cost)  !FIXME (and the prefac hsind /sind**2 is just tan(d/2))
-
-                at = sint + temp * at  ! using at and ap for unnormalized cos chi and sin chi...
-                ap = temp * ap
-                temp = dsqrt(at * at + ap * ap)
-                if (temp > 0d0) then
-                    ptg(3, pix) = at / temp ! cos chi
-                    ptg(4, pix) = ap / temp ! sin chi
-                else
-                    ptg(3, pix) = 1d0
-                    ptg(4, pix) = 0.
-                end if
-                pix = pix + 1
-                phi = phi  + dphi
-            end do
+        !$OMP PARALLEL DO SCHEDULE(STATIC)&
+        !$OMP SHARED(values, gamma, npix)
+        ! spin must be 'shared' here for things to work, no idea why
+        do i = 1, npix
+            values(i) = values(i) * cexp(cmplx(0d0, spin * gamma(i)))
         end do
         !$OMP END PARALLEL DO
-    end subroutine pointingeig
+    end subroutine apply_inplacef
+    subroutine my_incr(var, incr)
+      implicit none
+      integer, intent(inout) :: var
+      integer, intent(in)    :: incr
+      var = var + incr
+    end subroutine my_incr
 end module remapping

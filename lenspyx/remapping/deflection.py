@@ -15,7 +15,7 @@ from lenspyx.utils import timer, blm_gauss
 from lenspyx.remapping.utils_geom import Geom, pbdGeometry, pbounds
 from multiprocessing import cpu_count
 try:
-    from lenspyx.fortran import remapping as fremap
+    from lenspyx.fortran.remapping import remapping as fremap
     HAS_FORTRAN = True
 except:
     HAS_FORTRAN = False
@@ -26,11 +26,10 @@ try:
 except:
     HAS_NUMEXPR = False
 
-try:
+HAS_DUCCPOINTING = 'get_deflected_angles' in ducc0.misc.__dict__
+HAS_DUCCGRADONLY = 'mode:' in ducc0.sht.experimental.synthesis.__doc__
+if HAS_DUCCPOINTING:
     from ducc0.misc import get_deflected_angles
-    HAS_DUCCPOINTING = True
-except:
-    HAS_DUCCPOINTING = False
 
 
 ctype = {np.dtype(np.float32): np.complex64,
@@ -90,13 +89,6 @@ class deflection:
         self.lmax_dlm = lmax
         self.mmax_dlm = mmax_dlm
 
-        if dclm is None: # FIXME
-            # FIXME:  plm is input?
-            p2d = np.sqrt(np.arange(self.lmax_dlm + 1) * np.arange(1, self.lmax_dlm + 2))
-            p2d[0] = 1.
-            self.plm = np.atleast_2d(almxfl(self.dlm, 1. / p2d, self.mmax_dlm, False))
-        else:
-            self.plm = None
 
         self.cacher = cacher
         self.geom = lens_geom
@@ -143,11 +135,11 @@ class deflection:
         return self.cacher.load('gamma')
 
     def _build_d1(self):
-        if self.dclm is None:
+        if self.dclm is None and HAS_DUCCGRADONLY:
             # undo p2d to use
             self.tim.reset()
-            d1 = self.geom.synthesis_deriv1(self.plm, self.lmax_dlm, self.mmax_dlm, self.sht_tr)
-            self.tim.add('build angles <- synthesis_deriv1')
+            d1 = self.geom.synthesis(self.dlm, 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr, mode='GRAD_ONLY')
+            self.tim.add('build angles <- synthesis (GRAD_ONLY)')
         else:
             # FIXME: want to do that only once
             self.tim.reset()
@@ -183,9 +175,9 @@ class deflection:
                 red, imd = d1
                 tht, phi0, nph, ofs = self.geom.theta, self.geom.phi0, self.geom.nph, self.geom.ofs
                 if self.single_prec_ptg:
-                    thp_phip_gamma = fremap.remapping.fpointing(red, imd, tht, phi0, nph, ofs, self.sht_tr)
+                    thp_phip_gamma = fremap.fpointing(red, imd, tht, phi0, nph, ofs, self.sht_tr)
                 else:
-                    thp_phip_gamma = fremap.remapping.pointing(red, imd, tht, phi0, nph, ofs, self.sht_tr)
+                    thp_phip_gamma = fremap.pointing(red, imd, tht, phi0, nph, ofs, self.sht_tr)
                 self.tim.add('build angles <- th-phi-gm (ftn)')
                 # I think this just trivially turns the F-array into a C-contiguous array:
                 self.cacher.cache(fn_ptg, thp_phip_gamma.transpose()[:, 0:2])
@@ -240,7 +232,7 @@ class deflection:
             npix = Geom.npix(self.geom)
             if HAS_FORTRAN:
                 tht, phi0, nph, ofs = self.geom.theta, self.geom.phi0, self.geom.nph, self.geom.ofs
-                thp_phip_cischi = fremap.remapping.pointingeig(red, imd, tht, phi0, nph, ofs, self.sht_tr)
+                thp_phip_cischi = fremap.pointingeig(red, imd, tht, phi0, nph, ofs, self.sht_tr)
                 self.tim.add('build angles <- th-phi-cischi (ftn)')
                 # I think this just trivially turns the F-array into a C-contiguous array:
                 self.cacher.cache(fn_ptg, thp_phip_cischi.transpose()[:, 0:2])
@@ -401,14 +393,19 @@ class deflection:
                 for i in range(polrot * abs(spin)):
                     values *= cis
                 self.tim.add('polrot (cis)')
-            elif HAS_NUMEXPR:
-                g = self._get_gamma()
-                js = 1j * spin
-                values *= numexpr.evaluate("exp(js * mg)")
-                self.tim.add('polrot (numexpr)')
             else:
-                values *= np.exp((1j * spin) * self._get_gamma())  # polrot. last entry is -gamma
-                self.tim.add('polrot (python)')
+                func = fremap.apply_inplace if values.dtype == np.complex128 else fremap.apply_inplacef
+                func(values, self._get_gamma(), spin, self.sht_tr)
+                self.tim.add('polrot (fortran)')
+
+            #elif HAS_NUMEXPR:
+            #    g = self._get_gamma()
+            #    js = 1j * spin
+            #    values *= numexpr.evaluate("exp(js * mg)")
+            #    self.tim.add('polrot (numexpr)')
+            #else:
+            #    values *= np.exp((1j * spin) * self._get_gamma())  # polrot. last entry is -gamma
+            #    self.tim.add('polrot (python)')
         self.tim.close('gclm2lenmap')
         if self.verbosity:
             print(self.tim)
