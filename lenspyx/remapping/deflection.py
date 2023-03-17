@@ -45,6 +45,10 @@ rtype = {np.dtype(np.complex64): np.float32,
          np.complex128: np.float64,
          np.longcomplex: np.longfloat}
 
+def ducc_sht_mode(gclm):
+    gclm_ = np.atleast_2d(gclm)
+    return 'GRAD_ONLY' if gclm_[0].size == gclm_.size else 'STANDARD'
+
 class deflection:
     def __init__(self, lens_geom:Geom, dglm, mmax_dlm:int or None, numthreads:int=0,
                  cacher:cachers.cacher or None=None, dclm:np.ndarray or None=None,
@@ -343,9 +347,16 @@ class deflection:
         nphi = 2 * nphihalf
         # Is this any different to scarf wraps ?
         # NB: type of map, map_df, and FFTs will follow that of input gclm
-        map = ducc0.sht.experimental.synthesis_2d(alm=gclm, ntheta=ntheta, nphi=nphi,
+        if HAS_DUCCGRADONLY:
+            mode = ducc_sht_mode(gclm)
+            map = ducc0.sht.experimental.synthesis_2d(alm=gclm, ntheta=ntheta, nphi=nphi,
+                                spin=spin, lmax=lmax_unl, mmax=mmax, geometry="CC", nthreads=self.sht_tr, mode=mode)
+            self.tim.add('experimental.synthesis_2d (%s)'%mode)
+
+        else:
+            map = ducc0.sht.experimental.synthesis_2d(alm=gclm, ntheta=ntheta, nphi=nphi,
                                 spin=spin, lmax=lmax_unl, mmax=mmax, geometry="CC", nthreads=self.sht_tr)
-        self.tim.add('experimental.synthesis_2d')
+            self.tim.add('experimental.synthesis_2d')
 
         # extend map to double Fourier sphere map
         map_dfs = np.empty((2 * ntheta - 2, nphi), dtype=map.dtype if spin == 0 else ctype[map.dtype])
@@ -412,7 +423,7 @@ class deflection:
         # Return real array of shape (2, npix) for spin > 0
         return values.real if spin == 0 else values.view(rtype[values.dtype]).reshape((values.size, 2)).T
 
-    def lenmap2gclm(self, points:np.ndarray[complex or float], spin:int, lmax:int, mmax:int):
+    def lenmap2gclm(self, points:np.ndarray[complex or float], spin:int, lmax:int, mmax:int, sht_mode='STANDARD'):
         """
             Note:
                 points mst be already quadrature-weigthed, and be complex
@@ -465,18 +476,25 @@ class deflection:
         self.tim.add('Double Fourier')
 
         # adjoint SHT synthesis
-        slm = ducc0.sht.experimental.adjoint_synthesis_2d(map=map, spin=spin,
+        if sht_mode != 'STANDARD' and HAS_DUCCGRADONLY:
+            slm = ducc0.sht.experimental.adjoint_synthesis_2d(map=map, spin=spin,
+                                            lmax=lmax, mmax=mmax, geometry="CC", nthreads=self.sht_tr, mode=sht_mode)
+            self.tim.add('adjoint_synthesis_2d (%s)'%sht_mode)
+
+        else:
+            slm = ducc0.sht.experimental.adjoint_synthesis_2d(map=map, spin=spin,
                                                           lmax=lmax, mmax=mmax, geometry="CC", nthreads=self.sht_tr)
-        self.tim.add('map2alm_spin')
+            self.tim.add('adjoint_synthesis_2d')
         self.tim.close('lenmap2gclm')
         if self.verbosity:
             print(self.tim)
         return slm.squeeze()
 
-    def lensgclm(self, gclm:np.ndarray, mmax:int or None, spin, lmax_out, mmax_out:int or None, backwards=False, nomagn=False, polrot=True):
+    def lensgclm(self, gclm:np.ndarray, mmax:int or None, spin, lmax_out, mmax_out:int or None,
+                 backwards=False, nomagn=False, polrot=True):
         """Adjoint remapping operation from lensed alm space to unlensed alm space
 
-
+            #FIXME: How to include SHT mod ?
             #FIXME: nomagn=True is a backward comptability thing to ask for inverse lensing
             #        but in this implementation it actually puts a magn...
 
@@ -493,6 +511,7 @@ class deflection:
                 ret = alm_copy(gclm, mmax, lmax_out, mmax_out)
                 self.tim.close(stri)
                 return ret
+            # FIXME: What to do with SHT mode here ?
             glmret = alm_copy(gclm[0], mmax, lmax_out, mmax_out)
             ret = np.array([glmret, alm_copy(gclm[1], mmax, lmax_out, mmax_out) if gclm[1] is not None else np.zeros_like(glmret)])
             self.tim.close(stri)
@@ -503,13 +522,13 @@ class deflection:
             self.tim.reset()
             if spin == 0:
                 ret = self.geom.adjoint_synthesis(m, spin, lmax_out, mmax_out, self.sht_tr)
-                self.tim.add('map2alm')
+                self.tim.add('adjoint_synthesis')
                 self.tim.close('lengclm ' + 'bwd' * backwards + 'fwd' * (not backwards))
                 return ret.squeeze()
             else:
                 assert polrot
                 ret = self.geom.adjoint_synthesis(m, spin, lmax_out, mmax_out, self.sht_tr)
-                self.tim.add('map2alm_spin')
+                self.tim.add('adjoint_synthesis')
                 self.tim.close('lengclm ' + 'bwd' * backwards + 'fwd' * (not backwards))
                 return ret
         else:

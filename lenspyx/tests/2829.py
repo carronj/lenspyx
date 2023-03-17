@@ -50,7 +50,7 @@ if __name__ == '__main__':
     cpu_count = min(multiprocessing.cpu_count(), 36)
     nts = range(1, cpu_count+ 1)
     ffi_ref = get_ffi(dlmax_gl, False, nthreads=nts[-1], epsilon=1e-11)
-    ptg = ffi_ref._build_angles()
+    ptg = ffi_ref._get_ptg()
     print(ffi_ref.tim)
     assert ptg.dtype == np.float64
     Sref = ffi_ref.gclm2lenmap(ebunl.astype(np.complex128), mmax_unl, spin, False,   polrot=POLROT)

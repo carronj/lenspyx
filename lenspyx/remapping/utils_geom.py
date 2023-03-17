@@ -55,21 +55,83 @@ class Geom:
         """
         return np.sum(self.weight * self.nph) / (4 * np.pi)
 
-    def sort(self, arr:np.ndarray):
-        assert arr.size == self.theta.size, (arr.size, self.theta.size)
-        argsort = np.argsort(arr) # We sort here the rings by order in the maps
-        for ar in [self.theta, self.weight, self.phi0, self.nph, self.ofs]:
-            ar[:] = ar[argsort]
+    def sort(self, arr:np.ndarray, inplace:bool):
+        """Rearrange the arrays inplace, sorting them argsorting the input array
 
-    def synthesis(self, gclm: np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int, **kwargs):
+
+        """
+        assert arr.size == self.theta.size, (arr.size, self.theta.size)
+        asort = np.argsort(arr) # We sort here the rings by order in the maps
+        if inplace:
+            for ar in [self.theta, self.weight, self.phi0, self.nph, self.ofs]:
+                ar[:] = ar[asort]
+            return self
+        return Geom(self.theta[asort], self.phi0[asort], self.nph[asort], self.ofs[asort], self.weight[asort])
+
+    def restrict(self, tht_min:float, tht_max:float, northsouth_sym:bool):
+        """Returns a geometry with restricted co-latitude range
+
+            Args:
+                tht_min: min colatitude in radians
+                tht_max: max colatitude in radians
+                northsouth_sym: includes the equator-symmetrized region if set
+
+            Return:
+                Geometry object with corresponding colatitude range
+
+            Note:
+                The ringstart indices of the output object still refer to the original geometry map
+
+        """
+        n_cond = (self.theta <= tht_max) & (self.theta >= tht_min)
+        if northsouth_sym:
+            n_cond = n_cond | (self.theta <= (np.pi - tht_min)) & (self.theta >= (np.pi - tht_max))
+        band = np.where(n_cond)
+        return Geom(self.theta[band], self.phi0[band], self.nph[band], self.ofs[band], self.weight[band])
+
+    def split(self, nbands, verbose=False):
+        """Split the pixelization into chunks
+
+            Args:
+                nbands(int): the colatitude range is uniformly split into 'nbands'
+
+            Returns:
+                list of Geom instances
+
+            Notes:
+                Respects north-south symmetry when present in the instance for faster SHTs
+
+                The ringstarts of the geoms refers to the original full map
+
+                There can be some small overlap between bands if the instance co-latitudes exactly match the separation points
+
+        """
+        thts = np.linspace(0., np.pi * 0.5, nbands + 1)
+        th_ls = thts[:-1]
+        th_us = thts[1:]
+        th_ls[0] = 0.
+        th_us[-1] = np.pi * 0.5
+        geoms = []
+        for th_l, th_u in zip(th_ls, th_us):
+            geoms.append(self.restrict(th_l, th_u, True))
+        npix = self.npix()
+        npix_tot = np.sum([geo.npix() for geo in geoms])
+        assert npix_tot >= npix, (npix, npix_tot, 'aaargh')
+        if npix_tot > npix:
+            if verbose:
+                print('(split with overlap, %s additional pixels out of %s)'%(npix_tot-npix, npix))
+        return geoms
+
+    def synthesis(self, gclm: np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int, map:np.ndarray=None, **kwargs):
         """Wrapper to ducc forward SHT
 
             Return a map or a pair of map for spin non-zero, with the same type as gclm
 
+
         """
         gclm = np.atleast_2d(gclm)
         return synthesis(alm=gclm, theta=self.theta, lmax=lmax, mmax=mmax, nphi=self.nph, spin=spin, phi0=self.phi0,
-                         nthreads=nthreads, ringstart=self.ofs, **kwargs)
+                         nthreads=nthreads, ringstart=self.ofs,map=map, **kwargs)
 
     def synthesis_deriv1(self, alm: np.ndarray, lmax:int, mmax:int, nthreads:int, **kwargs):
         """Wrapper to ducc synthesis_deriv1
