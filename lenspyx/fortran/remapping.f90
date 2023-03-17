@@ -332,44 +332,25 @@ module remapping
         integer i
 
         call OMP_SET_NUM_THREADS(nthreads)
-        !$OMP PARALLEL DO SCHEDULE(STATIC)&
-        !$OMP SHARED(values, gamma, npix)
+        !$OMP PARALLEL DO
         ! spin must be 'shared' here for things to work, no idea why
         do i = 1, npix
-            values(i) = values(i) * cdexp(dcmplx(0d0, spin * gamma(i)))
+            values(i) = values(i) * cdexp(dcmplx(0, spin * gamma(i)))
         end do
         !$OMP END PARALLEL DO
     end subroutine apply_inplace
-    subroutine apply_inplace_simd(npix, values, gamma, spin, nthreads)
-        use OMP_LIB
-        implicit none
-        double precision, intent(in) :: gamma(npix)
-        integer, intent(in) :: npix, spin, nthreads
-        double complex, intent(inout) :: values(npix)
-        integer i
-
-        call OMP_SET_NUM_THREADS(nthreads)
-        !$OMP PARALLEL DO SIMD SCHEDULE(SIMD:STATIC)
-        ! spin must be 'shared' here for things to work, no idea why
-        do i = 1, npix
-            values(i) = values(i) * cdexp(dcmplx(0d0, spin * gamma(i)))
-        end do
-        !$OMP END PARALLEL DO SIMD
-    end subroutine apply_inplace_simd
     subroutine apply_inplacef(npix, values, gamma, spin, nthreads)
         use OMP_LIB
         implicit none
-        double precision, intent(in) :: gamma(npix)
+        real, intent(in) :: gamma(npix)
         integer, intent(in) :: npix, spin, nthreads
         complex, intent(inout) :: values(npix)
         integer i
 
         call OMP_SET_NUM_THREADS(nthreads)
-        !$OMP PARALLEL DO SCHEDULE(STATIC)&
-        !$OMP SHARED(values, gamma, npix)
-        ! spin must be 'shared' here for things to work, no idea why
+        !$OMP PARALLEL DO
         do i = 1, npix
-            values(i) = values(i) * cexp(cmplx(0d0, spin * gamma(i)))
+            values(i) = values(i) * cexp(complex(0, spin * gamma(i)))
         end do
         !$OMP END PARALLEL DO
     end subroutine apply_inplacef

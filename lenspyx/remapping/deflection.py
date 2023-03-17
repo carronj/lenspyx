@@ -166,7 +166,7 @@ class deflection:
                 self.tim.add('build angles <- th-phi%s (ducc)'%('-gm'*calc_rotation))
                 if calc_rotation:
                     self.cacher.cache(fns[0], tht_phip_gamma[:, 0:2])
-                    self.cacher.cache(fns[1], tht_phip_gamma[:, 2])
+                    self.cacher.cache(fns[1], tht_phip_gamma[:, 2] if not self.single_prec else tht_phip_gamma[:, 2].astype(np.float32))
                 else:
                     self.cacher.cache(fns[0], tht_phip_gamma)
                 self.tim.close('build_angles')
@@ -183,7 +183,7 @@ class deflection:
                 # I think this just trivially turns the F-array into a C-contiguous array:
                 self.cacher.cache(fns[0], thp_phip_gamma.transpose()[:, 0:2])
                 if calc_rotation:
-                    self.cacher.cache(fns[1], thp_phip_gamma.transpose()[:, 2])
+                    self.cacher.cache(fns[1], thp_phip_gamma[:, 2] if not self.single_prec else thp_phip_gamma[:, 2].astype(np.float32))
                 self.tim.close('build_angles')
                 if self.verbosity:
                     print(self.tim)
@@ -213,7 +213,7 @@ class deflection:
             self.tim.add('thts, phis and gammas  (python)')
             self.cacher.cache(fns[0], thp_phip_gamma.T[:, 0:2])
             if calc_rotation:
-                self.cacher.cache(fns[1], thp_phip_gamma.T[:, 2])
+                self.cacher.cache(fns[1], thp_phip_gamma.T[:, 2] if not self.single_prec else thp_phip_gamma.T[:, 2].astype(np.float32) )
             self.tim.close('build_angles')
             assert startpix == npix, (startpix, npix)
             if self.verbosity:
@@ -416,10 +416,10 @@ class deflection:
         """
         self.tim.start('lenmap2gclm')
         self.tim.reset()
-        assert points.ndim == 1, (points.ndim, points.dtype)
         if spin == 0 and not np.iscomplexobj(points):
-            points = points.astype(ctype[points.dtype])
-
+            points = points.astype(ctype[points.dtype]).squeeze()
+        if spin > 0 and not np.iscomplexobj(points):
+            points = (points[0] + 1j * points[1]).squeeze()
         ptg = self._get_ptg()
         self.tim.add('_get_ptg')
 
@@ -473,7 +473,7 @@ class deflection:
         return slm.squeeze()
 
     def lensgclm(self, gclm:np.ndarray, mmax:int or None, spin, lmax_out, mmax_out:int or None,
-                 backwards=False, nomagn=False, polrot=True):
+                 backwards=False, nomagn=False, polrot=True, output_sht_mode='STANDARD'):
         """Adjoint remapping operation from lensed alm space to unlensed alm space
 
             #FIXME: How to include SHT mod ?
@@ -484,6 +484,7 @@ class deflection:
         stri = 'lengclm ' + 'bwd' * backwards + 'fwd' * (not backwards)
         self.tim.start(stri)
         self.tim.reset()
+        input_sht_mode = ducc_sht_mode(gclm, spin)
         if nomagn:
             assert backwards
         if mmax_out is None:
@@ -503,13 +504,13 @@ class deflection:
             m = self.gclm2lenmap(gclm, mmax, spin, backwards)
             self.tim.reset()
             if spin == 0:
-                ret = self.geom.adjoint_synthesis(m, spin, lmax_out, mmax_out, self.sht_tr)
+                ret = self.geom.adjoint_synthesis(m, spin, lmax_out, mmax_out, self.sht_tr, mode=output_sht_mode)
                 self.tim.add('adjoint_synthesis')
                 self.tim.close('lengclm ' + 'bwd' * backwards + 'fwd' * (not backwards))
                 return ret.squeeze()
             else:
                 assert polrot
-                ret = self.geom.adjoint_synthesis(m, spin, lmax_out, mmax_out, self.sht_tr)
+                ret = self.geom.adjoint_synthesis(m, spin, lmax_out, mmax_out, self.sht_tr, mode=output_sht_mode)
                 self.tim.add('adjoint_synthesis')
                 self.tim.close('lengclm ' + 'bwd' * backwards + 'fwd' * (not backwards))
                 return ret
@@ -518,12 +519,13 @@ class deflection:
                 gclm = gclm.astype(np.complex64)
                 self.tim.add('type conversion')
             if spin == 0 and self._totalconvolves0:
+                assert output_sht_mode == 'STANDARD', 'cant handle this here'
                 # The code below works for any spin but this seems a little bit faster for non-zero spin
                 # So keeping this for the moment
                 lmax_unl = Alm.getlmax(gclm[0].size if abs(spin) > 0 else gclm.size, mmax)
                 inter = ducc0.totalconvolve.Interpolator(lmax_out, spin, 1, epsilon=self.epsilon,
                                                          ofactor=self.ofactor, nthreads=self.sht_tr)
-                I = self.geom.synthesis(gclm, spin, lmax_unl, mmax, self.sht_tr)
+                I = self.geom.synthesis(gclm, spin, lmax_unl, mmax, self.sht_tr, mode=input_sht_mode)
                 for ofs, w, nph in zip(self.geom.ofs, self.geom.weight, self.geom.nph):
                     I[ofs:ofs + nph] *= w
                 self.tim.add('points')
@@ -538,8 +540,8 @@ class deflection:
                 return ret
             if spin == 0:
                 lmax_unl = Alm.getlmax(gclm.size, mmax)
-                points = self.geom.synthesis(gclm, spin, lmax_unl, mmax, self.sht_tr).squeeze()
-                self.tim.add('points')
+                points = self.geom.synthesis(gclm, spin, lmax_unl, mmax, self.sht_tr, mode=input_sht_mode)
+                self.tim.add('points synthesis (%s)'%input_sht_mode)
                 if nomagn:
                     points *= self.dlm2A()
                     self.tim.add('nomagn')
@@ -548,34 +550,28 @@ class deflection:
                 lmax_unl = Alm.getlmax(gclm[0].size, mmax)
                 if mmax is None:
                     mmax = lmax_unl
-                points = self.geom.synthesis(gclm, spin, lmax_unl, mmax, self.sht_tr)
-                self.tim.add('points')
+                pointsc = np.empty((self.geom.npix(),), dtype=np.complex64 if self.single_prec else np.complex128)
+                points = pointsc.view(rtype[pointsc.dtype]).reshape((pointsc.size, 2)).T  # real view onto complex array
+                self.geom.synthesis(gclm, spin, lmax_unl, mmax, self.sht_tr, map=points, mode=input_sht_mode)
+                self.tim.add('points synthesis (%s)'%input_sht_mode)
                 if nomagn:
                     points *= self.dlm2A()
                     self.tim.add('nomagn')
-                if polrot * spin:#TODO: at some point get rid of these exp(atan2)...
-                          # maybe simplest to save cis gamma and twice multiply in place...
-                    if self._cis:
-                        cis = self._get_cischi()
-                        assert 0, 'fix this complex view and in place application?'
-                    elif HAS_NUMEXPR:
-                        re, im = points
-                        g = self._get_gamma()
-                        js = - 1j * spin
-                        points = numexpr.evaluate("(re + 1j * im) * exp(js * mg)")
-                        self.tim.add('polrot (numexpr)')
+                if polrot * spin:
+                    if HAS_FORTRAN:
+                        func = fremap.apply_inplace if pointsc.dtype == np.complex128 else fremap.apply_inplacef
+                        func(pointsc, self._get_gamma(), -spin, self.sht_tr)
+                        self.tim.add('polrot (fortran)')
                     else:
-                        points = (points[0] + 1j * points[1]) * np.exp((-1j * spin) * self._get_gamma())
-                        self.tim.add('polrot (python)')
-                else:
-                    points = points[0] + 1j * points[1]
+                        assert 0
+                        #points *= np.exp((-1j * spin) * self._get_gamma())
+                        #self.tim.add('polrot (python)')
 
-            assert points.ndim == 1
+            assert points.ndim == 2 and not np.iscomplexobj(points)
             for ofs, w, nph in zip(self.geom.ofs, self.geom.weight, self.geom.nph):
-                points[ofs:ofs + nph] *= w
+                points[:, ofs:ofs + nph] *= w
             self.tim.add('weighting')
-            # make complex if necessary
-            slm = self.lenmap2gclm(points, spin, lmax_out, mmax_out)
+            slm = self.lenmap2gclm(points, spin, lmax_out, mmax_out, sht_mode=output_sht_mode)
             self.tim.close(stri)
             if self.verbosity:
                 print(self.tim)
@@ -588,8 +584,8 @@ class deflection:
                 determinant of magnification matrix. Array of size input pixelization geometry
 
         """
+        #FIXME splits in band with new offsets
         self.tim.start('dlm2A')
-        #FIXME:self.dlm
         geom, lmax, mmax, tr = self.geom, self.lmax_dlm, self.mmax_dlm, self.sht_tr
         dgclm = np.empty((2, self.dlm.size), dtype=self.dlm.dtype)
         dgclm[0] = self.dlm
@@ -619,6 +615,11 @@ class deflection:
             f0 = jn(0, d)
             di = np.where(d > 0, d, 1.) # Something I can take the inverse of
         f1 = np.cos(d) - f0
+        try: #FIXME
+            import numexpr
+            HAS_NUMEXPR = True
+        except:
+            HAS_NUMEXPR = False
         if HAS_NUMEXPR:
             A = numexpr.evaluate('f0 * ((1. - k) ** 2 - g1 * g1 - g2 * g2 + w * w)')
             A+= numexpr.evaluate('f1 * (1. - k - ( (d1 * d1 - d2 * d2)  * g1 + (2 * d1 * d2) * g2) / (di * di))')
