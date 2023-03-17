@@ -13,28 +13,10 @@ try:
 except:
     HAS_FORTRAN = False
 
-try:
-    import numexpr
-    HAS_NUMEXPR = True
-except:
-    HAS_NUMEXPR = False
-    print("deflection.py::could not load numexpr, falling back on python impl.")
 HAS_DUCCGRADONLY = 'mode:' in synthesis_general.__doc__
-
+if not HAS_DUCCGRADONLY:
+    print("You might need to update to ducc0 latest version")
 # some helper functions
-
-ctype = {np.dtype(np.float32): np.complex64,
-         np.dtype(np.float64): np.complex128,
-         np.dtype(np.longfloat): np.longcomplex,
-         np.float32: np.complex64,
-         np.float64: np.complex128,
-         np.longfloat: np.longcomplex}
-rtype = {np.dtype(np.complex64): np.float32,
-         np.dtype(np.complex128): np.float64,
-         np.dtype(np.longcomplex): np.longfloat,
-         np.complex64: np.float32,
-         np.complex128: np.float64,
-         np.longcomplex: np.longfloat}
 
 class deflection(deflection_28.deflection):
     def __init__(self, *args, **kwargs):
@@ -42,13 +24,14 @@ class deflection(deflection_28.deflection):
 
         self._cis =  False # Testing this
 
-    def gclm2lenmap(self, gclm:np.ndarray, mmax:int or None, spin, backwards:bool, polrot=True, ptg=None):
+    def gclm2lenmap(self, gclm:np.ndarray, mmax:int or None, spin:int, backwards:bool, polrot=True, ptg=None):
         assert not backwards, 'backward 2lenmap not implemented at this moment'
         self.tim.start('gclm2lenmap')
         self.tim.reset()
         if self.single_prec and gclm.dtype != np.complex64:
             gclm = gclm.astype(np.complex64)
         gclm = np.atleast_2d(gclm)
+        sht_mode = deflection_28.ducc_sht_mode(gclm, spin)
         lmax_unl = Alm.getlmax(gclm[0].size, mmax)
         if mmax is None:
             mmax = lmax_unl
@@ -59,42 +42,22 @@ class deflection(deflection_28.deflection):
             ptg = ptg.astype(np.float64)
             self.tim.add('float type conversion')
         if spin == 0:
-            values = synthesis_general(lmax=lmax_unl, mmax=mmax, alm=gclm, loc=ptg, spin=spin,
-                                                          epsilon=self.epsilon, nthreads=self.sht_tr)
-            self.tim.add('synthesis general')
+            values = synthesis_general(lmax=lmax_unl, mmax=mmax, alm=gclm, loc=ptg, spin=spin, epsilon=self.epsilon,
+                                       nthreads=self.sht_tr, mode=sht_mode)
+            self.tim.add('synthesis general (%s)' % sht_mode)
         else:
             npix = self.geom.npix()
             # This is a trick with two views of the same array to get complex values as output to multiply by the phase
             valuesc = np.empty((npix,), dtype=np.complex64 if self.single_prec else np.complex128)
             values = valuesc.view(np.float32 if self.single_prec else np.float64).reshape((npix, 2)).T
-            if (gclm[0].size == gclm.size) and HAS_DUCCGRADONLY:
-                synthesis_general(map=values, lmax=lmax_unl, mmax=mmax, alm=gclm, loc=ptg,
-                                    spin=spin, epsilon=self.epsilon, nthreads=self.sht_tr, mode='GRAD_ONLY')
-                self.tim.add('synthesis general (GRAD_ONLY)')
-
-            else:
-                synthesis_general(map=values, lmax=lmax_unl, mmax=mmax, alm=gclm, loc=ptg,
-                                  spin=spin, epsilon=self.epsilon, nthreads=self.sht_tr)
-                self.tim.add('synthesis general')
-
+            sht_mode = deflection_28.ducc_sht_mode(gclm, spin)
+            synthesis_general(map=values, lmax=lmax_unl, mmax=mmax, alm=gclm, loc=ptg, spin=spin, epsilon=self.epsilon,
+                              nthreads=self.sht_tr, mode=sht_mode)
+            self.tim.add('synthesis general (%s)' % sht_mode)
             if polrot * spin:
-                if self._cis:
-                    cis = self._get_cischi()
-                    for i in range(abs(spin)):
-                        valuesc *= cis
-                    self.tim.add('polrot (cis)')
-                else:
-                    func = fremap.apply_inplace if valuesc.dtype == np.complex128 else fremap.apply_inplacef
-                    func(valuesc, self._get_gamma(), spin, self.sht_tr)
-                    self.tim.add('polrot (fortran)')
-                #elif HAS_NUMEXPR:
-                #    mg = self._get_gamma()
-                #    js = 1j * spin
-                #    valuesc *= numexpr.evaluate("exp(js * mg)")
-                #    self.tim.add('polrot (numexpr)')
-                #else:
-                #    valuesc *= np.exp((1j * spin) * self._get_gamma())
-                #    self.tim.add('polrot (python)')
+                func = fremap.apply_inplace if valuesc.dtype == np.complex128 else fremap.apply_inplacef
+                func(valuesc, self._get_gamma(), spin, self.sht_tr)
+                self.tim.add('polrot (fortran)')
         self.tim.close('gclm2lenmap')
         if self.verbosity:
             print(self.tim)
@@ -108,16 +71,11 @@ class deflection(deflection_28.deflection):
         ptg = self._get_ptg()
         self.tim.add('_get_ptg')
         # Use a view instead to turn complex array into real:
-        points2 = points.view(rtype[points.dtype]).reshape(points.size, 2).T if spin > 0 else np.atleast_2d(points)
+        points2 = points.view(deflection_28.rtype[points.dtype]).reshape(points.size, 2).T if spin > 0 else np.atleast_2d(points)
         self.tim.add('_refactoring to real')
-        if sht_mode != 'STANDARD' and HAS_DUCCGRADONLY:
-            ret = adjoint_synthesis_general(lmax=lmax, mmax=mmax, map=points2, loc=ptg, spin=spin, epsilon=self.epsilon,
+        ret = adjoint_synthesis_general(lmax=lmax, mmax=mmax, map=points2, loc=ptg, spin=spin, epsilon=self.epsilon,
                                             nthreads=self.sht_tr, mode=sht_mode)
-            self.tim.add('adjoint_synthesis_general (%s)'%sht_mode)
-        else:
-            ret = adjoint_synthesis_general(lmax=lmax, mmax=mmax, map=points2, loc=ptg, spin=spin, epsilon=self.epsilon,
-                                            nthreads=self.sht_tr)
-            self.tim.add('adjoint_synthesis_general')
+        self.tim.add('adjoint_synthesis_general (%s)'%sht_mode)
         self.tim.close('lenmap2gclm')
         return ret.squeeze()
 

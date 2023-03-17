@@ -296,6 +296,33 @@ module remapping
         end do
         !$OMP END PARALLEL DO
     end subroutine pointing
+    subroutine get_drange(npix, nring, red, imd, nphis, ofs, nthreads, drange)
+        !gets min and max of deflection angle ring per ring
+        use OMP_LIB
+        implicit none
+        integer, intent(in) :: npix, nring, nthreads
+        integer, intent(in) :: nphis(nring), ofs(nring)
+        double precision, intent(in) :: red(npix), imd(npix)
+        double precision, intent(out) :: drange(nring, 2)
+        integer ir, ip, pix
+        double precision a, amin, amax
+        call OMP_SET_NUM_THREADS(nthreads)
+        !$OMP PARALLEL DO
+        do ir = 1, nring
+            amin = 1d30
+            amax = 0d0
+            do ip = 1, nphis(ir)
+                pix = ofs(ir) + ip
+                a = red(pix) * red(pix) + imd(pix) * imd(pix)
+                amin = MIN(a, amin)
+                amax = MAX(a, amax)
+            end do
+            drange(ir, 1) = dsqrt(amin)
+            drange(ir, 2) = dsqrt(amax)
+        end do
+        !$OMP END PARALLEL DO
+    end subroutine get_drange
+
     subroutine apply_inplace(npix, values, gamma, spin, nthreads)
         use OMP_LIB
         implicit none

@@ -11,7 +11,7 @@ lmax = 200
 spin = 0
 nthreads = min(4, cpu_count())
 
-gl_base = []
+gl_base = list()
 gl_base.append(utils_geom.Geom.get_healpix_geometry(2048))
 gl_base.append(utils_geom.Geom.get_thingauss_geometry(3000, 2))
 maxdiff = 0

@@ -20,16 +20,12 @@ try:
 except:
     HAS_FORTRAN = False
 
-try:
-    import numexpr
-    HAS_NUMEXPR = True
-except:
-    HAS_NUMEXPR = False
-
 HAS_DUCCPOINTING = 'get_deflected_angles' in ducc0.misc.__dict__
 HAS_DUCCGRADONLY = 'mode:' in ducc0.sht.experimental.synthesis.__doc__
 if HAS_DUCCPOINTING:
     from ducc0.misc import get_deflected_angles
+if not HAS_DUCCGRADONLY:
+    print("You might need to update ducc0 to latest version")
 
 
 ctype = {np.dtype(np.float32): np.complex64,
@@ -45,9 +41,10 @@ rtype = {np.dtype(np.complex64): np.float32,
          np.complex128: np.float64,
          np.longcomplex: np.longfloat}
 
-def ducc_sht_mode(gclm):
+def ducc_sht_mode(gclm, spin):
+
     gclm_ = np.atleast_2d(gclm)
-    return 'GRAD_ONLY' if gclm_[0].size == gclm_.size else 'STANDARD'
+    return 'GRAD_ONLY' if ((gclm_[0].size == gclm_.size) * (spin > 0)) else 'STANDARD'
 
 class deflection:
     def __init__(self, lens_geom:Geom, dglm, mmax_dlm:int or None, numthreads:int=0,
@@ -111,9 +108,6 @@ class deflection:
         self.planned = planned
         self.plans = {}
 
-        if HAS_NUMEXPR:
-            os.environ['NUMEXPR_MAX_THREADS'] = str(numthreads)
-            os.environ['NUMEXPR_NUM_THREADS'] = str(numthreads)
         if verbosity:
             print(" DUCC %s threads deflection instantiated"%self.sht_tr + self.single_prec * '(single prec)', self.epsilon)
         self._totalconvolves0 = False
@@ -139,7 +133,7 @@ class deflection:
         return self.cacher.load('gamma')
 
     def _build_d1(self):
-        if self.dclm is None and HAS_DUCCGRADONLY:
+        if self.dclm is None:
             # undo p2d to use
             self.tim.reset()
             d1 = self.geom.synthesis(self.dlm, 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr, mode='GRAD_ONLY')
@@ -149,29 +143,32 @@ class deflection:
             self.tim.reset()
             dgclm = np.empty((2, self.dlm.size), dtype=self.dlm.dtype)
             dgclm[0] = self.dlm
-            dgclm[1] = self.dclm if self.dclm is not None else 0.
+            dgclm[1] = self.dclm
             d1 = self.geom.synthesis(dgclm, 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr)
             self.tim.add('build angles <- d1 alm2map_spin')
         return d1
 
-    def _build_angles(self, fortran=True):
+    def _build_angles(self, fortran=True, calc_rotation=True):
         """Builds deflected positions and angles
 
             Returns (npix, 3) array with new tht, phi and -gamma
 
         """
-        fn_ptg, fn_gamma = 'ptg', 'gamma'
-        if not self.cacher.is_cached(fn_ptg) or not self.cacher.is_cached(fn_gamma) :
+        fns = ['ptg'] + calc_rotation * ['gamma']
+        if not np.all([self.cacher.is_cached(fn) for fn in fns]) :
             self.tim.start('build_angles')
             d1 = self._build_d1()
             # Probably want to keep red, imd double precision for the calc?
             if HAS_DUCCPOINTING:
                 tht, phi0, nph, ofs = self.geom.theta, self.geom.phi0, self.geom.nph, self.geom.ofs
                 tht_phip_gamma = get_deflected_angles(theta=tht, phi0=phi0, nphi=nph, ringstart=ofs, deflect=d1.T,
-                                                      calc_rotation=True, nthreads=self.sht_tr)
-                self.tim.add('build angles <- th-phi-gm (ducc)')
-                self.cacher.cache(fn_ptg, tht_phip_gamma[:, 0:2])
-                self.cacher.cache(fn_gamma, tht_phip_gamma[:, 2])
+                                                      calc_rotation=calc_rotation, nthreads=self.sht_tr)
+                self.tim.add('build angles <- th-phi%s (ducc)'%('-gm'*calc_rotation))
+                if calc_rotation:
+                    self.cacher.cache(fns[0], tht_phip_gamma[:, 0:2])
+                    self.cacher.cache(fns[1], tht_phip_gamma[:, 2])
+                else:
+                    self.cacher.cache(fns[0], tht_phip_gamma)
                 self.tim.close('build_angles')
                 return
             npix = Geom.npix(self.geom)
@@ -184,8 +181,9 @@ class deflection:
                     thp_phip_gamma = fremap.pointing(red, imd, tht, phi0, nph, ofs, self.sht_tr)
                 self.tim.add('build angles <- th-phi-gm (ftn)')
                 # I think this just trivially turns the F-array into a C-contiguous array:
-                self.cacher.cache(fn_ptg, thp_phip_gamma.transpose()[:, 0:2])
-                self.cacher.cache(fn_gamma, thp_phip_gamma.transpose()[:, 2])
+                self.cacher.cache(fns[0], thp_phip_gamma.transpose()[:, 0:2])
+                if calc_rotation:
+                    self.cacher.cache(fns[1], thp_phip_gamma.transpose()[:, 2])
                 self.tim.close('build_angles')
                 if self.verbosity:
                     print(self.tim)
@@ -213,8 +211,9 @@ class deflection:
                     thp_phip_gamma[2, sli] = np.arctan2(i_imd, t_red ) - np.arctan2(i_imd, d * np.sin(d) * cot + t_red  * np.cos(d))
                     startpix += len(pixs)
             self.tim.add('thts, phis and gammas  (python)')
-            self.cacher.cache(fn_ptg, thp_phip_gamma.T[:, 0:2])
-            self.cacher.cache(fn_gamma, thp_phip_gamma.T[:, 2])
+            self.cacher.cache(fns[0], thp_phip_gamma.T[:, 0:2])
+            if calc_rotation:
+                self.cacher.cache(fns[1], thp_phip_gamma.T[:, 2])
             self.tim.close('build_angles')
             assert startpix == npix, (startpix, npix)
             if self.verbosity:
@@ -233,7 +232,6 @@ class deflection:
             self.tim.reset()
             red, imd = self._build_d1()
             # Probably want to keep red, imd double precision for the calc?
-            npix = Geom.npix(self.geom)
             if HAS_FORTRAN:
                 tht, phi0, nph, ofs = self.geom.theta, self.geom.phi0, self.geom.nph, self.geom.ofs
                 thp_phip_cischi = fremap.pointingeig(red, imd, tht, phi0, nph, ofs, self.sht_tr)
@@ -347,17 +345,10 @@ class deflection:
         nphi = 2 * nphihalf
         # Is this any different to scarf wraps ?
         # NB: type of map, map_df, and FFTs will follow that of input gclm
-        if HAS_DUCCGRADONLY:
-            mode = ducc_sht_mode(gclm)
-            map = ducc0.sht.experimental.synthesis_2d(alm=gclm, ntheta=ntheta, nphi=nphi,
+        mode = ducc_sht_mode(gclm, spin)
+        map = ducc0.sht.experimental.synthesis_2d(alm=gclm, ntheta=ntheta, nphi=nphi,
                                 spin=spin, lmax=lmax_unl, mmax=mmax, geometry="CC", nthreads=self.sht_tr, mode=mode)
-            self.tim.add('experimental.synthesis_2d (%s)'%mode)
-
-        else:
-            map = ducc0.sht.experimental.synthesis_2d(alm=gclm, ntheta=ntheta, nphi=nphi,
-                                spin=spin, lmax=lmax_unl, mmax=mmax, geometry="CC", nthreads=self.sht_tr)
-            self.tim.add('experimental.synthesis_2d')
-
+        self.tim.add('experimental.synthesis_2d (%s)'%mode)
         # extend map to double Fourier sphere map
         map_dfs = np.empty((2 * ntheta - 2, nphi), dtype=map.dtype if spin == 0 else ctype[map.dtype])
         if spin == 0:
@@ -408,15 +399,6 @@ class deflection:
                 func = fremap.apply_inplace if values.dtype == np.complex128 else fremap.apply_inplacef
                 func(values, self._get_gamma(), spin, self.sht_tr)
                 self.tim.add('polrot (fortran)')
-
-            #elif HAS_NUMEXPR:
-            #    g = self._get_gamma()
-            #    js = 1j * spin
-            #    values *= numexpr.evaluate("exp(js * mg)")
-            #    self.tim.add('polrot (numexpr)')
-            #else:
-            #    values *= np.exp((1j * spin) * self._get_gamma())  # polrot. last entry is -gamma
-            #    self.tim.add('polrot (python)')
         self.tim.close('gclm2lenmap')
         if self.verbosity:
             print(self.tim)
