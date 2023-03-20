@@ -2,6 +2,7 @@
 #FIXME: check exact A
 #TODO: spin-0 gradient conventions ?
 #TODO: double-check delensing/adjoint for spin!= 0
+#TODO inplace lensgclm
 from __future__ import annotations
 
 import os
@@ -19,6 +20,7 @@ try:
     HAS_FORTRAN = True
 except:
     HAS_FORTRAN = False
+    print("Could not load fortran modules, some pieces might be slower")
 
 HAS_DUCCPOINTING = 'get_deflected_angles' in ducc0.misc.__dict__
 HAS_DUCCGRADONLY = 'mode:' in ducc0.sht.experimental.synthesis.__doc__
@@ -64,6 +66,7 @@ class deflection:
 
 
         #FIXME: make input a (ncom, ?) array that can be complex or real (1d)
+        #FIXME: remove single_prec
         """
         lmax = Alm.getlmax(dglm.size, mmax_dlm)
         if mmax_dlm is None:
@@ -120,14 +123,6 @@ class deflection:
         self._build_angles() if not self._cis else self._build_angleseig()
         return self.cacher.load('ptg')
 
-    def _get_cischi(self):
-        self._build_angles() if not self._cis else self._build_angleseig()
-        return self.cacher.load('cischi')
-
-    #def _get_mgamma(self):
-    #    self._build_angles() if not self._cis else self._build_angleseig()
-    #    return self.cacher.load('mgamma')
-
     def _get_gamma(self):
         self._build_angles() if not self._cis else self._build_angleseig()
         return self.cacher.load('gamma')
@@ -145,7 +140,7 @@ class deflection:
             dgclm[0] = self.dlm
             dgclm[1] = self.dclm
             d1 = self.geom.synthesis(dgclm, 1, self.lmax_dlm, self.mmax_dlm, self.sht_tr)
-            self.tim.add('build angles <- d1 alm2map_spin')
+            self.tim.add('build angles <- synthesis (STANDARD)')
         return d1
 
     def _build_angles(self, fortran=True, calc_rotation=True):
@@ -208,7 +203,7 @@ class deflection:
                     thp_phip_gamma[1, sli] = phip_
                     cot = np.cos(self.geom.theta[ir]) / np.sin(self.geom.theta[ir])
                     d = np.sqrt(t_red ** 2 + i_imd ** 2)
-                    thp_phip_gamma[2, sli] = np.arctan2(i_imd, t_red ) - np.arctan2(i_imd, d * np.sin(d) * cot + t_red  * np.cos(d))
+                    thp_phip_gamma[2, sli] = np.arctan2(i_imd, t_red ) - np.arctan2(i_imd, d * np.sin(d) * cot + t_red * np.cos(d))
                     startpix += len(pixs)
             self.tim.add('thts, phis and gammas  (python)')
             self.cacher.cache(fns[0], thp_phip_gamma.T[:, 0:2])
@@ -294,6 +289,7 @@ class deflection:
         """
         assert spin >= 0, spin
         gclm = np.atleast_2d(gclm)
+        sth_mode = ducc_sht_mode(gclm, spin)
         ptg = self._get_ptg()
         thts, phis, gamma = ptg[pixs, 0], ptg[pixs, 1], self._get_gamma()[pixs]
         nph = 2 * np.ones(thts.size, dtype=np.uint64)  # I believe at least 2 points per ring
@@ -303,8 +299,9 @@ class deflection:
         gclm = np.atleast_2d(gclm)
         lmax = Alm.getlmax(gclm[0].size, mmax)
         if mmax is None: mmax = lmax
-        m = geom.synthesis(gclm, spin, lmax, mmax, self.sht_tr)[:, 0::2]
-        if spin * polrot:
+        m = geom.synthesis(gclm, spin, lmax, mmax, self.sht_tr, mode=sth_mode)[:, 0::2]
+        # could do: complex view trick etc
+        if spin and polrot:
             m = np.exp(1j * spin * gamma) * (m[0] + 1j * m[1])
             return m.real, m.imag
         return m.squeeze()
@@ -405,10 +402,11 @@ class deflection:
         # Return real array of shape (2, npix) for spin > 0
         return values.real if spin == 0 else values.view(rtype[values.dtype]).reshape((values.size, 2)).T
 
-    def lenmap2gclm(self, points:np.ndarray[complex or float], spin:int, lmax:int, mmax:int, sht_mode='STANDARD'):
+    def lenmap2gclm(self, points:np.ndarray[complex or float], spin:int, lmax:int, mmax:int, gclm_out=None,
+                    sht_mode='STANDARD'):
         """
             Note:
-                points mst be already quadrature-weigthed, and be complex
+                points mst be already quadrature-weigthed
 
             Note:
                 For inverse-lensing, need to feed in lensed maps times unlensed forward magnification matrix.
@@ -458,25 +456,30 @@ class deflection:
         self.tim.add('Double Fourier')
 
         # adjoint SHT synthesis
-        if sht_mode != 'STANDARD' and HAS_DUCCGRADONLY:
-            slm = ducc0.sht.experimental.adjoint_synthesis_2d(map=map, spin=spin,
-                                            lmax=lmax, mmax=mmax, geometry="CC", nthreads=self.sht_tr, mode=sht_mode)
-            self.tim.add('adjoint_synthesis_2d (%s)'%sht_mode)
-
-        else:
-            slm = ducc0.sht.experimental.adjoint_synthesis_2d(map=map, spin=spin,
-                                                          lmax=lmax, mmax=mmax, geometry="CC", nthreads=self.sht_tr)
-            self.tim.add('adjoint_synthesis_2d')
+        slm = ducc0.sht.experimental.adjoint_synthesis_2d(map=map, spin=spin,
+                            lmax=lmax, mmax=mmax, geometry="CC", nthreads=self.sht_tr, mode=sht_mode, alm=gclm_out)
+        self.tim.add('adjoint_synthesis_2d (%s)'%sht_mode)
         self.tim.close('lenmap2gclm')
         if self.verbosity:
             print(self.tim)
         return slm.squeeze()
 
-    def lensgclm(self, gclm:np.ndarray, mmax:int or None, spin, lmax_out, mmax_out:int or None,
-                 backwards=False, nomagn=False, polrot=True, output_sht_mode='STANDARD'):
+    def lensgclm(self, gclm:np.ndarray, mmax:int or None, spin:int, lmax_out:int, mmax_out:int or None,
+                 gclm_out:np.ndarray=None, backwards=False, nomagn=False, polrot=True, out_sht_mode='STANDARD'):
         """Adjoint remapping operation from lensed alm space to unlensed alm space
 
-            #FIXME: How to include SHT mod ?
+            Args:
+                gclm: input gradient and possibly curl mode ((1 or 2, nalm)-shaped complex numpy.ndarray)
+                mmax: set this for non-standard mmax != lmax in input array
+                spin: spin-weight of the fields (larger or equal 0)
+                lmax_out: desired output array lmax
+                mmax_out: desired output array mmax (defaults to lmax_out if None)
+                gclm_out(optional): output array (can be same as gclm provided it is large enough)
+                backwards: forward or adjoint (not the same as inverse) lensing operation
+                polrot(optional): includes small rotation of spin-weighted fields (defaults to True)
+                out_sht_mode(optional): e.g. 'GRAD_ONLY' if only the output gradient mode is desired
+
+
             #FIXME: nomagn=True is a backward comptability thing to ask for inverse lensing
             #        but in this implementation it actually puts a magn...
 
@@ -501,25 +504,19 @@ class deflection:
             return ret
         if not backwards:
             # FIXME: should return here 2d array?
-            m = self.gclm2lenmap(gclm, mmax, spin, backwards)
+            m = self.gclm2lenmap(gclm, mmax, spin, backwards, polrot=polrot)
             self.tim.reset()
-            if spin == 0:
-                ret = self.geom.adjoint_synthesis(m, spin, lmax_out, mmax_out, self.sht_tr, mode=output_sht_mode)
-                self.tim.add('adjoint_synthesis')
-                self.tim.close('lengclm ' + 'bwd' * backwards + 'fwd' * (not backwards))
-                return ret.squeeze()
-            else:
-                assert polrot
-                ret = self.geom.adjoint_synthesis(m, spin, lmax_out, mmax_out, self.sht_tr, mode=output_sht_mode)
-                self.tim.add('adjoint_synthesis')
-                self.tim.close('lengclm ' + 'bwd' * backwards + 'fwd' * (not backwards))
-                return ret
+            gclm_out = self.geom.adjoint_synthesis(m, spin, lmax_out, mmax_out, self.sht_tr, alm=gclm_out,
+                                                   mode=out_sht_mode)
+            self.tim.add('adjoint_synthesis')
+            self.tim.close('lengclm ' + 'bwd' * backwards + 'fwd' * (not backwards))
+            return gclm_out
         else:
             if self.single_prec and gclm.dtype != np.complex64:
                 gclm = gclm.astype(np.complex64)
                 self.tim.add('type conversion')
             if spin == 0 and self._totalconvolves0:
-                assert output_sht_mode == 'STANDARD', 'cant handle this here'
+                assert out_sht_mode == 'STANDARD', 'cant handle this here'
                 # The code below works for any spin but this seems a little bit faster for non-zero spin
                 # So keeping this for the moment
                 lmax_unl = Alm.getlmax(gclm[0].size if abs(spin) > 0 else gclm.size, mmax)
@@ -557,21 +554,20 @@ class deflection:
                 if nomagn:
                     points *= self.dlm2A()
                     self.tim.add('nomagn')
-                if polrot * spin:
+                if spin and polrot:
                     if HAS_FORTRAN:
                         func = fremap.apply_inplace if pointsc.dtype == np.complex128 else fremap.apply_inplacef
                         func(pointsc, self._get_gamma(), -spin, self.sht_tr)
                         self.tim.add('polrot (fortran)')
                     else:
-                        assert 0
-                        #points *= np.exp((-1j * spin) * self._get_gamma())
-                        #self.tim.add('polrot (python)')
+                        pointsc *= np.exp((-1j * spin) * self._get_gamma())
+                        self.tim.add('polrot (python)')
 
             assert points.ndim == 2 and not np.iscomplexobj(points)
             for ofs, w, nph in zip(self.geom.ofs, self.geom.weight, self.geom.nph):
                 points[:, ofs:ofs + nph] *= w
             self.tim.add('weighting')
-            slm = self.lenmap2gclm(points, spin, lmax_out, mmax_out, sht_mode=output_sht_mode)
+            slm = self.lenmap2gclm(points, spin, lmax_out, mmax_out, sht_mode=out_sht_mode, gclm_out=gclm_out)
             self.tim.close(stri)
             if self.verbosity:
                 print(self.tim)

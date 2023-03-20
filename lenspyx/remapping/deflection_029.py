@@ -50,11 +50,10 @@ class deflection(deflection_28.deflection):
             # This is a trick with two views of the same array to get complex values as output to multiply by the phase
             valuesc = np.empty((npix,), dtype=np.complex64 if self.single_prec else np.complex128)
             values = valuesc.view(np.float32 if self.single_prec else np.float64).reshape((npix, 2)).T
-            sht_mode = deflection_28.ducc_sht_mode(gclm, spin)
             synthesis_general(map=values, lmax=lmax_unl, mmax=mmax, alm=gclm, loc=ptg, spin=spin, epsilon=self.epsilon,
                               nthreads=self.sht_tr, mode=sht_mode)
             self.tim.add('synthesis general (%s)' % sht_mode)
-            if polrot * spin:
+            if spin and polrot:
                 func = fremap.apply_inplace if valuesc.dtype == np.complex128 else fremap.apply_inplacef
                 func(valuesc, self._get_gamma(), spin, self.sht_tr)
                 self.tim.add('polrot (fortran)')
@@ -63,15 +62,15 @@ class deflection(deflection_28.deflection):
             print(self.tim)
         return values
 
-    def lenmap2gclm(self, points:np.ndarray[float], spin:int, lmax:int, mmax:int, sht_mode='STANDARD'):
-        assert points.ndim == 2
+    def lenmap2gclm(self, points:np.ndarray[float], spin:int, lmax:int, mmax:int, gclm_out=None, sht_mode='STANDARD'):
+        assert points.ndim == 2, points.ndim
         assert not np.iscomplexobj(points), (spin, points.ndim, points.dtype)
         self.tim.start('lenmap2gclm')
         self.tim.reset()
         ptg = self._get_ptg()
-        self.tim.add('_get_ptg')
+        self.tim.add('get_pointing')
         ret = adjoint_synthesis_general(lmax=lmax, mmax=mmax, map=points, loc=ptg, spin=spin, epsilon=self.epsilon,
-                                            nthreads=self.sht_tr, mode=sht_mode)
+                                            nthreads=self.sht_tr, mode=sht_mode, alm=gclm_out)
         self.tim.add('adjoint_synthesis_general (%s)'%sht_mode)
         self.tim.close('lenmap2gclm')
         return ret.squeeze()

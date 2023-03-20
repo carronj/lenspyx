@@ -2,13 +2,14 @@ import numpy as np
 import time
 from lenspyx.tests.helper import syn_ffi_ducc_29
 from lenspyx.fortran.remapping import remapping
+from multiprocessing import cpu_count
 try:
     import jcducc0
     HAS_JCDUCC = True
 except:
-    HAS_JCDUCC= False
+    HAS_JCDUCC = False
 
-ffi, gl = syn_ffi_ducc_29(dlmax_gl=0,dlmax=0, epsilon=1e-7, nthreads=8)
+ffi, gl = syn_ffi_ducc_29(dlmax_gl=0, dlmax=0, epsilon=1e-7, nthreads=min(4, cpu_count()))
 ffi.geom = gl
 npix = gl.npix()
 values = np.random.standard_normal(gl.npix()) + 1j * np.random.standard_normal(gl.npix())

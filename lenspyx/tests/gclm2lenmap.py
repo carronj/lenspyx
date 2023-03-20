@@ -2,14 +2,15 @@
 import os
 import numpy as np
 import healpy as hp
-from lenspyx.tests.helper import syn_ffi_ducc_29, syn_ffi_ducc, cls_unl
-from lenspyx import lensing, cachers
+from lenspyx.tests.helper import syn_ffi_ducc_29,  cls_unl
+from lenspyx import cachers
 import multiprocessing
 import argparse
 import time
 from lenspyx.remapping import utils_geom
 from lenspyx.utils import timer
 import ducc0
+import tracemalloc
 
 
 if __name__ == '__main__':
@@ -24,6 +25,8 @@ if __name__ == '__main__':
     parser.add_argument('-gonly', dest='gonly', action='store_true', help='grad-only SHTs')
     parser.add_argument('-HL', dest='HL', type=int, default=0, help='also test Healpix pixelization with this nside')
     parser.add_argument('-alloc', dest='alloc',  type=int, default=0, help='tries pre-allocating ''alloc'' GB of memory')
+    parser.add_argument('-tracemalloc', dest='tracemalloc',  action='store_true', help='trace memory usage')
+
     args = parser.parse_args()
 
     if args.alloc:
@@ -42,9 +45,8 @@ if __name__ == '__main__':
     nrings = ffi.geom.theta.size
     eblm = np.array([hp.synalm(cls_unl['ee' if args.spin > 0 else 'tt'][:lmax_unl + 1]),
                      hp.synalm(cls_unl['bb'][:lmax_unl + 1])])[0:1 + (args.spin != 0) * (not args.gonly)]
-    #t0 = time.time()
-    #ffi._build_angles()
-    #t1 = time.time()
+    if args.tracemalloc:
+        tracemalloc.start()
     for nthreads in [args.nt]:
         ffi.sht_tr = nthreads
         os.environ['NUMEXPR_MAX_THREADS'] = str(nthreads)
@@ -58,6 +60,12 @@ if __name__ == '__main__':
         t3 = time.time()
         print(ffi.tim)
         print('            calc: %.3f Mpix/s, total %.3f sec'%(npix / (t3 - t2) / 1e6, t3 - t2))
+        if args.tracemalloc:
+            snapshot = tracemalloc.take_snapshot()
+            top_stats = snapshot.statistics('lineno')
+            print("     Tracemalloc first 4 lines:")
+            for stat in top_stats[:4]:
+                print(stat)
         if args.HL:
             # Now healpix grid (nrings is 4 * nside or so)
             nside = args.HL
@@ -73,3 +81,9 @@ if __name__ == '__main__':
             t5 = time.time()
             print(ffi.tim)
             print('            calc: %.3f Mpix/s, total %.3f sec'%(12 * nside ** 2 / (t5 - t4) / 1e6, t5 - t4))
+            if args.tracemalloc:
+                snapshot = tracemalloc.take_snapshot()
+                top_stats = snapshot.statistics('lineno')
+                print("     Tracemalloc first 4 lines:")
+                for stat in top_stats[:4]:
+                    print(stat)
