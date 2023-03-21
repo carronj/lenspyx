@@ -68,26 +68,39 @@ class Geom:
             return self
         return Geom(self.theta[asort], self.phi0[asort], self.nph[asort], self.ofs[asort], self.weight[asort])
 
-    def restrict(self, tht_min:float, tht_max:float, northsouth_sym:bool):
+    def restrict(self, tht_min:float, tht_max:float, northsouth_sym:bool, update_ringstart=False):
         """Returns a geometry with restricted co-latitude range
 
             Args:
                 tht_min: min colatitude in radians
                 tht_max: max colatitude in radians
                 northsouth_sym: includes the equator-symmetrized region if set
+                update_ringstart: The ringstart indices of the output object still refer to the original geometry map if not set
 
             Return:
                 Geometry object with corresponding colatitude range
-
-            Note:
-                The ringstart indices of the output object still refer to the original geometry map
 
         """
         n_cond = (self.theta <= tht_max) & (self.theta >= tht_min)
         if northsouth_sym:
             n_cond = n_cond | (self.theta <= (np.pi - tht_min)) & (self.theta >= (np.pi - tht_max))
         band = np.where(n_cond)
-        return Geom(self.theta[band], self.phi0[band], self.nph[band], self.ofs[band], self.weight[band])
+        ofs = np.insert(np.cumsum(self.nph[band][:-1]), 0, 0) if update_ringstart else self.ofs[band]
+        return Geom(self.theta[band], self.phi0[band], self.nph[band], ofs, self.weight[band])
+
+
+    def thinout(self, spin, good_size_real=True):
+        ntht, tht = self.theta.size, self.theta
+        st = np.sin(tht)
+        lmax = ntht - 1
+        mmax = np.minimum(np.maximum(st2mmax(spin, tht, lmax), st2mmax(-spin, tht, lmax)), np.ones(ntht) * lmax)
+        nph = np.array([good_size(int(np.ceil(2 * m + 1)), good_size_real) for m in mmax])
+        ir_eq = np.argmax(st) # We force the longitude resolution not to degrade compared to the equator
+        dph_eq = 1. / nph[ir_eq]
+        nphi_eq = np.array([good_size(int(np.ceil(stx / dph_eq)), good_size_real) for stx in st])
+        nph = np.where((st / nph) > dph_eq, nphi_eq, nph)
+        ofs = np.insert(np.cumsum(nph[:-1]), 0, 0)
+        return Geom(tht, self.phi0, nph, ofs, self.weight / nph * self.nph)
 
     def split(self, nbands, verbose=False):
         """Split the pixelization into chunks
@@ -189,6 +202,7 @@ class Geom:
     def rings2phi(geom:Geom, rings:np.ndarray[int]):
         return np.concatenate([Geom.phis(geom, ir) for ir in rings])
 
+
     @staticmethod
     def get_thingauss_geometry(lmax:int, smax:int, zbounds:tuple[float, float]=(-1., 1.), good_size_real=True):
         """Build a 'thinned' Gauss-Legendre geometry
@@ -226,6 +240,35 @@ class Geom:
         geom = base.sht_info()
         area = (4 * np.pi) / (12 * nside ** 2)
         return Geom(w=np.full((geom['theta'].size, ), area), **geom)
+
+    @staticmethod
+    def get_cc_geometry(ntheta:int, nphi:int):
+        tht = np.linspace(0, np.pi, ntheta, dtype=float)
+        phi0 = np.zeros(ntheta, dtype=float)
+        nph = np.full((ntheta,), nphi, dtype=np.uint64)
+        ofs = np.insert(np.cumsum(nph[:-1]), 0, 0)
+        w = ducc0.sht.experimental.get_gridweights('CC', ntheta)
+        return Geom(tht, phi0, nph, ofs, w / nphi)
+
+    @staticmethod
+    def get_f1_geometry(ntheta:int, nphi:int):
+        tht = np.linspace(0.5 * np.pi / ntheta, (ntheta - 0.5) * np.pi / ntheta, ntheta)
+        phi0 = np.zeros(ntheta, dtype=float)
+        nph = np.full((ntheta,), nphi, dtype=np.uint64)
+        ofs = np.insert(np.cumsum(nph[:-1]), 0, 0)
+        w = ducc0.sht.experimental.get_gridweights('F1', ntheta)
+        return Geom(tht, phi0, nph, ofs, w / nphi)
+
+    @staticmethod
+    def get_gl_geometry(lmax:int, good_size_real=True):
+        nlatf = lmax + 1  # full meridian GL points
+        nphi = good_size(2 * lmax + 1, good_size_real)
+        tht = GL_thetas(nlatf)
+        wt = GL_weights(nlatf, 1)
+        phi0 = np.zeros(nlatf, dtype=float)
+        nph = np.full((nlatf,), nphi, dtype=np.uint64)
+        ofs = np.insert(np.cumsum(nph[:-1]), 0, 0)
+        return Geom(tht, phi0, nph, ofs, wt / nph)
 
 class pbounds:
     """Class to regroup simple functions handling sky maps longitude truncation
