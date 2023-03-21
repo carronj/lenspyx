@@ -178,7 +178,7 @@ class deflection:
                 # I think this just trivially turns the F-array into a C-contiguous array:
                 self.cacher.cache(fns[0], thp_phip_gamma.transpose()[:, 0:2])
                 if calc_rotation:
-                    self.cacher.cache(fns[1], thp_phip_gamma[:, 2] if not self.single_prec else thp_phip_gamma[:, 2].astype(np.float32))
+                    self.cacher.cache(fns[1], thp_phip_gamma.transpose()[:, 2] if not self.single_prec else thp_phip_gamma.transpose()[:, 2].astype(np.float32))
                 self.tim.close('build_angles')
                 if self.verbosity:
                     print(self.tim)
