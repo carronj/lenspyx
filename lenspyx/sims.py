@@ -108,7 +108,7 @@ class sims_cmb_len(object):
         if not self.cacher.is_cached(fname):
             tlm= self.unlcmbs.get_sim_tlm(self.offset_index(idx, self.offset_cmb[0], self.offset_cmb[1]))
             f = self._get_f(idx)
-            tlm = f.lensgclm(tlm, self.lmax_unl, 0, self.lmax, self.lmax, False)
+            tlm = f.lensgclm(tlm, self.lmax_unl, 0, self.lmax, self.lmax)
             self.cacher.cache(fname, tlm)
             return tlm
         return self.cacher.load(fname)
@@ -116,10 +116,15 @@ class sims_cmb_len(object):
     def get_sim_eblm(self, idx):
         fneb ='sim_%04d_eblm'%idx
         if not self.cacher.is_cached(fneb):
-            elm = self.unlcmbs.get_sim_elm(self.offset_index(idx, self.offset_cmb[0], self.offset_cmb[1]))
-            blm = None if 'b' not in self.fields else self.unlcmbs.get_sim_blm(self.offset_index(idx, self.offset_cmb[0], self.offset_cmb[1]))
             f = self._get_f(idx)
-            eblm = f.lensgclm([elm, blm], self.lmax_unl, 2, self.lmax, self.lmax, False)
+            if 'b' not in self.fields:
+                elm = self.unlcmbs.get_sim_elm(self.offset_index(idx, self.offset_cmb[0], self.offset_cmb[1]))
+                eblm = f.lensgclm(np.atleast_2d(elm), self.lmax_unl, 2, self.lmax, self.lmax)
+            else:
+                eblm = np.empty((2, utils_hp.Alm.getsize(self.lmax_unl, self.lmax_unl)), dtype=complex)
+                eblm[0] = self.unlcmbs.get_sim_elm(self.offset_index(idx, self.offset_cmb[0], self.offset_cmb[1]))
+                eblm[1] = self.unlcmbs.get_sim_blm(self.offset_index(idx, self.offset_cmb[0], self.offset_cmb[1]))
+                eblm = f.lensgclm(eblm, self.lmax_unl, 2, self.lmax, self.lmax)
             self.cacher.cache('sim_%04d_eblm' % idx, eblm)
             return eblm
         return self.cacher.load(fneb)
