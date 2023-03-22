@@ -5,6 +5,12 @@ import sys
 from lenspyx.utils_hp import Alm
 import json
 
+def cli(cl):
+    ret = np.zeros_like(cl)
+    ii = np.where(cl != 0)
+    ret[ii] = 1. / cl[ii]
+    return ret
+
 class timer:
     def __init__(self, verbose, prefix='', suffix=''):
         self.t0 = time.time()

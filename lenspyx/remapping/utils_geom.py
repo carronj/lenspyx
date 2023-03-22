@@ -1,5 +1,6 @@
 from __future__ import annotations
 import numpy as np
+from lenspyx import utils_hp
 import ducc0
 from ducc0.misc import GL_thetas, GL_weights
 from ducc0.fft import good_size
@@ -153,7 +154,7 @@ class Geom:
         return synthesis_deriv1(alm=alm, theta=self.theta, lmax=lmax, mmax=mmax, nphi=self.nph, phi0=self.phi0,
                          nthreads=nthreads, ringstart=self.ofs, **kwargs)
 
-    def adjoint_synthesis(self, m: np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int, **kwargs):
+    def adjoint_synthesis(self, m: np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int, alm=None, **kwargs):
         """Wrapper to ducc backward SHT
 
             Return an array with leading dimension 1 for spin-0 or 2 for spin non-zero
@@ -165,8 +166,10 @@ class Geom:
         m = np.atleast_2d(m)
         for of, w, npi in zip(self.ofs, self.weight, self.nph):
             m[:, of:of + npi] *= w
+        if alm is not None:
+            assert alm.shape[-1] == utils_hp.Alm.getsize(lmax, mmax)
         return adjoint_synthesis(map=m, theta=self.theta, lmax=lmax, mmax=mmax, nphi=self.nph, spin=spin, phi0=self.phi0,
-                                 nthreads=nthreads, ringstart=self.ofs, **kwargs)
+                                 nthreads=nthreads, ringstart=self.ofs, alm=alm,  **kwargs)
 
     def alm2map_spin(self, gclm:np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int, zbounds=(-1., 1.), **kwargs):
         # FIXME: method only here for backwards compatiblity

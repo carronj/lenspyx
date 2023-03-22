@@ -35,7 +35,7 @@ for ir in [0, 1, gl.theta.size-2, gl.theta.size-1]:
         pl.plot(phi, ptg[sli, 1], label=r'$\phi^{\prime}$')
         pl.plot(phi, (np.pi + phi - beta[sli]) %(2 * np.pi), label=r'$\phi + \pi - \beta$')
         pl.plot(phi, chi[sli] % (2 * np.pi), label=r'$\chi$')
-        pl.plot(phi, (beta[sli]- 1*np.pi)% (2 * np.pi) , label=r'$\beta - \pi$')
+        pl.plot(phi, (beta[sli]- 1*np.pi)% (2 * np.pi), label=r'$\beta - \pi$')
         print('tht dev SP in amin', np.max(np.abs( (np.pi-ptg[sli, 0]) - np.sqrt(asqd[sli])))/np.pi * 180 * 60)
         pl.legend()
         pl.title(r'SP, $\pi - \theta = %.2f$ amin'%( (np.pi-gl.theta[ir]) / np.pi * 180 * 60. ))

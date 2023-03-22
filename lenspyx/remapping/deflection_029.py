@@ -4,7 +4,7 @@ from __future__ import annotations
 import numpy as np
 from lenspyx.utils_hp import Alm
 from lenspyx import cachers
-from lenspyx.remapping import deflection as deflection_28
+from lenspyx.remapping import deflection_028 as deflection_28
 from ducc0.sht.experimental import adjoint_synthesis_general, synthesis_general
 
 try:
@@ -69,6 +69,8 @@ class deflection(deflection_28.deflection):
         self.tim.reset()
         ptg = self._get_ptg()
         self.tim.add('get_pointing')
+        if gclm_out is not None:
+            assert deflection_28.rtype[gclm_out.dtype] == points.dtype
         ret = adjoint_synthesis_general(lmax=lmax, mmax=mmax, map=points, loc=ptg, spin=spin, epsilon=self.epsilon,
                                             nthreads=self.sht_tr, mode=sht_mode, alm=gclm_out)
         self.tim.add('adjoint_synthesis_general (%s)'%sht_mode)
