@@ -507,7 +507,7 @@ class deflection:
             m = self.gclm2lenmap(gclm, mmax, spin, backwards, polrot=polrot)
             self.tim.reset()
             if gclm_out is not None:
-                assert gclm_out.dtype == ctype[m.dtype]
+                assert gclm_out.dtype == ctype[m.dtype], 'type precision must match'
             gclm_out = self.geom.adjoint_synthesis(m, spin, lmax_out, mmax_out, self.sht_tr, alm=gclm_out,
                                                    mode=out_sht_mode)
             self.tim.add('adjoint_synthesis')
