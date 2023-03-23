@@ -29,6 +29,7 @@ class deflection(deflection_28.deflection):
         self.tim.start('gclm2lenmap')
         self.tim.reset()
         if self.single_prec and gclm.dtype != np.complex64:
+            print('** gclm2lenmap: inconsistent input dtype !')
             gclm = gclm.astype(np.complex64)
         gclm = np.atleast_2d(gclm)
         sht_mode = deflection_28.ducc_sht_mode(gclm, spin)
@@ -38,9 +39,7 @@ class deflection(deflection_28.deflection):
         if ptg is None:
             ptg = self._get_ptg()
         assert ptg.shape[-1] == 2, ptg.shape
-        if ptg.dtype != np.float64: #FIXMEL synthesis general only accepts float
-            ptg = ptg.astype(np.float64)
-            self.tim.add('float type conversion')
+        assert ptg.dtype == np.float64, 'synthesis_general only accepts float here'
         if spin == 0:
             values = synthesis_general(lmax=lmax_unl, mmax=mmax, alm=gclm, loc=ptg, spin=spin, epsilon=self.epsilon,
                                        nthreads=self.sht_tr, mode=sht_mode)

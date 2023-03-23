@@ -62,7 +62,8 @@ def gauss_beam(fwhm:float, lmax:int):
     bl = np.exp(-0.5 * l * (l + 1) * (fwhm / np.sqrt(8.0 * np.log(2.0))) ** 2)
     return bl
 
-def synalm(cl:np.ndarray, lmax:int, mmax:int or None):
+
+def synalm(cl:np.ndarray, lmax:int, mmax:int or None, rlm_dtype=np.float64):
     """Creates a Gaussian field alm from input cl array
 
     Parameters
@@ -73,6 +74,8 @@ def synalm(cl:np.ndarray, lmax:int, mmax:int or None):
         Maximum multipole simulated
     mmax: int
         Maximum m defining the alm layout, defaults to lmax if None or < 0
+    rlm_dtype(optional, defaults to np.float64):
+        Precision of real components of the array (e.g. np.float32 for single precision output array)
 
     Returns
     -------
@@ -84,11 +87,12 @@ def synalm(cl:np.ndarray, lmax:int, mmax:int or None):
     if mmax is None or mmax < 0:
         mmax = lmax
     alm_size = Alm.getsize(lmax, mmax)
-    alm = rng.standard_normal(alm_size) + 1j * rng.standard_normal(alm_size)
+    alm = rng.standard_normal(alm_size, dtype=rlm_dtype) + 1j * rng.standard_normal(alm_size, dtype=rlm_dtype)
     almxfl(alm, np.sqrt(cl[:lmax+1] * 0.5), mmax, True)
     real_idcs = Alm.getidx(lmax, np.arange(lmax + 1, dtype=int), 0)
     alm[real_idcs] = alm[real_idcs].real * np.sqrt(2.)
     return alm
+
 
 def alm2cl(alm:np.ndarray, blm:np.ndarray or None, lmax:int or None, mmax:int or None, lmaxout:int or None):
     """Auto- or cross-power spectrum between two alm arrays
@@ -138,6 +142,7 @@ def alm2cl(alm:np.ndarray, blm:np.ndarray or None, lmax:int or None, mmax:int or
         return ret
     return cl
 
+
 def alm_copy(alm:np.ndarray, mmaxin:int or None, lmaxout:int, mmaxout:int):
     """Copies the healpy alm array, with the option to change its lmax
 
@@ -166,6 +171,7 @@ def alm_copy(alm:np.ndarray, mmaxin:int or None, lmaxout:int, mmaxout:int):
             idx_out = m * (2 * lmaxout+ 1 - m) // 2 + m
             ret[idx_out: idx_out + lmax_min + 1 - m] = alm[idx_in: idx_in + lmax_min + 1 - m]
     return ret
+
 
 class Alm:
     """alm arrays useful statics. Directly from healpy but excluding keywords

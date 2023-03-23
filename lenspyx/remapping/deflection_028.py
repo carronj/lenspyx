@@ -66,7 +66,7 @@ class deflection:
 
 
         #FIXME: make input a (ncom, ?) array that can be complex or real (1d)
-        #FIXME: remove single_prec
+        #FIXME: remove single_prec or check input compatible ?
         """
         lmax = Alm.getlmax(dglm.size, mmax_dlm)
         if mmax_dlm is None:
@@ -80,6 +80,7 @@ class deflection:
         s2_d = np.sum(alm2cl(dglm, dglm, lmax, mmax_dlm, lmax) * (2 * np.arange(lmax + 1) + 1)) / (4 * np.pi)
         if dclm is not None:
             s2_d += np.sum(alm2cl(dclm, dclm, lmax, mmax_dlm, lmax) * (2 * np.arange(lmax + 1) + 1)) / (4 * np.pi)
+            s2_d /= np.sqrt(2.)
         sig_d = np.sqrt(s2_d / lens_geom.fsky())
         sig_d_amin = sig_d / np.pi * 180 * 60
         if sig_d >= 0.01:
