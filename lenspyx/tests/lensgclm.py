@@ -21,7 +21,7 @@ if __name__ == '__main__':
     parser.add_argument('-tracemalloc', dest='tracemalloc',  action='store_true', help='trace memory usage')
 
     args = parser.parse_args()
-    nthreads = min(4, multiprocessing.cpu_count())
+    nthreads = args.nt
     ffi, geom = syn_ffi_ducc_29(lmax_len=args.lmax_len, dlmax=args.dlmax, dlmax_gl=args.dlmax_gl, nthreads=nthreads,
                              verbosity=0, epsilon=10 ** (-args.epsilon))
     lmax_len, mmax_len = args.lmax_len, args.lmax_len
