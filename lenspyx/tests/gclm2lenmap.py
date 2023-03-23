@@ -2,7 +2,7 @@
 import os
 import numpy as np
 import healpy as hp
-from lenspyx.tests.helper import syn_ffi_ducc_29,  cls_unl
+from lenspyx.tests.helper import syn_ffi_ducc_29,  syn_alms, cls_unl
 from lenspyx import cachers
 import multiprocessing
 import argparse
@@ -43,8 +43,7 @@ if __name__ == '__main__':
 
     npix = geom.npix()
     nrings = ffi.geom.theta.size
-    eblm = np.array([hp.synalm(cls_unl['ee' if args.spin > 0 else 'tt'][:lmax_unl + 1]),
-                     hp.synalm(cls_unl['bb'][:lmax_unl + 1])])[0:1 + (args.spin != 0) * (not args.gonly)]
+    eblm = syn_alms(args.spin, lmax_unl=lmax_unl, ctyp=np.complex64 if ffi.single_prec else np.complex128)
     if args.tracemalloc:
         tracemalloc.start()
     for nthreads in [args.nt]:
