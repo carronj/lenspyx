@@ -1,4 +1,8 @@
-"""Times the deflection angles calculation etc"""
+"""Times the deflection angles calculation etc
+
+    python ./lenspyx/tests/lensgclm.py
+
+"""
 import numpy as np
 from lenspyx.tests.helper import syn_ffi_ducc_29, cls_unl, syn_alms
 from lenspyx.utils_hp import synalm, Alm

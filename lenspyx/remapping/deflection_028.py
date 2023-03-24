@@ -308,6 +308,16 @@ class deflection:
         return m.squeeze()
 
     def gclm2lenmap(self, gclm:np.ndarray, mmax:int or None, spin, backwards:bool, polrot=True, ptg=None):
+        """Produces deflected spin-weighted map from alm array and instance pointing information
+
+            Args:
+                gclm: input alm array, shape (ncomp, nalm), where ncomp can be 1 (gradient-only) or 2 (gradient or curl)
+                mmax: mmax parameter of alm array layout, if different from lmax
+                spin: spin (>=0) of the transform
+                backwards: forward or backward (adjoint) operation
+
+
+        """
         assert not backwards, 'backward 2lenmap not implemented at this moment'
         self.tim.start('gclm2lenmap')
         self.tim.reset()
@@ -498,9 +508,13 @@ class deflection:
                 ret = alm_copy(gclm, mmax, lmax_out, mmax_out)
                 self.tim.close(stri)
                 return ret
-            # FIXME: What to do with SHT mode here ?
-            glmret = alm_copy(gclm[0], mmax, lmax_out, mmax_out)
-            ret = np.array([glmret, alm_copy(gclm[1], mmax, lmax_out, mmax_out) if gclm[1] is not None else np.zeros_like(glmret)])
+            gclm = np.atleast_2d(gclm)
+            if out_sht_mode == 'GRAD_ONLY':
+                ret = alm_copy(gclm[0], mmax, lmax_out, mmax_out)
+            else:
+                ret = np.empty((2, Alm.getsize(lmax_out, mmax_out)), gclm.dtype)
+                ret[0] = alm_copy(gclm[0], mmax, lmax_out, mmax_out)
+                ret[1] = 0. if input_sht_mode == 'GRAD_ONLY' else alm_copy(gclm[1], mmax, lmax_out, mmax_out)
             self.tim.close(stri)
             return ret
         if not backwards:

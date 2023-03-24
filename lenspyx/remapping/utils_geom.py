@@ -145,7 +145,7 @@ class Geom:
         """
         gclm = np.atleast_2d(gclm)
         return synthesis(alm=gclm, theta=self.theta, lmax=lmax, mmax=mmax, nphi=self.nph, spin=spin, phi0=self.phi0,
-                         nthreads=nthreads, ringstart=self.ofs,map=map, **kwargs)
+                         nthreads=nthreads, ringstart=self.ofs, map=map, **kwargs)
 
     def synthesis_deriv1(self, alm: np.ndarray, lmax:int, mmax:int, nthreads:int, **kwargs):
         """Wrapper to ducc synthesis_deriv1

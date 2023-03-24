@@ -29,3 +29,4 @@ jobs:
           python lenspyx/tests/test_epsilon.py
           python lenspyx/tests/splits.py
           python lenspyx/tests/polrot.py
+          python lenspyx/tests/cmplexvsreal.py
