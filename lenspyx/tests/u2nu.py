@@ -19,7 +19,7 @@ if __name__ == '__main__':
     spin = args.spin
     lmax_len, dlmax, dlmax_gl = args.lmax_len, args.dlmax, args.dlmax_gl
 
-    ffi, geom = syn_ffi_ducc(nthreads=args.nmin, lmax_len=lmax_len, dlmax=dlmax, dlmax_gl=dlmax_gl, verbosity=1)
+    ffi, geom = syn_ffi_ducc(nthreads=args.ntmin, lmax_len=lmax_len, dlmax=dlmax, dlmax_gl=dlmax_gl, verbosity=1)
     #ffi_29, _ = syn_ffi_ducc_29(nthreads=nthreads,  lmax_len=lmax_len, dlmax=dlmax, dlmax_gl=dlmax_gl, verbosity=1)
 
     alm = syn_alms(spin, ctyp=np.complex64 if ffi.single_prec else np.complex128)
