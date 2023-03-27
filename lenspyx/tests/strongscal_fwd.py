@@ -47,7 +47,7 @@ if __name__ == '__main__':
             ffi = get_ffi(dlmax_gl, nt)
             ffi.verbosity = 0
             t0 = time.time()
-            ffi.lensgclm(ebunl, mmax_unl, spin, lmax_len, mmax_len, False)
+            ffi.lensgclm(ebunl, mmax_unl, spin, lmax_len, mmax_len)
             ffi.tim.keys['lensgclm (total, lmax_unl %s )'%lmax_unl] = time.time() - t0
             ffi.tim.dumpjson(json_file)
             print(json.load(open(json_file, 'r')))
