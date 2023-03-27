@@ -20,20 +20,16 @@ if __name__ == '__main__':
     lmax_len, dlmax, dlmax_gl = args.lmax_len, args.dlmax, args.dlmax_gl
     lmax_unl = lmax_len + dlmax
 
-    if args.bwd:
-        lmax_in, mmax_in, lmax_out, mmax_out, = lmax_len, lmax_len, lmax_unl, lmax_unl
-    else:
-        lmax_in, mmax_in, lmax_out, mmax_out, = lmax_unl, lmax_unl, lmax_len, lmax_len
     ffi, geom = syn_ffi_ducc(nthreads=args.ntmin, lmax_len=lmax_len, dlmax=dlmax, dlmax_gl=dlmax_gl, verbosity=1, epsilon=10**(-args.epsilon))
 
-    alm = syn_alms(spin, lmax_unl=lmax_in, ctyp=np.complex64 if ffi.single_prec else np.complex128)
-    for n in range(args.ntmin, args.ntmax + 1):
-        ffi.sht_tr = n
-        for bwd in [False, True]:
-            if bwd:
-                lmax_in, mmax_in, lmax_out, mmax_out, = lmax_len, lmax_len, lmax_unl, lmax_unl
-            else:
-                lmax_in, mmax_in, lmax_out, mmax_out, = lmax_unl, lmax_unl, lmax_len, lmax_len
+    for bwd in [False, True]:
+        if bwd:
+            lmax_in, mmax_in, lmax_out, mmax_out, = lmax_len, lmax_len, lmax_unl, lmax_unl
+        else:
+            lmax_in, mmax_in, lmax_out, mmax_out, = lmax_unl, lmax_unl, lmax_len, lmax_len
+        alm = syn_alms(spin, lmax_unl=lmax_in, ctyp=np.complex64 if ffi.single_prec else np.complex128)
+        for n in range(args.ntmin, args.ntmax + 1):
+            ffi.sht_tr = n
             k = 'nu2u' if bwd else 'u2nu'
             ffi.tim = timer('', False)
             ffi.lensgclm(alm, mmax_in, spin, lmax_out, mmax_out, backwards=bwd)
