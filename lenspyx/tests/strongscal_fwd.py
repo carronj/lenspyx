@@ -24,7 +24,7 @@ def get_ffi(dlmax_gl, nthreads=4, dlmax=1024):
 if __name__ == '__main__':
     import argparse, os, time, json
     parser = argparse.ArgumentParser(description='test FFP10-like fwd building')
-    if os.path.exists('SCRATCH'):
+    if os.environ.get('SCRATCH', None) is not None:
         DIR = os.environ['SCRATCH'] + '/lenspyx/'
     else:
         #local ?
