@@ -27,7 +27,7 @@ if __name__ == '__main__':
         ffi.sht_tr = n
         ffi.tim = timer('', False)
         ffi.gclm2lenmap(alm, None, spin, False)
-        print("u2nu: %s threads, %.3f Mpix / s"%(args.sht_tr, geom.npix() * 1e-6 / ffi.tim.keys['u2nu']))
+        print("u2nu: %s threads, %.3f Mpix / s"%(ffi.sht_tr, geom.npix() * 1e-6 / ffi.tim.keys['u2nu']))
 
     #ffi_29.tim = timer('', False)
     #ffi_29.gclm2lenmap(alm, None, spin, False)
