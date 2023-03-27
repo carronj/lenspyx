@@ -30,6 +30,10 @@ if __name__ == '__main__':
     for n in range(args.ntmin, args.ntmax + 1):
         ffi.sht_tr = n
         for bwd in [False, True]:
+            if bwd:
+                lmax_in, mmax_in, lmax_out, mmax_out, = lmax_len, lmax_len, lmax_unl, lmax_unl
+            else:
+                lmax_in, mmax_in, lmax_out, mmax_out, = lmax_unl, lmax_unl, lmax_len, lmax_len
             k = 'nu2u' if bwd else 'u2nu'
             ffi.tim = timer('', False)
             ffi.lensgclm(alm, mmax_in, spin, lmax_out, mmax_out, backwards=bwd)
