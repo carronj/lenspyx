@@ -38,7 +38,7 @@ if __name__ == '__main__':
     cpu_count = multiprocessing.cpu_count()
 
     ffi, geom = syn_ffi_ducc_29(lmax_len=args.lmax_len, dlmax=args.dlmax, dlmax_gl=args.dlmax_gl, nthreads=args.nt,
-                             verbosity=0, epsilon=10 ** (-args.epsilon))
+                             verbosity=1, epsilon=10 ** (-args.epsilon))
     lmax_unl, mmax_unl = args.lmax_len + args.dlmax, args.lmax_len + args.dlmax
 
     npix = geom.npix()
