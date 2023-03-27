@@ -2,7 +2,7 @@
 
 
 """
-from lenspyx.tests.helper import syn_ffi_ducc, syn_ffi_ducc_29,cls_unl, cls_len, duccd
+from lenspyx.tests.helper import syn_ffi_ducc, syn_ffi_ducc_29,cls_unl, cls_len
 import healpy as hp, numpy as np
 USE29=True
 def binit(cl, d=10):
@@ -22,13 +22,14 @@ def get_ffi(dlmax_gl, nthreads=4, dlmax=1024):
 if __name__ == '__main__':
     import argparse, os, time, json
     parser = argparse.ArgumentParser(description='test FFP10-like fwd building')
-    if os.path.exists('SCRATCH'):
+    if os.environ.get('SCRATCH', None) is not None:
         DIR = os.environ['SCRATCH'] + '/lenspyx/'
     else:
         #local ?
         DIR = os.environ['ONED'] + '/ducclens/Tex/figs/MacOSlocal'
     if not os.path.exists(DIR):
         os.makedirs(DIR)
+    spin = 2
     args = parser.parse_args()
     lmax_len, mmax_len, dlmax = 4096, 4096, 1024
     lmax_unl = lmax_len + dlmax
@@ -46,7 +47,7 @@ if __name__ == '__main__':
             ffi = get_ffi(dlmax_gl, nt)
             ffi.verbosity = 0
             t0 = time.time()
-            ffi.lensgclm(eblen, mmax_len, 2, lmax_unl, mmax_unl, True)
+            ffi.lensgclm(eblen, mmax_len, spin, lmax_unl, mmax_unl, backwards=True, out_sht_mode='GRAD_ONLY')
             ffi.tim.keys['lensgclm (total, lmax in-out %s %s )'%(lmax_len, lmax_unl)] = time.time() - t0
             ffi.tim.dumpjson(json_file)
             print(json.load(open(json_file, 'r')))
