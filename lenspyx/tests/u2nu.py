@@ -13,7 +13,6 @@ if __name__ == '__main__':
     parser.add_argument('-eps', dest='epsilon', type=float, default=7, help='-log10 of nufft accuracy')
     parser.add_argument('-nmin', dest='ntmin', type=int, default=4, help='min number of threads')
     parser.add_argument('-nmax', dest='ntmax', type=int, default=4, help='max number of threads')
-    parser.add_argument('-bwd', dest='bwd', action='store_true', help='nu2u instead of u2nu')
 
     args = parser.parse_args()
 
@@ -28,11 +27,12 @@ if __name__ == '__main__':
     ffi, geom = syn_ffi_ducc(nthreads=args.ntmin, lmax_len=lmax_len, dlmax=dlmax, dlmax_gl=dlmax_gl, verbosity=1, epsilon=10**(-args.epsilon))
 
     alm = syn_alms(spin, lmax_unl=lmax_in, ctyp=np.complex64 if ffi.single_prec else np.complex128)
-    k = 'nu2u' if args.bwd else 'u2nu'
     for n in range(args.ntmin, args.ntmax + 1):
         ffi.sht_tr = n
-        ffi.tim = timer('', False)
-        ffi.lensgclm(alm, mmax_in, spin, lmax_out, mmax_out, backwards=args.bwd)
-        dt = ffi.tim.keys[k]
-        print(k + ": %s threads, %.3f Mpix / s"%(ffi.sht_tr, geom.npix() * 1e-6 / dt))
+        for bwd in [False, True]:
+            k = 'nu2u' if bwd else 'u2nu'
+            ffi.tim = timer('', False)
+            ffi.lensgclm(alm, mmax_in, spin, lmax_out, mmax_out, backwards=bwd)
+            dt = ffi.tim.keys[k]
+            print(k + ": %s threads, %.3f Mpix / s"%(ffi.sht_tr, geom.npix() * 1e-6 / dt))
 
