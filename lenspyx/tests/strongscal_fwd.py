@@ -2,10 +2,10 @@
 
 
 """
-from lenspyx.tests.helper import syn_ffi_ducc, syn_ffi_ducc_29, cls_unl
+from lenspyx.tests.helper import syn_ffi_ducc, syn_ffi_ducc_29, cls_unl, syn_alms
 import healpy as hp, numpy as np
 
-USE29 =False
+USE29 = True
 spin = 2
 def binit(cl, d=10):
     ret = cl.copy()
@@ -18,7 +18,7 @@ def get_ffi(dlmax_gl, nthreads=4, dlmax=1024):
     lmax_len, mmax_len, dlmax, dlmax_gl = 4096, 4096, dlmax, dlmax_gl
     func = syn_ffi_ducc_29 if USE29 else syn_ffi_ducc
     ffi_ducc, ref_geom = func(lmax_len=lmax_len, dlmax=dlmax,dlmax_gl=dlmax_gl,
-                                      nthreads=nthreads)
+                                      nthreads=nthreads, epsilon=1e-5)
     return ffi_ducc
 
 if __name__ == '__main__':
@@ -36,13 +36,11 @@ if __name__ == '__main__':
     lmax_unl = lmax_len + dlmax
     mmax_unl = lmax_unl
     dlmax_gl = 1024
-    ebunl = np.array([hp.synalm(cls_unl['ee'][:lmax_unl + 1]),
-                      hp.synalm(cls_unl['bb'][:lmax_unl + 1])]).astype(np.complex64)
-    ebunl = np.atleast_2d(ebunl[:1 + (spin > 0)])
+    ebunl = syn_alms(spin, lmax_unl=lmax_unl, ctyp=np.complex64)
     import multiprocessing
     cpu_count = min(multiprocessing.cpu_count(), 36)
-    for tentative in [1]:
-        for nt in range(6):
+    for tentative in [1, 2]:
+        for nt in range(1, cpu_count + 1):
             os.environ['OMP_NUM_THREADS'] = str(nt)
             print('doing %s_%s'%(nt, tentative))
             json_file = DIR + '/sscal_fwd_%s%s_%s_sgl.json'%('v29_'*USE29, nt, tentative)
