@@ -471,8 +471,6 @@ class deflection:
                             lmax=lmax, mmax=mmax, geometry="CC", nthreads=self.sht_tr, mode=sht_mode, alm=gclm_out)
         self.tim.add('adjoint_synthesis_2d (%s)'%sht_mode)
         self.tim.close('lenmap2gclm')
-        if self.verbosity:
-            print(self.tim)
         return slm.squeeze()
 
     def lensgclm(self, gclm:np.ndarray, mmax:int or None, spin:int, lmax_out:int, mmax_out:int or None,
