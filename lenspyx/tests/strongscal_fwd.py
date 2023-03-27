@@ -36,7 +36,7 @@ if __name__ == '__main__':
     lmax_unl = lmax_len + dlmax
     mmax_unl = lmax_unl
     dlmax_gl = 1024
-    ebunl = syn_alms(spin, lmax_unl=lmax_unl, ctyp=np.complex64)
+    ebunl = syn_alms(spin, lmax_unl=lmax_unl, ctyp=np.complex64)[0:1] # grad-only
     import multiprocessing
     cpu_count = min(multiprocessing.cpu_count(), 36)
     for tentative in [1, 2]:
