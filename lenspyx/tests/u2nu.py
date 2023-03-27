@@ -28,9 +28,11 @@ if __name__ == '__main__':
     ffi, geom = syn_ffi_ducc(nthreads=args.ntmin, lmax_len=lmax_len, dlmax=dlmax, dlmax_gl=dlmax_gl, verbosity=1, epsilon=10**(-args.epsilon))
 
     alm = syn_alms(spin, lmax_unl=lmax_in, ctyp=np.complex64 if ffi.single_prec else np.complex128)
+    k = 'nu2u' if args.bwd else 'u2nu'
     for n in range(args.ntmin, args.ntmax + 1):
         ffi.sht_tr = n
         ffi.tim = timer('', False)
         ffi.lensgclm(alm, mmax_in, spin, lmax_out, mmax_out, backwards=args.bwd)
-        print("u2nu: %s threads, %.3f Mpix / s"%(ffi.sht_tr, geom.npix() * 1e-6 / ffi.tim.keys['u2nu']))
+        dt = ffi.tim.keys[k]
+        print(k + ": %s threads, %.3f Mpix / s"%(ffi.sht_tr, geom.npix() * 1e-6 / dt))
 
