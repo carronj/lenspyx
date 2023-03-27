@@ -23,7 +23,7 @@ if __name__ == '__main__':
     #ffi_29, _ = syn_ffi_ducc_29(nthreads=nthreads,  lmax_len=lmax_len, dlmax=dlmax, dlmax_gl=dlmax_gl, verbosity=1)
 
     alm = syn_alms(spin, ctyp=np.complex64 if ffi.single_prec else np.complex128)
-    for n in range(args.nmin, args.nmax + 1):
+    for n in range(args.ntmin, args.ntmax + 1):
         ffi.sht_tr = n
         ffi.tim = timer('', False)
         ffi.gclm2lenmap(alm, None, spin, False)
