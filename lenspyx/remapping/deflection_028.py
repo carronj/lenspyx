@@ -262,7 +262,7 @@ class deflection:
 
     def change_dlm(self, dlm:list or np.ndarray, mmax_dlm:int or None, cacher:cachers.cacher or None=None):
         assert len(dlm) == 2, (len(dlm), 'gradient and curl mode (curl can be none)')
-        return deflection(self.geom, dlm[0], mmax_dlm, self.sht_tr, cacher, dlm[1],
+        return deflection(self.geom, dlm[0], mmax_dlm, numthreads=self.sht_tr, cacher=cacher, dclm=dlm[1],
                           verbosity=self.verbosity, epsilon=self.epsilon, single_prec=self.single_prec)
 
     def change_geom(self, lens_geom:Geom, cacher:cachers.cacher or None=None):

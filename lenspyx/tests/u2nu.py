@@ -8,9 +8,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='test FFP10-like fwd building')
     parser.add_argument('-s', dest='spin', type=int, default=0, help='spin to test')
     parser.add_argument('-lmaxlen', dest='lmax_len', type=int, default=4096, help='lmax of lensed CMBs')
-    parser.add_argument('-dlmaxgl', dest='dlmax_gl', type=int, default=0, help='buffer to GL grid')
+    parser.add_argument('-dlmaxgl', dest='dlmax_gl', type=int, default=1024, help='buffer to GL grid')
     parser.add_argument('-dlmax', dest='dlmax', type=int, default=1024, help='buffer to lensed alms')
-    parser.add_argument('-eps', dest='epsilon', type=float, default=5, help='-log10 of nufft accuracy')
+    parser.add_argument('-eps', dest='epsilon', type=float, default=11, help='-log10 of nufft accuracy')
     parser.add_argument('-n', dest='nt', type=int, default=4, help='number of threads')
     args = parser.parse_args()
 
