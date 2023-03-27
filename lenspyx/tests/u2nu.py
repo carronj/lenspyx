@@ -31,7 +31,6 @@ if __name__ == '__main__':
     for n in range(args.ntmin, args.ntmax + 1):
         ffi.sht_tr = n
         ffi.tim = timer('', False)
-        ffi.gclm2lenmap(alm, None, spin, False)
         ffi.lensgclm(alm, mmax_in, spin, lmax_out, mmax_out, backwards=args.bwd)
         print("u2nu: %s threads, %.3f Mpix / s"%(ffi.sht_tr, geom.npix() * 1e-6 / ffi.tim.keys['u2nu']))
 
