@@ -28,7 +28,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     nthreads = args.nt
-    if args.aglversion == 29:
+    if args.algversion == 29:
         ffi, geom = syn_ffi_ducc_29(lmax_len=args.lmax_len, dlmax=args.dlmax, dlmax_gl=args.dlmax_gl, nthreads=nthreads,
                                  verbosity=args.verbose, epsilon=10 ** (-args.epsilon))
     else:
