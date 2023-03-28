@@ -4,7 +4,7 @@
 
 """
 import numpy as np
-from lenspyx.tests.helper import syn_ffi_ducc_29, cls_unl, syn_alms
+from lenspyx.tests.helper import syn_ffi_ducc_29, syn_ffi_ducc, cls_unl, syn_alms
 from lenspyx.utils_hp import synalm, Alm
 import multiprocessing
 import argparse
@@ -22,13 +22,18 @@ if __name__ == '__main__':
     parser.add_argument('-bwd', dest='bwd', action='store_true', help='adjoint lensing')
     parser.add_argument('-gonly', dest='gonly', action='store_true', help='grad-only mode')
     parser.add_argument('-v', dest='verbose', action='store_true')
+    parser.add_argument('-valg', dest='algversion', type=int, default=29)
     parser.add_argument('-inplace', dest='inplace', action='store_true', help='write to input array (spares a gclm with lmax_len')
     parser.add_argument('-tracemalloc', dest='tracemalloc',  action='store_true', help='trace memory usage')
 
     args = parser.parse_args()
     nthreads = args.nt
-    ffi, geom = syn_ffi_ducc_29(lmax_len=args.lmax_len, dlmax=args.dlmax, dlmax_gl=args.dlmax_gl, nthreads=nthreads,
-                             verbosity=args.verbose, epsilon=10 ** (-args.epsilon))
+    if args.aglversion == 29:
+        ffi, geom = syn_ffi_ducc_29(lmax_len=args.lmax_len, dlmax=args.dlmax, dlmax_gl=args.dlmax_gl, nthreads=nthreads,
+                                 verbosity=args.verbose, epsilon=10 ** (-args.epsilon))
+    else:
+        ffi, geom = syn_ffi_ducc(lmax_len=args.lmax_len, dlmax=args.dlmax, dlmax_gl=args.dlmax_gl, nthreads=nthreads,
+                                 verbosity=args.verbose, epsilon=10 ** (-args.epsilon))
     lmax_len, mmax_len = args.lmax_len, args.lmax_len
     lmax_unl, mmax_unl = args.lmax_len + args.dlmax, args.lmax_len + args.dlmax
 
