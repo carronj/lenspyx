@@ -21,7 +21,7 @@ if __name__ == '__main__':
     parser.add_argument('-n', dest='nt', type=int, default=4, help='number of threads')
     parser.add_argument('-bwd', dest='bwd', action='store_true', help='adjoint lensing')
     parser.add_argument('-gonly', dest='gonly', action='store_true', help='grad-only mode')
-    parser.add_argument('-v', dest='verbose', action='store_True')
+    parser.add_argument('-v', dest='verbose', action='store_true')
     parser.add_argument('-inplace', dest='inplace', action='store_true', help='write to input array (spares a gclm with lmax_len')
     parser.add_argument('-tracemalloc', dest='tracemalloc',  action='store_true', help='trace memory usage')
 
