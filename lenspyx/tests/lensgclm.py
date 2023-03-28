@@ -15,19 +15,20 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='test FFP10-like fwd building')
     parser.add_argument('-s', dest='spin', type=int, default=0, help='spin to test')
     parser.add_argument('-lmaxlen', dest='lmax_len', type=int, default=4096, help='lmax of lensed CMBs')
-    parser.add_argument('-dlmaxgl', dest='dlmax_gl', type=int, default=0, help='buffer to GL grid')
+    parser.add_argument('-dlmaxgl', dest='dlmax_gl', type=int, default=1024, help='buffer to GL grid')
     parser.add_argument('-dlmax', dest='dlmax', type=int, default=1024, help='buffer to lensed alms')
     parser.add_argument('-eps', dest='epsilon', type=float, default=5, help='-log10 of nufft accuracy')
     parser.add_argument('-n', dest='nt', type=int, default=4, help='number of threads')
     parser.add_argument('-bwd', dest='bwd', action='store_true', help='adjoint lensing')
     parser.add_argument('-gonly', dest='gonly', action='store_true', help='grad-only mode')
+    parser.add_argument('-v', dest='verbose', action='store_True')
     parser.add_argument('-inplace', dest='inplace', action='store_true', help='write to input array (spares a gclm with lmax_len')
     parser.add_argument('-tracemalloc', dest='tracemalloc',  action='store_true', help='trace memory usage')
 
     args = parser.parse_args()
     nthreads = args.nt
     ffi, geom = syn_ffi_ducc_29(lmax_len=args.lmax_len, dlmax=args.dlmax, dlmax_gl=args.dlmax_gl, nthreads=nthreads,
-                             verbosity=0, epsilon=10 ** (-args.epsilon))
+                             verbosity=args.verbose, epsilon=10 ** (-args.epsilon))
     lmax_len, mmax_len = args.lmax_len, args.lmax_len
     lmax_unl, mmax_unl = args.lmax_len + args.dlmax, args.lmax_len + args.dlmax
 
