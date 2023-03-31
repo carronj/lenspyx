@@ -26,11 +26,11 @@ class Geom:
         """Iso-latitude pixelisation of the sphere
 
                 Args:
-                    theta: rings co-latitudes in radians
-                    phi0: longitude offset of first point in each ring
-                    nphi: number of points in each ring
-                    ringstart: offsets of each ring in real space map
-                    w: quadrature weight for each ring
+                    theta: rings co-latitudes in radians in [0, pi]
+                    phi0: longitude offset of first point in each ring in radians
+                    nphi: number of pixels in each ring
+                    ringstart: index of first pixel of each ring in real space map
+                    w: quadrature weight for each ring (used for SHT of 'analysis'-type )
 
 
         """
