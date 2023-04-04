@@ -285,14 +285,14 @@ class deflection:
                 The number of pixels must be small here, otherwise way too slow
 
             Note:
-                If the remapping angles etc were not calculated previously, it will build the full map, so make take some time.
+                If the remapping angles etc were not calculated previously, it will build the full map, so may take some time.
 
         """
         assert spin >= 0, spin
         gclm = np.atleast_2d(gclm)
         sth_mode = ducc_sht_mode(gclm, spin)
         ptg = self._get_ptg()
-        thts, phis, gamma = ptg[pixs, 0], ptg[pixs, 1], self._get_gamma()[pixs]
+        thts, phis = ptg[pixs, 0], ptg[pixs, 1]
         nph = 2 * np.ones(thts.size, dtype=np.uint64)  # I believe at least 2 points per ring
         ofs = 2 * np.arange(thts.size, dtype=np.uint64)
         wt = np.ones(thts.size, dtype=float)
@@ -303,6 +303,7 @@ class deflection:
         m = geom.synthesis(gclm, spin, lmax, mmax, self.sht_tr, mode=sth_mode)[:, 0::2]
         # could do: complex view trick etc
         if spin and polrot:
+            gamma = self._get_gamma()[pixs]
             m = np.exp(1j * spin * gamma) * (m[0] + 1j * m[1])
             return m.real, m.imag
         return m.squeeze()
