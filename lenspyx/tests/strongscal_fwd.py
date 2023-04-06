@@ -3,10 +3,9 @@
 
 """
 from lenspyx.tests.helper import syn_ffi_ducc, syn_ffi_ducc_29, cls_unl, syn_alms
-import healpy as hp, numpy as np
+import numpy as np
 
 USE29 = True
-spin = 2
 def binit(cl, d=10):
     ret = cl.copy()
     for l in range(d, ret.size -d):
@@ -24,6 +23,10 @@ def get_ffi(dlmax_gl, nthreads=4, dlmax=1024):
 if __name__ == '__main__':
     import argparse, os, time, json
     parser = argparse.ArgumentParser(description='test FFP10-like fwd building')
+    parser.add_argument('-s', dest='spin', default=2, type=int, help='spin of the transform')
+    args = parser.parse_args()
+
+    spin = args.spin
     if os.environ.get('SCRATCH', None) is not None:
         DIR = os.environ['SCRATCH'] + '/lenspyx/'
     else:
@@ -43,7 +46,7 @@ if __name__ == '__main__':
         for nt in range(1, cpu_count + 1):
             os.environ['OMP_NUM_THREADS'] = str(nt)
             print('doing %s_%s'%(nt, tentative))
-            json_file = DIR + '/sscal_fwd_%s%s_%s_sgl.json'%('v29_'*USE29, nt, tentative)
+            json_file = DIR + '/sscal_fwd_%s%s_%s_%ssgl.json'%('v29_'*USE29, nt, tentative, ('spin%s'%spin) * (spin != 2) )
             ffi = get_ffi(dlmax_gl, nt)
             ffi.verbosity = 1
             t0 = time.time()

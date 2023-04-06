@@ -2,8 +2,8 @@
 
 
 """
-from lenspyx.tests.helper import syn_ffi_ducc, syn_ffi_ducc_29,cls_unl, cls_len
-import healpy as hp, numpy as np
+from lenspyx.tests.helper import syn_ffi_ducc, syn_ffi_ducc_29,cls_unl, cls_len, syn_alms
+import numpy as np
 USE29=True
 def binit(cl, d=10):
     ret = cl.copy()
@@ -22,6 +22,10 @@ def get_ffi(dlmax_gl, nthreads=4, dlmax=1024):
 if __name__ == '__main__':
     import argparse, os, time, json
     parser = argparse.ArgumentParser(description='test FFP10-like fwd building')
+    parser.add_argument('-s', dest='spin', default=2, type=int, help='spin of the transform')
+    args = parser.parse_args()
+
+    spin = args.spin
     if os.environ.get('SCRATCH', None) is not None:
         DIR = os.environ['SCRATCH'] + '/lenspyx/'
     else:
@@ -29,21 +33,20 @@ if __name__ == '__main__':
         DIR = os.environ['ONED'] + '/ducclens/Tex/figs/MacOSlocal'
     if not os.path.exists(DIR):
         os.makedirs(DIR)
-    spin = 2
     args = parser.parse_args()
     lmax_len, mmax_len, dlmax = 4096, 4096, 1024
     lmax_unl = lmax_len + dlmax
     mmax_unl = lmax_unl
     dlmax_gl = 1024
-    eblen = np.array([hp.synalm(cls_len['ee'][:lmax_len + 1]),
-                      hp.synalm(cls_len['bb'][:lmax_len + 1])]).astype(np.complex64)
+
+    eblen = syn_alms(spin, lmax_unl=lmax_len, ctyp=np.complex64)
     import multiprocessing
     cpu_count = min(multiprocessing.cpu_count(), 36)
     for tentative in [1, 2]:
         for nt in range(1, cpu_count + 1):
             os.environ['OMP_NUM_THREADS'] = str(nt)
             print('doing %s_%s'%(nt, tentative))
-            json_file = DIR + '/sscal_bwd_%s%s_%s_sgl.json'%('v29_'*USE29, nt, tentative)
+            json_file = DIR + '/sscal_bwd_%s%s_%s_%ssgl.json'%('v29_'*USE29, nt, tentative, ('spin%s'%spin) * (spin != 2) )
             ffi = get_ffi(dlmax_gl, nt)
             ffi.verbosity = 1
             t0 = time.time()

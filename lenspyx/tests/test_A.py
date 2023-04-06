@@ -1,4 +1,4 @@
-from lenspyx.tests.helper import syn_ffi_ducc, cls_unl
+from lenspyx.tests.helper import syn_ffi_ducc_29, cls_unl
 from lenspyx.utils import timer
 from lenspyx.utils_hp import Alm, synalm
 import numpy as np
@@ -6,13 +6,13 @@ import pylab as pl
 import healpy as hp
 
 tim = timer(True)
-ffi, _ = syn_ffi_ducc()
+ffi, _ = syn_ffi_ducc_29()
 tim.add('ffi gen.')
 Aunl = ffi.dlm2A()
 
 lmax, mmax = 4096, 4096
-tlm_unl = synalm(cls_unl['tt'][:lmax + 1], lmax, mmax)
-tmap_len = ffi.gclm2lenmap(tlm_unl, mmax, 0, False)
+tlm_unl = synalm(cls_unl['tt'][:lmax + 1], lmax, mmax).astype(np.complex64)
+tmap_len = ffi.gclm2lenmap(tlm_unl, mmax, 0, backwards=False)
 tim.add('gen and lensing of Tlm')
 
 points1 = tmap_len.copy()
