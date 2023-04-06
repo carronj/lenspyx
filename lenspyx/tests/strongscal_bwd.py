@@ -50,6 +50,6 @@ if __name__ == '__main__':
             ffi = get_ffi(dlmax_gl, nt)
             ffi.verbosity = 1
             t0 = time.time()
-            ffi.lensgclm(eblen, mmax_len, spin, lmax_unl, mmax_unl, backwards=True, out_sht_mode='GRAD_ONLY')
+            ffi.lensgclm(eblen, mmax_len, spin, lmax_unl, mmax_unl, backwards=True, out_sht_mode='GRAD_ONLY' if spin else 'STANDARD')
             ffi.tim.keys['lensgclm (total, lmax in-out %s %s )'%(lmax_len, lmax_unl)] = time.time() - t0
             ffi.tim.dumpjson(json_file)
