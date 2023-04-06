@@ -19,7 +19,7 @@ def _extend_cl(cl:np.ndarray, lmax):
     else:
         ret = np.zeros(lmax + 1, dtype=cl.dtype)
         ret[:lmax_cl+1] = cl
-        return cl
+        return ret
 
 def syn_alms(spin, lmax_unl=5120, ctyp=np.complex128):
     ncomp = 1 + (abs(spin) > 0)
