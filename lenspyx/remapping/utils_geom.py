@@ -241,6 +241,9 @@ class Geom:
 
     @staticmethod
     def get_healpix_geometry(nside:int):
+        """Healpix pixelization
+
+        """
         base = ducc0.healpix.Healpix_Base(nside, "RING")
         geom = base.sht_info()
         area = (4 * np.pi) / (12 * nside ** 2)
@@ -248,6 +251,9 @@ class Geom:
 
     @staticmethod
     def get_cc_geometry(ntheta:int, nphi:int):
+        """Clenshaw-Curtis pixelization
+
+        """
         tht = np.linspace(0, np.pi, ntheta, dtype=float)
         phi0 = np.zeros(ntheta, dtype=float)
         nph = np.full((ntheta,), nphi, dtype=np.uint64)
@@ -257,6 +263,9 @@ class Geom:
 
     @staticmethod
     def get_f1_geometry(ntheta:int, nphi:int):
+        """Fejer-1 pixelization
+
+        """
         tht = np.linspace(0.5 * np.pi / ntheta, (ntheta - 0.5) * np.pi / ntheta, ntheta)
         phi0 = np.zeros(ntheta, dtype=float)
         nph = np.full((ntheta,), nphi, dtype=np.uint64)
@@ -266,6 +275,9 @@ class Geom:
 
     @staticmethod
     def get_gl_geometry(lmax:int, good_size_real=True):
+        """Gauss-Legendre pixelization
+
+        """
         nlatf = lmax + 1  # full meridian GL points
         nphi = good_size(2 * lmax + 1, good_size_real)
         tht = GL_thetas(nlatf)
@@ -274,6 +286,13 @@ class Geom:
         nph = np.full((nlatf,), nphi, dtype=np.uint64)
         ofs = np.insert(np.cumsum(nph[:-1]), 0, 0)
         return Geom(tht, phi0, nph, ofs, wt / nph)
+
+    @staticmethod
+    def get_tgl_geometry(lmax:int, smax:int, good_size_real=True):
+        """Longitude-thinned Gauss-Legendre pixelization
+
+        """
+        return Geom.get_thingauss_geometry(lmax, smax, good_size_real=good_size_real)
 
 class pbounds:
     """Class to regroup simple functions handling sky maps longitude truncation
