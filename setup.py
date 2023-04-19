@@ -25,7 +25,6 @@ setup(
                                       'lenspyxs/data/cls/FFP10_wdipole_params.ini'])],
     author_email='to.jcarron@gmail.com',
     description='lensed CMB sims pipe',
-    install_requires=['numpy'],
     long_description=long_description,
     configuration=configuration)
 
