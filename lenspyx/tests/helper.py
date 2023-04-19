@@ -31,6 +31,13 @@ def syn_alms(spin, lmax_unl=5120, ctyp=np.complex128):
        eblm[1] = synalm(_extend_cl(cls_unl['bb'][:lmax_unl + 1], lmax_unl), lmax_unl, mmax_unl, rlm_dtype=rtyp)
     return eblm
 
+def syn_dlm(lmax_unl=5120, ctyp=np.complex128):
+    mmax_unl = lmax_unl
+    rtyp = lenspyx.remapping.deflection_028.rtype[ctyp]
+    cdd = _extend_cl(cls_unl['pp'][:lmax_unl + 1], lmax_unl)
+    cdd *= np.arange(lmax_unl + 1) * np.arange(1, lmax_unl + 2)
+    return synalm(cdd, lmax_unl, mmax_unl, rlm_dtype=rtyp)
+
 
 
 def syn_ffi_ducc(lmax_len = 4096, dlmax=1024, epsilon=1e-5, dlm_fac=1., nthreads=0, dlmax_gl=1024, verbosity=1, planned=False):

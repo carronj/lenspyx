@@ -43,7 +43,7 @@ class deflection(deflection_28.deflection):
         assert ptg.dtype == np.float64, 'synthesis_general only accepts float here'
         if spin == 0:
             values = synthesis_general(lmax=lmax_unl, mmax=mmax, alm=gclm, loc=ptg, spin=spin, epsilon=self.epsilon,
-                                       nthreads=self.sht_tr, mode=sht_mode)#, verbose=self.verbosity)
+                                       nthreads=self.sht_tr, mode=sht_mode, verbose=self.verbosity)
             self.tim.add('synthesis general (%s)' % sht_mode)
         else:
             npix = self.geom.npix()
@@ -51,7 +51,7 @@ class deflection(deflection_28.deflection):
             valuesc = np.empty((npix,), dtype=np.complex64 if self.single_prec else np.complex128)
             values = valuesc.view(np.float32 if self.single_prec else np.float64).reshape((npix, 2)).T
             synthesis_general(map=values, lmax=lmax_unl, mmax=mmax, alm=gclm, loc=ptg, spin=spin, epsilon=self.epsilon,
-                              nthreads=self.sht_tr, mode=sht_mode)#, verbose=self.verbosity)
+                              nthreads=self.sht_tr, mode=sht_mode, verbose=self.verbosity)
             self.tim.add('synthesis general (%s)' % sht_mode)
             if spin and polrot:
                 if HAS_DUCCROTATE:
@@ -76,7 +76,7 @@ class deflection(deflection_28.deflection):
         if gclm_out is not None:
             assert deflection_28.rtype[gclm_out.dtype] == points.dtype, 'precision must match'
         ret = adjoint_synthesis_general(lmax=lmax, mmax=mmax, map=points, loc=ptg, spin=spin, epsilon=self.epsilon,
-                                            nthreads=self.sht_tr, mode=sht_mode, alm=gclm_out)#, verbose=self.verbosity)
+                                            nthreads=self.sht_tr, mode=sht_mode, alm=gclm_out, verbose=self.verbosity)
         self.tim.add('adjoint_synthesis_general (%s)'%sht_mode)
         self.tim.close('lenmap2gclm')
         return ret.squeeze()

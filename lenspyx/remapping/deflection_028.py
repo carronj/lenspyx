@@ -65,8 +65,6 @@ class deflection:
                 epsilon: desired accuracy on remapping
 
 
-        #FIXME: make input a (ncom, ?) array that can be complex or real (1d)
-        #FIXME: remove single_prec or check input compatible ?
         """
         lmax = Alm.getlmax(dglm.size, mmax_dlm)
         if mmax_dlm is None:
@@ -494,8 +492,9 @@ class deflection:
                 out_sht_mode(optional): e.g. 'GRAD_ONLY' if only the output gradient mode is desired
 
 
-            #FIXME: nomagn=True is a backward comptability thing to ask for inverse lensing
-            #        but in this implementation it actually puts a magn...
+            Note:
+                 nomagn=True is a backward comptability thing to ask for inverse lensing
+
 
         """
         stri = 'lengclm ' + 'bwd' * backwards + 'fwd' * (not backwards)
@@ -521,7 +520,6 @@ class deflection:
             self.tim.close(stri)
             return ret
         if not backwards:
-            # FIXME: should return here 2d array?
             m = self.gclm2lenmap(gclm, mmax, spin, backwards, polrot=polrot)
             self.tim.reset()
             if gclm_out is not None:

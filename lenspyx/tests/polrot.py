@@ -1,7 +1,6 @@
 import numpy as np
 import time
 from lenspyx.tests.helper import syn_ffi_ducc_29
-from lenspyx.fortran.remapping import remapping
 from multiprocessing import cpu_count
 try:
     import jcducc0
@@ -13,6 +12,13 @@ try:
     HAS_LROT = True
 except:
     HAS_LROT = False
+try:
+    from lenspyx.fortran.remapping import remapping
+    HAS_FORTRAN = True
+except:
+    HAS_FORTRAN = False
+
+assert HAS_FORTRAN, 'this test is about the fortran thingy'
 
 ffi, gl = syn_ffi_ducc_29(dlmax_gl=1024, dlmax=1024, epsilon=1e-7, nthreads=min(4, cpu_count()))
 ffi.geom = gl

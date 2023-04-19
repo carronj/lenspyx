@@ -20,7 +20,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip3 install --user git+https://gitlab.mpcdf.mpg.de/mtr/ducc.git@general_sht_timing
+          pip3 install --user git+https://gitlab.mpcdf.mpg.de/mtr/ducc.git@ducc0
       - name: install
         run: |
           pip install -e . --user
@@ -28,5 +28,5 @@ jobs:
         run: |
           python lenspyx/tests/test_epsilon.py
           python lenspyx/tests/splits.py
-          python lenspyx/tests/polrot.py
+          python lenspyx/tests/test_funkypointing.py
           python lenspyx/tests/cmplxvsreal.py

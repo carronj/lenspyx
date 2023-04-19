@@ -1,8 +1,7 @@
 """Times the deflection angles calculation etc"""
 import os
 import numpy as np
-import healpy as hp
-from lenspyx.tests.helper import syn_ffi_ducc_29,  syn_alms, cls_unl
+from lenspyx.tests.helper import syn_ffi_ducc_29,  syn_alms
 from lenspyx import cachers
 import multiprocessing
 import argparse
