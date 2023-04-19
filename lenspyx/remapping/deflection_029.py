@@ -6,7 +6,7 @@ from lenspyx.utils_hp import Alm
 from lenspyx import cachers
 from lenspyx.remapping import deflection_028 as deflection_28
 from ducc0.sht.experimental import adjoint_synthesis_general, synthesis_general
-
+import ducc0
 try:
     from lenspyx.fortran.remapping import remapping as fremap
     HAS_FORTRAN = True
@@ -14,7 +14,8 @@ except:
     HAS_FORTRAN = False
 
 HAS_DUCCGRADONLY = 'mode:' in synthesis_general.__doc__
-if not HAS_DUCCGRADONLY:
+HAS_DUCCROTATE = 'lensing_rotate' in ducc0.misc.__dict__
+if not HAS_DUCCGRADONLY or not HAS_DUCCROTATE:
     print("You might need to update to ducc0 latest version")
 # some helper functions
 
@@ -42,7 +43,7 @@ class deflection(deflection_28.deflection):
         assert ptg.dtype == np.float64, 'synthesis_general only accepts float here'
         if spin == 0:
             values = synthesis_general(lmax=lmax_unl, mmax=mmax, alm=gclm, loc=ptg, spin=spin, epsilon=self.epsilon,
-                                       nthreads=self.sht_tr, mode=sht_mode, verbose=self.verbosity)
+                                       nthreads=self.sht_tr, mode=sht_mode)#, verbose=self.verbosity)
             self.tim.add('synthesis general (%s)' % sht_mode)
         else:
             npix = self.geom.npix()
@@ -50,12 +51,16 @@ class deflection(deflection_28.deflection):
             valuesc = np.empty((npix,), dtype=np.complex64 if self.single_prec else np.complex128)
             values = valuesc.view(np.float32 if self.single_prec else np.float64).reshape((npix, 2)).T
             synthesis_general(map=values, lmax=lmax_unl, mmax=mmax, alm=gclm, loc=ptg, spin=spin, epsilon=self.epsilon,
-                              nthreads=self.sht_tr, mode=sht_mode, verbose=self.verbosity)
+                              nthreads=self.sht_tr, mode=sht_mode)#, verbose=self.verbosity)
             self.tim.add('synthesis general (%s)' % sht_mode)
             if spin and polrot:
-                func = fremap.apply_inplace if valuesc.dtype == np.complex128 else fremap.apply_inplacef
-                func(valuesc, self._get_gamma(), spin, self.sht_tr)
-                self.tim.add('polrot (fortran)')
+                if HAS_DUCCROTATE:
+                    ducc0.misc.lensing_rotate(valuesc, self._get_gamma(), spin, self.sht_tr)
+                    self.tim.add('polrot (ducc)')
+                else:
+                    func = fremap.apply_inplace if valuesc.dtype == np.complex128 else fremap.apply_inplacef
+                    func(valuesc, self._get_gamma(), spin, self.sht_tr)
+                    self.tim.add('polrot (fortran)')
         self.tim.close('gclm2lenmap')
         if self.verbosity:
             print(self.tim)
@@ -71,7 +76,7 @@ class deflection(deflection_28.deflection):
         if gclm_out is not None:
             assert deflection_28.rtype[gclm_out.dtype] == points.dtype, 'precision must match'
         ret = adjoint_synthesis_general(lmax=lmax, mmax=mmax, map=points, loc=ptg, spin=spin, epsilon=self.epsilon,
-                                            nthreads=self.sht_tr, mode=sht_mode, alm=gclm_out, verbose=self.verbosity)
+                                            nthreads=self.sht_tr, mode=sht_mode, alm=gclm_out)#, verbose=self.verbosity)
         self.tim.add('adjoint_synthesis_general (%s)'%sht_mode)
         self.tim.close('lenmap2gclm')
         return ret.squeeze()

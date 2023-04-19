@@ -1,8 +1,3 @@
-#FIXME: always work ith alms arrays of shape [ncomp, nlm] ?
-#FIXME: check exact A
-#TODO: spin-0 gradient conventions ?
-#TODO: double-check delensing/adjoint for spin!= 0
-#TODO inplace lensgclm
 from __future__ import annotations
 
 import os
@@ -23,10 +18,15 @@ except:
     print("Could not load fortran modules, some pieces might be slower")
 
 HAS_DUCCPOINTING = 'get_deflected_angles' in ducc0.misc.__dict__
+HAS_DUCCROTATE = 'lensing_rotate' in ducc0.misc.__dict__
 HAS_DUCCGRADONLY = 'mode:' in ducc0.sht.experimental.synthesis.__doc__
+
 if HAS_DUCCPOINTING:
     from ducc0.misc import get_deflected_angles
-if not HAS_DUCCGRADONLY:
+if HAS_DUCCROTATE:
+    from ducc0.misc import lensing_rotate
+
+if not HAS_DUCCGRADONLY or not HAS_DUCCROTATE:
     print("You might need to update ducc0 to latest version")
 
 
@@ -405,9 +405,13 @@ class deflection:
                     values *= cis
                 self.tim.add('polrot (cis)')
             else:
-                func = fremap.apply_inplace if values.dtype == np.complex128 else fremap.apply_inplacef
-                func(values, self._get_gamma(), spin, self.sht_tr)
-                self.tim.add('polrot (fortran)')
+                if HAS_DUCCROTATE:
+                    lensing_rotate(values, self._get_gamma(), spin, self.sht_tr)
+                    self.tim.add('polrot (ducc)')
+                else:
+                    func = fremap.apply_inplace if values.dtype == np.complex128 else fremap.apply_inplacef
+                    func(values, self._get_gamma(), spin, self.sht_tr)
+                    self.tim.add('polrot (fortran)')
         self.tim.close('gclm2lenmap')
         if self.verbosity:
             print(self.tim)
@@ -571,7 +575,10 @@ class deflection:
                     points *= self.dlm2A()
                     self.tim.add('nomagn')
                 if spin and polrot:
-                    if HAS_FORTRAN:
+                    if HAS_DUCCROTATE:
+                        lensing_rotate(pointsc, self._get_gamma(), -spin, self.sht_tr)
+                        self.tim.add('polrot (ducc)')
+                    elif HAS_FORTRAN:
                         func = fremap.apply_inplace if pointsc.dtype == np.complex128 else fremap.apply_inplacef
                         func(pointsc, self._get_gamma(), -spin, self.sht_tr)
                         self.tim.add('polrot (fortran)')
