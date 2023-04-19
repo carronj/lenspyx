@@ -25,7 +25,7 @@ jobs:
           pip install -e . --user
       - name: testlensing
         run: |
-          python lenspyx/tests/test_epsilon.py
+          python lenspyx/tests/lensing.py
           python lenspyx/tests/splits.py
           python lenspyx/tests/test_funkypointing.py
           python lenspyx/tests/cmplxvsreal.py
