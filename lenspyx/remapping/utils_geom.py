@@ -89,8 +89,10 @@ class Geom:
         ofs = np.insert(np.cumsum(self.nph[band][:-1]), 0, 0) if update_ringstart else self.ofs[band]
         return Geom(self.theta[band], self.phi0[band], self.nph[band], ofs, self.weight[band])
 
-
     def thinout(self, spin, good_size_real=True):
+        """Reduces the number of long points at high latitudes keeping the resolution similar to that of the equator
+
+        """
         ntht, tht = self.theta.size, self.theta
         st = np.sin(tht)
         lmax = ntht - 1
@@ -215,7 +217,7 @@ class Geom:
             Args:
                 lmax: band-limit (or desired band-limit) on the equator
                 smax: maximal intended spin-value (this changes the m-truncation by an amount ~smax)
-                zbounds: pixels outside of provided cos-colatitude bounds will be discarded
+                zbounds: pixels outside provided cos-colatitude bounds will be discarded
                 good_size_real(optional): picks slightly larger longitudes more suited for real FFTs if set (see ducc)
 
             Note:
