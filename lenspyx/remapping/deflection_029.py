@@ -16,7 +16,7 @@ except:
 HAS_DUCCGRADONLY = 'mode:' in synthesis_general.__doc__
 HAS_DUCCROTATE = 'lensing_rotate' in ducc0.misc.__dict__
 if not HAS_DUCCGRADONLY or not HAS_DUCCROTATE:
-    print("You might need to update to ducc0 latest version")
+    print("You might need to update ducc0 to latest version")
 # some helper functions
 
 class deflection(deflection_28.deflection):

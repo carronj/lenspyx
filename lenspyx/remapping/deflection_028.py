@@ -15,7 +15,6 @@ try:
     HAS_FORTRAN = True
 except:
     HAS_FORTRAN = False
-    print("Could not load fortran modules, some pieces might be slower")
 
 HAS_DUCCPOINTING = 'get_deflected_angles' in ducc0.misc.__dict__
 HAS_DUCCROTATE = 'lensing_rotate' in ducc0.misc.__dict__
