@@ -11,16 +11,16 @@ This allows one to build very easily lensed CMB simulations.
 The package explicitly provides two methods for most basic usage. Check the [doc](https://lenspyx.readthedocs.io/en/latest). 
 There is also an example notebook [demo_lenspyx](examples/demo_lenspyx.ipynb).
 
+There are further tools for CMB lensing reconstruction (adjoint lensing etc.)
+
 **From v2 onwards (april 2023)**: 
 
 Lenspyx now essentially only wraps extremely efficient routines from [DUCC](https://gitlab.mpcdf.mpg.de/mtr/ducc) by M.Reinecke,
 with massive speed-ups and accuracy improvements (see Reinecke, Belkner & Carron 2023), in a way incompatible to v1 which is now abandoned.
 
-Required is ducc0 version >= 0.30.0
-Note that installation of DUCC from source can enhance performance substantially (factor of a few sometimes), owing to compiler specfic optimizations.
+Required is ducc0 version >= 0.30.0.
+For best performance, please refer to the [DUCC page](https://gitlab.mpcdf.mpg.de/mtr/ducc) for installation instructions making profit of compiler-specfic optimizations.
 
-
-There are further tools for CMB lensing reconstruction (adjoint lensing etc.)
 
 ### Installation
 
