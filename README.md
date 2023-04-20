@@ -8,13 +8,14 @@ Curved-sky python lensed CMB maps simulation package by Julien Carron.
 
 This allows one to build very easily lensed CMB simulations. 
 
-**From v2 onwards (april 2023)**: 
-
-Lenspyx now essentially only wraps extremely efficient routines from [ducc](https://gitlab.mpcdf.mpg.de/mtr/ducc) by M.Reinecke,
-with massive speed-ups and accuracy improvements (see Reinecke, Belkner & Carron 2023), in a way incompatible from v1 which is abandoned.
-
 The package explicitly provides two methods for most basic usage. Check the [doc](https://lenspyx.readthedocs.io/en/latest). 
 There is also an example notebook [demo_lenspyx](examples/demo_lenspyx.ipynb).
+
+**From v2 onwards (april 2023)**: 
+
+Lenspyx now essentially only wraps extremely efficient routines from [DUCC](https://gitlab.mpcdf.mpg.de/mtr/ducc) by M.Reinecke,
+with massive speed-ups and accuracy improvements (see Reinecke, Belkner & Carron 2023), in a way incompatible from v1 which is abandoned.
+
 
 There are further tools for CMB lensing reconstruction (adjoint lensing etc.)
 

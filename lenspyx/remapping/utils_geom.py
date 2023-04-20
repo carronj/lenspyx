@@ -207,31 +207,48 @@ class Geom:
     def rings2phi(geom:Geom, rings:np.ndarray[int]):
         return np.concatenate([Geom.phis(geom, ir) for ir in rings])
 
+    @staticmethod
+    def get_supported_geometries():
+        geoms = ''
+        vs = vars(Geom)
+        for k in list(vs.keys()):
+            s = k.split('_')
+            if len(s) == 3 and s[0] == 'get' and s[2] == 'geometry':
+                geoms += ' ' + s[1]
+        return geoms
 
     @staticmethod
-    def get_thingauss_geometry(lmax:int, smax:int, zbounds:tuple[float, float]=(-1., 1.), good_size_real=True):
-        """Build a 'thinned' Gauss-Legendre geometry
+    def show_supported_geometries():
+        geoms = []
+        vs = vars(Geom)
+        for k in list(vs.keys()):
+            s = k.split('_')
+            if len(s) == 3 and s[0] == 'get' and s[2] == 'geometry':
+                geoms.append(s)
+        if len(geoms) > 0:
+            print('supported geometries: ')
+            for geo in geoms:
+                print(geo[1] + ':')
+                print(getattr(Geom, '_'.join(geo)).__doc__)
+        else:
+            print('no supported geometry found')
 
-            This uses polar optimization to reduce the number of points away from the equator
+
+    @staticmethod
+    def get_thingauss_geometry(lmax:int, smax:int, good_size_real=True):
+        """Longitude-thinned Gauss-Legendre pixelization
 
             Args:
-                lmax: band-limit (or desired band-limit) on the equator
-                smax: maximal intended spin-value (this changes the m-truncation by an amount ~smax)
-                zbounds: pixels outside provided cos-colatitude bounds will be discarded
-                good_size_real(optional): picks slightly larger longitudes more suited for real FFTs if set (see ducc)
-
-            Note:
-                'thinning' saves memory but hardly any computational time for the same latitude range
+                lmax: number of latitude points is lmax + 1 (exact quadrature rules for this band-limit)
+                smax: maximum spin-weight to be used on this grid (impact slightly the choice of longitude points)
+                good_size_real(optional): decides on a FFT-friendly number of phi point for real if set or complex FFTs'
+                                          (very slightly more points if set but largely inconsequential)
 
 
         """
         nlatf = lmax + 1  # full meridian GL points
         tht = GL_thetas(nlatf)
-        tb = np.sort(np.arccos(zbounds))
-        p = np.where((tb[0] <= tht) & (tht <= tb[1]))
-
-        tht = tht[p]
-        wt = GL_weights(nlatf, 1)[p]
+        wt = GL_weights(nlatf, 1)
         nlat = tht.size
         phi0 = np.zeros(nlat, dtype=float)
         mmax = np.minimum(np.maximum(st2mmax(smax, tht, lmax), st2mmax(-smax, tht, lmax)), np.ones(nlat) * lmax)
@@ -243,6 +260,10 @@ class Geom:
     def get_healpix_geometry(nside:int):
         """Healpix pixelization
 
+            Args:
+                nside: healpix nside resolution parameter (npix is 12 * nside ** 2)
+
+
         """
         base = ducc0.healpix.Healpix_Base(nside, "RING")
         geom = base.sht_info()
@@ -252,6 +273,13 @@ class Geom:
     @staticmethod
     def get_cc_geometry(ntheta:int, nphi:int):
         """Clenshaw-Curtis pixelization
+
+            Uniformly-spaced in latitude, one point on each pole
+
+            Args:
+                ntheta: number of latitude points
+                nphi: number of longitude points
+
 
         """
         tht = np.linspace(0, np.pi, ntheta, dtype=float)
@@ -265,6 +293,13 @@ class Geom:
     def get_f1_geometry(ntheta:int, nphi:int):
         """Fejer-1 pixelization
 
+            Uniformly-spaced in latitude, first and last point pi / 2N away from the poles
+
+            Args:
+                ntheta: number of latitude points
+                nphi: number of longitude points
+
+
         """
         tht = np.linspace(0.5 * np.pi / ntheta, (ntheta - 0.5) * np.pi / ntheta, ntheta)
         phi0 = np.zeros(ntheta, dtype=float)
@@ -273,9 +308,15 @@ class Geom:
         w = ducc0.sht.experimental.get_gridweights('F1', ntheta)
         return Geom(tht, phi0, nph, ofs, w / nphi)
 
+
     @staticmethod
     def get_gl_geometry(lmax:int, good_size_real=True):
         """Gauss-Legendre pixelization
+
+            Args:
+                lmax: number of latitude points is lmax + 1 (exact quadrature rules for this band-limit)
+                good_size_real(optional): decides on a FFT-friendly number of phi point for real if set or complex FFTs'
+                                          (very slightly more points if set but largely inconsequential)
 
         """
         nlatf = lmax + 1  # full meridian GL points
@@ -291,8 +332,15 @@ class Geom:
     def get_tgl_geometry(lmax:int, smax:int, good_size_real=True):
         """Longitude-thinned Gauss-Legendre pixelization
 
+            Args:
+                lmax: number of latitude points is lmax + 1 (exact quadrature rules for this band-limit)
+                smax: maximum spin-weight to be used on this grid (impact slightly the choice of longitude points)
+                good_size_real(optional): decides on a FFT-friendly number of phi point for real if set or complex FFTs'
+                                          (very slightly more points if set but largely inconsequential)
+
         """
         return Geom.get_thingauss_geometry(lmax, smax, good_size_real=good_size_real)
+
 
 class pbounds:
     """Class to regroup simple functions handling sky maps longitude truncation
