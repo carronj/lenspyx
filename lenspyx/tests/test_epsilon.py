@@ -21,10 +21,10 @@ matplotlib.rc('font', **font)
 
 
 res, nside, nthreads = 1.71, 2048, 8
-#lmax_len, mmax_len, dlmax = 4096, 4096, 1024
-res, nside, nthreads = 1.7, 2048, 8
-lmax_len, mmax_len, dlmax = 100, 100, 20
-SAVE = (lmax_len == 4096) * (os.environ.get('ONED', 'SCRATCH') + '/ducclens/Tex/figs/epsilon.pdf')
+lmax_len, mmax_len, dlmax = 4096, 4096, 1024
+#res, nside, nthreads = 1.7, 2048, 8
+#lmax_len, mmax_len, dlmax = 100, 100, 20
+SAVE = False#(lmax_len == 4096) * (os.environ.get('ONED', 'SCRATCH') + '/ducclens/Tex/figs/epsilon.pdf')
 OPTI = True
 
 lmax_unl, mmax_unl = lmax_len + dlmax, lmax_len + dlmax
@@ -86,16 +86,7 @@ pl.xlabel(r'$\varphi$')
 pl.ylabel(r'relative error in Pol.')
 pl.xticks([0., np.pi * 0.5, np.pi , 3 * np.pi * 0.5, 2 * np.pi], [r'0', r'$\pi/2$',r'$\pi$',r'$3\pi/2$',r'$2\pi$' ])
 pl.xlim(0. - 0.0125 * np.pi, 2 * np.pi + 0.0125 * np.pi)
-if False and (lmax_unl <= 1000 or nside <= 2048): # plotlenspyx like at 1.78 res should add this
-    ffi._fwd_angles()
-    t0 = time()
-    Q, U = ffi.gclm2lenmap(eblm, mmax_unl, 2, False)
-    print(' %.3f JC exec time ' % (time() - t0))
 
-    for i, ir in enumerate(rings):
-        tht = ffi_ducc.geom.theta[ofs_sorted[ir]]
-        pl.semilogy(phis[i], norm * np.abs(Pexs[i] - (Q[pixels[i]] + 1j*U[pixels[i]])), c='k')
-
-if SAVE is not None and os.path.exists(os.path.dirname(SAVE)):
+if SAVE and os.path.exists(os.path.dirname(SAVE)):
     pl.savefig(SAVE, bbox_inches='tight')
 pl.show()

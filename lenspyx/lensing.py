@@ -10,7 +10,7 @@ def get_geom(geometry:tuple[str, dict]=('healpix', {'nside':2048})):
     """Returns sphere pixelization geometry instance from name and arguments
 
         Note:
-            Custom geometry can be defined follow lenspyx.remapping.utils_geom.Geom
+            Custom geometries can be defined following lenspyx.remapping.utils_geom.Geom
 
     """
     geo = getattr(Geom, '_'.join(['get', geometry[0], 'geometry']), None)
@@ -24,21 +24,26 @@ def alm2lenmap(alm, dlms, geometry:tuple[str, dict]=('healpix', {'nside':2048}),
 
         Args:
             alm: undeflected map healpy alm array or sequence of arrays
-            dlms: The spin-1 deflection, in the form of one or two arrays
+            dlms: The spin-1 deflection, in the form of one or two arrays.
 
-                    The two arrays are the gradient and curl deflection healpy alms.
-                    (e.g. :math:`\sqrt{L(L+1)}\phi_{LM}` with :math:`\phi` the lensing potential)
+                    The two arrays are the gradient and curl deflection healpy alms:
+
+                    :math:`\sqrt{L(L+1)}\phi_{LM}` with :math:`\phi` the lensing potential
+
+                    :math:`\sqrt{L(L+1)}\Omega_{LM}` with :math:`\Omega` the lensing curl potential
+
+
                     The curl can be omitted if zero, resulting in principle in slightly faster transforms
 
-            geometry(optional): sphere pixelization, tuple with geometry name and argument dictionary
-                                Defaults to Healpix with nside 2048
+            geometry(optional): sphere pixelization, tuple with geometry name and argument dictionary,
+                                defaults to Healpix with nside 2048
             epsilon(optional): target accuracy of the result (defaults to 1e-7)
             verbose(optional): If set, prints a bunch of timing and other info. Defaults to true.
             nthreads(optional): number of threads to use (defaults to os.cpu_count())
             pol: input arrays are interpreted as T and E if there are two, T E B if there are 3, otherwise performs only spin-0 transforms
 
         Returns:
-            lensed maps, each an array of size given by the number of pixels of input geometry
+            lensed maps, each an array of size given by the number of pixels of input geometry.
             T, Q, U if pol and there 2 or 3 input arrays, otherwise spin-0 maps
 
 
@@ -83,27 +88,33 @@ def alm2lenmap_spin(gclm:np.ndarray or list, dlms:np.ndarray or list, spin:int, 
             gclm:  undeflected map healpy gradient (and curl, if relevant) modes
                     (e.g. polarization Elm and Blm).
 
-            dlms: The spin-1 deflection, in the form of a list or akin of two healpy alm arrays.
+            dlms: The spin-1 deflection, in the form of one or two arrays.
 
-                    The two arrays are the gradient and curl deflection healpy alms.
-                    (e.g. :math:`\sqrt{L(L+1)}\phi_{LM}` with :math:`\phi` the lensing potential)
-                    The curl can be omitted if zero
+                    The two arrays are the gradient and curl deflection healpy alms:
+
+                    :math:`\sqrt{L(L+1)}\phi_{LM}` with :math:`\phi` the lensing potential
+
+                    :math:`\sqrt{L(L+1)}\Omega_{LM}` with :math:`\Omega` the lensing curl potential
+
+
+                    The curl can be omitted if zero, resulting in principle in slightly faster transforms
 
 
             spin(int >= 0): spin-weight of the maps to deflect (e.g. 2 for polarization).
-            geometry(optional): sphere pixelization, tuple with geometry name and argument dictionary
-                                Defaults to Healpix with nside 2048
+            geometry(optional): sphere pixelization, tuple with geometry name and argument dictionary,
+                                defaults to Healpix with nside 2048
             epsilon(optional): target accuracy of the result (defaults to 1e-7)
             verbose(optional): If set, prints a bunch of timing and other info. Defaults to true.
             nthreads(optional): number of threads to use (defaults to os.cpu_count())
 
 
         Returns:
-            lensed maps for input geometry (real and imaginary parts
-            array of size given by the number of pixels of input geometry
+            lensed maps for input geometry (real and imaginary parts),
+            arrays of size given by the number of pixels of input geometry
 
-        Notes:
-            If curl modes are zero, they can be omitted, which can result in slightly faster transforms
+        Note:
+
+            If curl modes are zero (deflection and/or alm's to lens), they can be omitted, which can result in slightly faster transforms
 
 
     """
