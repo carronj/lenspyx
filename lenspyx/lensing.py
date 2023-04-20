@@ -19,7 +19,7 @@ def get_geom(geometry:tuple[str, dict]=('healpix', {'nside':2048})):
     return geo(**geometry[1])
 
 
-def alm2lenmap(alm, dlms, geometry:tuple[str, dict]=('healpix', {'nside':2048}), epsilon=1e-7, verbose=1, nthreads:int=0, pol=True):
+def alm2lenmap(alm, dlms, geometry:tuple[str, dict]=('healpix', {'nside':2048}), epsilon=1e-7, verbose=0, nthreads:int=0, pol=True):
     r"""Computes lensed CMB maps from their alm's and deflection field alm's.
 
         Args:
@@ -38,9 +38,10 @@ def alm2lenmap(alm, dlms, geometry:tuple[str, dict]=('healpix', {'nside':2048}),
             geometry(optional): sphere pixelization, tuple with geometry name and argument dictionary,
                                 defaults to Healpix with nside 2048
             epsilon(optional): target accuracy of the result (defaults to 1e-7)
-            verbose(optional): If set, prints a bunch of timing and other info. Defaults to true.
+            verbose(optional): If set, prints a bunch of timing and other info. Defaults to 0.
             nthreads(optional): number of threads to use (defaults to os.cpu_count())
-            pol: input arrays are interpreted as T and E if there are two, T E B if there are 3, otherwise performs only spin-0 transforms
+            pol: if True, input arrays are interpreted as T and E if there are two, T E B if there are 3, otherwise performs only spin-0 transforms.
+
 
         Returns:
             lensed maps, each an array of size given by the number of pixels of input geometry.
@@ -81,7 +82,7 @@ def alm2lenmap(alm, dlms, geometry:tuple[str, dict]=('healpix', {'nside':2048}),
     return ret
 
 
-def alm2lenmap_spin(gclm:np.ndarray or list, dlms:np.ndarray or list, spin:int, geometry:tuple[str, dict]=('healpix', {'nside':2048}), epsilon:float=1e-7, verbose=1, nthreads:int=0):
+def alm2lenmap_spin(gclm:np.ndarray or list, dlms:np.ndarray or list, spin:int, geometry:tuple[str, dict]=('healpix', {'nside':2048}), epsilon:float=1e-7, verbose=0, nthreads:int=0):
     r"""Computes a deflected spin-weight lensed CMB map from its gradient and curl modes and deflection field alm.
 
         Args:
@@ -104,7 +105,7 @@ def alm2lenmap_spin(gclm:np.ndarray or list, dlms:np.ndarray or list, spin:int, 
             geometry(optional): sphere pixelization, tuple with geometry name and argument dictionary,
                                 defaults to Healpix with nside 2048
             epsilon(optional): target accuracy of the result (defaults to 1e-7)
-            verbose(optional): If set, prints a bunch of timing and other info. Defaults to true.
+            verbose(optional): If set, prints a bunch of timing and other info. Defaults to 0.
             nthreads(optional): number of threads to use (defaults to os.cpu_count())
 
 
