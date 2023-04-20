@@ -22,7 +22,7 @@ jobs:
           pip install -r requirements.txt
       - name: install
         run: |
-          pip install -e .
+          pip install --no-binary ducc0 -e ./
       - name: testlensing
         run: |
           python lenspyx/tests/lensing.py
