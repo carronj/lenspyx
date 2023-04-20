@@ -5,6 +5,17 @@ from lenspyx.remapping.utils_geom import Geom
 from lenspyx.remapping.deflection_029 import deflection
 from lenspyx import cachers
 
+def get_geom(geometry:tuple[str, dict]=('healpix', {'nside':2048})):
+    """Returns sphere pixelization geometry instance from name and arguments
+
+        Note:
+            Custom geometry can be defined follow lenspyx.remapping.utils_geom.Geom
+
+    """
+    geo = getattr(Geom, '_'.join(['get', geometry[0], 'geometry']), None)
+    if geo is None:
+        assert 0, 'Geometry %s not found, available geometries: '%geometry[0] + Geom.get_supported_geometries()
+    return geo(**geometry[1])
 
 def alm2lenmap(alm, dlms, geometry:tuple[str, dict]=('healpix', {'nside':2048}), epsilon=1e-7, verbose=1, nthreads:int=0, pol=True):
     r"""Computes a deflected spin-0 healpix map from its alm and deflection field alm.
@@ -43,29 +54,24 @@ def alm2lenmap(alm, dlms, geometry:tuple[str, dict]=('healpix', {'nside':2048}),
         dglm = dlms
         dclm = None
 
-    geo = getattr(Geom, '_'.join(['get', geometry[0], 'geometry']), None)
-    if geo is None:
-        assert 0, 'Geometry %s not found, available geometries: '%geometry[0] + Geom.get_supported_geometries()
-    else:
-        geo = geo(**geometry[1])
-        defl = deflection(geo, dglm, None, dclm=dclm, epsilon=epsilon, numthreads=nthreads, verbosity=0,
-                          cacher=cachers.cacher_mem(safe=False))
-        if isinstance(alm, list) or alm.ndim == 2:
-            if pol and len(alm) in [2, 3]:
-                T = defl.gclm2lenmap(alm[0], None, 0, False)
-                Q, U = defl.gclm2lenmap(alm[1:], None, 2, False)
-                if verbose:
-                    print(defl.tim)
-                return T, Q, U
-            else:
-                ret = [defl.gclm2lenmap(a, None, 0, False) for a in alm]
-                if verbose:
-                    print(defl.tim)
-                return ret
-        ret = defl.gclm2lenmap(alm, None, 0, False)
-        if verbose:
-            print(defl.tim)
-        return ret
+    defl = deflection(get_geom(geometry), dglm, None, dclm=dclm, epsilon=epsilon, numthreads=nthreads, verbosity=0,
+                      cacher=cachers.cacher_mem(safe=False))
+    if isinstance(alm, list) or alm.ndim == 2:
+        if pol and len(alm) in [2, 3]:
+            T = defl.gclm2lenmap(alm[0], None, 0, False).squeeze()
+            Q, U = defl.gclm2lenmap(np.array(alm[1:]), None, 2, False)
+            if verbose:
+                print(defl.tim)
+            return T, Q, U
+        else:
+            ret = [defl.gclm2lenmap(a, None, 0, False).squeeze() for a in alm]
+            if verbose:
+                print(defl.tim)
+            return ret
+    ret = defl.gclm2lenmap(alm, None, 0, False).squeeze()
+    if verbose:
+        print(defl.tim)
+    return ret
 
 
 def alm2lenmap_spin(gclm:np.ndarray or list, dlms:np.ndarray or list, spin:int, geometry:tuple[str, dict]=('healpix', {'nside':2048}), epsilon:float=1e-7, verbose=1, nthreads:int=0):
@@ -114,18 +120,12 @@ def alm2lenmap_spin(gclm:np.ndarray or list, dlms:np.ndarray or list, spin:int, 
         if verbose:
             print('alm2lenmap_spin: using %s nthreads'%nthreads)
 
-    geo = getattr(Geom, '_'.join(['get', geometry[0], 'geometry']), None)
-    if geo is None:
-        assert 0, 'Geometry %s not found, available geometries: '%geometry[0] + Geom.get_supported_geometries()
-
-    else:
-        geo = geo(**geometry[1])
-        defl = deflection(geo, dglm, None, dclm=dclm, epsilon=epsilon, numthreads=nthreads, verbosity=0,
-                          cacher=cachers.cacher_mem(safe=False))
-        if isinstance(gclm, list) and gclm[1] is None:
-            gclm = gclm[0]
-        ret = defl.gclm2lenmap(gclm, None, spin, False)
-        if verbose:
-            print(defl.tim)
-        return ret
+    defl = deflection(get_geom(geometry), dglm, None, dclm=dclm, epsilon=epsilon, numthreads=nthreads, verbosity=0,
+                      cacher=cachers.cacher_mem(safe=False))
+    if isinstance(gclm, list) and gclm[1] is None:
+        gclm = gclm[0]
+    ret = defl.gclm2lenmap(gclm, None, spin, False)
+    if verbose:
+        print(defl.tim)
+    return ret
 

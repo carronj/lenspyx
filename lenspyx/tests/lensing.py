@@ -8,7 +8,7 @@ alm = syn_alms(0, lmax)  # tests T E B maps, here neglecting TE covariance and B
 eblm = syn_alms(2, lmax)
 dlm = syn_dlm(lmax)
 
-# T and Pol, on default geometry
+# T and Pol, on default geometry, with pure gradient lensing
 T, Q, U = alm2lenmap([alm, eblm[0], eblm[1]], dlm)
 
 # T and Pol, on default geometry, including curl deflection (here zero)

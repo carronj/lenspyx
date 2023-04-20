@@ -17,6 +17,9 @@ Lenspyx now essentially only wraps extremely efficient routines from [DUCC](http
 with massive speed-ups and accuracy improvements (see Reinecke, Belkner & Carron 2023), in a way incompatible from v1 which is abandoned.
 
 
+Note that installation of DUCC from source can enhance performance substantially (factor of a few sometimes), owing to compiler specfic optimizations
+
+
 There are further tools for CMB lensing reconstruction (adjoint lensing etc.)
 
 ### Installation
