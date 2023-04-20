@@ -7,7 +7,7 @@ from lenspyx import cachers
 
 
 def get_geom(geometry:tuple[str, dict]=('healpix', {'nside':2048})):
-    """Returns sphere pixelization geometry instance from name and arguments
+    r"""Returns sphere pixelization geometry instance from name and arguments
 
         Note:
             Custom geometries can be defined following lenspyx.remapping.utils_geom.Geom
