@@ -5,6 +5,7 @@ from lenspyx.remapping.utils_geom import Geom
 from lenspyx.remapping.deflection_029 import deflection
 from lenspyx import cachers
 
+
 def get_geom(geometry:tuple[str, dict]=('healpix', {'nside':2048})):
     """Returns sphere pixelization geometry instance from name and arguments
 
@@ -17,8 +18,9 @@ def get_geom(geometry:tuple[str, dict]=('healpix', {'nside':2048})):
         assert 0, 'Geometry %s not found, available geometries: '%geometry[0] + Geom.get_supported_geometries()
     return geo(**geometry[1])
 
+
 def alm2lenmap(alm, dlms, geometry:tuple[str, dict]=('healpix', {'nside':2048}), epsilon=1e-7, verbose=1, nthreads:int=0, pol=True):
-    r"""Computes a deflected spin-0 healpix map from its alm and deflection field alm.
+    r"""Computes lensed CMB maps from their alm's and deflection field alm's.
 
         Args:
             alm: undeflected map healpy alm array or sequence of arrays
@@ -75,7 +77,7 @@ def alm2lenmap(alm, dlms, geometry:tuple[str, dict]=('healpix', {'nside':2048}),
 
 
 def alm2lenmap_spin(gclm:np.ndarray or list, dlms:np.ndarray or list, spin:int, geometry:tuple[str, dict]=('healpix', {'nside':2048}), epsilon:float=1e-7, verbose=1, nthreads:int=0):
-    r"""Computes a deflected spin-weight Healpix map from its gradient and curl modes and deflection field alm.
+    r"""Computes a deflected spin-weight lensed CMB map from its gradient and curl modes and deflection field alm.
 
         Args:
             gclm:  undeflected map healpy gradient (and curl, if relevant) modes
