@@ -26,7 +26,7 @@ For best performance, please refer to the [DUCC page](https://gitlab.mpcdf.mpg.d
 
 Editable installation from source: clone the repo and
     
-    pip install -e ./ [--user]
+    pip install --no-binary ducc0 -e ./ [--user]
 
 From pypi (now only much slower v1)
 
