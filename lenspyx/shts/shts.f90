@@ -89,7 +89,6 @@ subroutine glm2vtm(ntht, lmax, s, tht, glm, vtm)
   end do
 
   spow_i(:) = 0.d0
-
 !$omp parallel do default(none) &
 !$omp private(j, tl, tm, scal, spow,id, tfac, llm_arr_p_lm0) &
 !$omp private(llm_arr_p_lm1, llm_arr_m_lm0, llm_arr_m_lm1, llm_arr_x_lmt, rl) &
@@ -323,10 +322,11 @@ subroutine vlm2vtm(ntht, lmax, s, tht, vlm, vtm)
 end subroutine vlm2vtm
 
 
-subroutine vlm2vtm_sym(ntht, lmax, s, tht, vlm, vtm)
+subroutine vlm2vtm_sym(ntht, lmax, s, tht, vlm, vtm, nthreads)
 ! Same as above but produces for all tht the result for 1 - tht as well.
 ! Using sLlm(pi - tht) = (-1) ** (l + s) sLl-m(tht)
-  integer ntht, lmax, s
+  use OMP_LIB
+  integer, intent(in) :: ntht, lmax, s, nthreads
   double precision tht(ntht)
   double complex, intent(in)  :: vlm(0:((lmax+1)*(lmax+1)-1))
   double complex, intent(out) :: vtm(0:2 * ntht -1, -lmax:lmax)
@@ -392,6 +392,7 @@ subroutine vlm2vtm_sym(ntht, lmax, s, tht, vlm, vtm)
   end do
 
   spow_i(:) = 0.d0
+  call OMP_SET_NUM_THREADS(nthreads)
 
 !$omp parallel do default(none) &
 !$omp private(j, tl, tm, sgn,scal, spow, tfac, llm_arr_p_lm0) &
@@ -600,13 +601,14 @@ subroutine glm2vtm_s0(ntht, lmax, tht, glm, vtm)
 !$omp end parallel do
 end subroutine glm2vtm_s0
 
-subroutine glm2vtm_s0sym(ntht, lmax, tht, glm, vtm)
+subroutine glm2vtm_s0sym(ntht, lmax, tht, glm, vtm, nthreads)
   ! Same as above but outputs only m = 0 to lmax + 1
   ! using for spin 0 vt-m = vtm^*
   ! for each tht, pi -tht is also calculated using Llm(t) = (-)^(l+m)Llm(pi -t)
   ! Not certain it works for tht = 0.
   ! Only 'upper half' of vtm array is used.
-  integer ntht, lmax,sgn
+  use OMP_LIB
+  integer ntht, lmax,sgn, nthreads
   double precision tht(ntht)
   double complex, intent(in)  :: glm(0:((lmax+1)*(lmax+2)/2-1))
   double complex, intent(out) :: vtm(0:2 * ntht-1,0:lmax)
@@ -659,6 +661,7 @@ subroutine glm2vtm_s0sym(ntht, lmax, tht, glm, vtm)
   end do
 
   spow_i(:) = 0.d0
+  call OMP_SET_NUM_THREADS(nthreads)
 
 !$omp parallel do default(none) &
 !$omp private(j,id,sgn, tl, tm, scal, spow, tfac, llm_arr_p_lm0) &

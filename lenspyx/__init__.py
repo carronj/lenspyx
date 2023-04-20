@@ -1,1 +1,1 @@
-from lenspyx.lensing import alm2lenmap, alm2lenmap_spin
+from lenspyx.lensing import alm2lenmap, alm2lenmap_spin, get_geom

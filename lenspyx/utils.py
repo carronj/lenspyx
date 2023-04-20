@@ -1,6 +1,15 @@
 import time
+from datetime import timedelta
 import numpy as np
 import sys
+from lenspyx.utils_hp import Alm
+import json
+
+def cli(cl):
+    ret = np.zeros_like(cl)
+    ii = np.where(cl != 0)
+    ret[ii] = 1. / cl[ii]
+    return ret
 
 class timer:
     def __init__(self, verbose, prefix='', suffix=''):
@@ -10,6 +19,7 @@ class timer:
         self.prefix = prefix
         self.suffix = suffix
         self.keys = {}
+        self.t0s = {}
 
     def __iadd__(self, othertimer):
         for k in othertimer.keys:
@@ -22,30 +32,49 @@ class timer:
     def reset(self):
         self.t0 = time.time()
 
+    def reset_ti(self):
+        self.ti = time.time()
+        self.t0 = time.time()
+
+    def start(self, key): # starts a new time tracker
+        assert key not in self.t0s.keys()
+        self.t0s[key] = time.time()
+
+    def close(self, key): # close tracker and store result
+        assert key in self.t0s.keys()
+        if key not in self.keys.keys():
+            self.keys[key]  = time.time() - self.t0s[key]
+        else:
+            self.keys[key] += time.time() - self.t0s[key]
+        del self.t0s[key]
+
     def __str__(self):
         if len(self.keys) == 0:
             return r""
+        maxlen = np.max([len(k) for k in self.keys])
+        dt_tot = time.time() - self.ti
         s = ""
+        ts = "\r  {0:%s}" % (str(maxlen) + "s")
         for k in self.keys:
-            dt = self.keys[k]
-            dh = np.floor(dt / 3600.)
-            dm = np.floor(np.mod(dt, 3600.) / 60.)
-            ds = np.floor(np.mod(dt, 60))
-            #s +=  "%24s: %.1f"%(k, self.keys[k]) + '\n'
-            s += "\r  %24s:  [" % k + ('%02d:%02d:%02d' % (dh, dm, ds)) + "] " + "\n"
-        dt = time.time() - self.ti
-        dh = np.floor(dt / 3600.)
-        dm = np.floor(np.mod(dt, 3600.) / 60.)
-        ds = np.floor(np.mod(dt, 60))
-        s += "\r  %24s:  [" % 'Total' + ('%02d:%02d:%02d' % (dh, dm, ds)) + "] "
+            s += ts.format(k) + ":  [" + str(timedelta(seconds=self.keys[k])) + "] " + "(%.1f%%)  \n"%(100 * self.keys[k]/dt_tot)
+        s += ts.format("Total") + ":  [" + str(timedelta(seconds=dt_tot)) + "] " + "d:h:m:s:mus"
         return s
 
     def add(self, label):
         if label not in self.keys:
             self.keys[label] = 0.
         t0 = time.time()
-        self.keys[label] += t0  - self.t0
+        self.keys[label] += t0 - self.t0
         self.t0 = t0
+
+    def add_elapsed(self, label):
+        if label not in self.keys:
+            self.keys[label] = 0.
+        t0 = time.time()
+        self.keys[label] += t0 - self.ti
+
+    def dumpjson(self, fn):
+        json.dump(self.keys, open(fn, 'w'))
 
     def checkpoint(self, msg):
         dt = time.time() - self.t0
@@ -62,6 +91,49 @@ class timer:
                              + " (total [" + (
                                  '%02d:%02d:%02d' % (dhi, dmi, dsi)) + "]) " + msg + ' %s \n' % self.suffix)
 
+
+
+def blm_gauss(fwhm, lmax, spin:int):
+    """Computes spherical harmonic coefficients of a circular Gaussian beam
+    pointing towards the North Pole
+
+    See an example of usage
+    `in the documentation <https://healpy.readthedocs.io/en/latest/blm_gauss_plot.html>`_
+
+    Parameters
+    ----------
+    fwhm : float, scalar
+        desired FWHM of the beam, in radians
+    lmax : int, scalar
+        maximum l multipole moment to compute
+    spin : bool, scalar
+        if True, E and B coefficients will also be computed
+
+    Returns
+    -------
+    blm : array with dtype numpy.complex128
+          lmax will be as specified
+          mmax is equal to spin
+    """
+    fwhm = float(fwhm)
+    lmax = int(lmax)
+    mmax = spin
+    ncomp = 2 if spin > 0 else 1
+    nval = Alm.getsize(lmax, mmax)
+
+    if mmax > lmax:
+        raise ValueError("lmax value too small")
+
+    blm = np.zeros((ncomp, nval), dtype=np.complex128)
+    sigmasq = fwhm * fwhm / (8 * np.log(2.0))
+    ls = np.arange(spin, lmax + 1)
+    if spin == 0:
+        blm[0, Alm.getidx(lmax, ls, spin)] = np.sqrt((2 * ls + 1) / (4.0 * np.pi)) * np.exp(-0.5 * sigmasq * ls * ls)
+
+    if spin > 0:
+        blm[0, Alm.getidx(lmax, ls, spin)] = np.sqrt((2 * ls + 1) / (32 * np.pi)) * np.exp(-0.5 * sigmasq * ls * ls)
+        blm[1] = 1j * blm[0]
+    return blm
 
 def get_nphi(th1, th2, facres=0, target_amin=0.745):
     """Calculates a phi sampling density at co-latitude theta """
@@ -167,3 +239,26 @@ def camb_clfile(fname, lmax=None):
             we = w(ell)
         cls[k][ell[idc]] = cols[i + 1][idc] / we[idc]
     return cls
+
+
+class Drop:
+    def __init__(self, a=0., b=1):
+        """Smooth fct that drops from 1 at a to zero at b"""
+        assert b > a, (a, b)
+        self.a = a
+        self.extent = b - a
+
+    def x2eps(self, x):
+        return (x - self.a) / self.extent
+
+    def eval(self, x):
+        eps = self.x2eps(x)
+        if np.isscalar(x):
+            if eps >= 1: return 0.
+            if eps <= 0: return 1.
+            return np.exp(1 - 1. / (1 - eps ** 2))
+        ret = np.zeros_like(eps)
+        ret[np.where(eps <= 0.)] = 1.
+        ii = np.where( (eps > 0) & (eps < 1))
+        ret[ii] = np.exp(1 - 1. / (1 - eps[ii] ** 2))
+        return ret
