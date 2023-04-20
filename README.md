@@ -28,7 +28,7 @@ Editable installation from source: clone the repo and
     
     pip install -e ./ [--user]
 
-From pypi
+From pypi (now only much slower v1)
 
     pip install lenspyx [--user]
 
