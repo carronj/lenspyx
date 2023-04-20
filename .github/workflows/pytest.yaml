@@ -18,7 +18,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
       - name: install
         run: |
           pip install -e .
