@@ -10,16 +10,15 @@ def configuration(parent_package='', top_path=''):
     config = Configuration('', parent_package, top_path)
     return config
 
-
+exec(open('lenspyx/_version.py').read())
 setup(
     name='lenspyx',
-    version='2.0.0',
-    packages=['lenspyx'],
+    version=__version__,
+    packages=['lenspyx', 'lenspyx.remapping', 'lenspyx.tests'],
     url='https://github.com/carronj/lenspyx',
     author='Julien Carron',
     data_files=[('lenspyx/data/cls', ['lenspyx/data/cls/FFP10_wdipole_lensedCls.dat',
-                                      'lenspyx/data/cls/FFP10_wdipole_lenspotentialCls.dat',
-                                      'lenspyxs/data/cls/FFP10_wdipole_params.ini'])],
+                                      'lenspyx/data/cls/FFP10_wdipole_lenspotentialCls.dat'])],
     author_email='to.jcarron@gmail.com',
     description='lensed CMB sims pipe',
     long_description=long_description,
