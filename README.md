@@ -9,7 +9,7 @@ Curved-sky python lensed CMB maps simulation package by Julien Carron.
 This allows one to build very easily lensed CMB simulations. 
 
 The package explicitly provides two methods for most basic usage. Check the [doc](https://lenspyx.readthedocs.io/en/latest). 
-There is also an example notebook [demo_lenspyx](examples/demo_lenspyx.ipynb).
+There is also a notebook [demo_lenspyx](examples/demo_lenspyx.ipynb) for examples and sanity checks.
 
 There are further tools for CMB lensing reconstruction (adjoint lensing etc.)
 
@@ -28,10 +28,11 @@ Editable installation from source: clone the repo and
     
     pip install --no-binary ducc0 -e ./ [--user]
 
-From pypi (now only much slower v1)
+From pypi
 
-    pip install lenspyx [--user]
+    pip install --no-binary ducc0 lenspyx [--user]
 
 The –-user is required only if you don’t have write permission to your main python installation.
+The ducc0 installation without binaries might take a while (several minutes).
 
 ![SNSF logo](./docs/SNF_logo_standard_web_color_neg_e.svg)

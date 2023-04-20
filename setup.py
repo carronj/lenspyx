@@ -21,6 +21,7 @@ setup(
                                       'lenspyx/data/cls/FFP10_wdipole_lenspotentialCls.dat'])],
     author_email='to.jcarron@gmail.com',
     description='lensed CMB sims pipe',
+    install_requires=['ducc0'],
     long_description=long_description,
     configuration=configuration)
 
