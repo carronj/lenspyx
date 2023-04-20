@@ -20,7 +20,6 @@ if __name__ == '__main__':
     parser.add_argument('-dlmax', dest='dlmax', type=int, default=1024, help='buffer to lensed alms')
     parser.add_argument('-n', dest='nt', type=int, default=4, help='number of threads')
     parser.add_argument('-eps', dest='epsilon', type=float, default=7, help='-log10 of nufft accuracy')
-    parser.add_argument('-cis', dest='cis', action='store_true', help='test cis action')
     parser.add_argument('-gonly', dest='gonly', action='store_true', help='grad-only SHTs')
     parser.add_argument('-HL', dest='HL', type=int, default=0, help='also test Healpix pixelization with this nside')
     parser.add_argument('-alloc', dest='alloc',  type=int, default=0, help='tries pre-allocating ''alloc'' GB of memory')
@@ -69,7 +68,6 @@ if __name__ == '__main__':
             nside = args.HL
             ffi.geom = utils_geom.Geom.get_healpix_geometry(nside)
             ffi.cacher = cachers.cacher_mem(safe=False)
-            ffi._cis = args.cis
             ffi.tim = timer(False, 'deflection instance timer')
             print("-----------------------")
             print('Healpix grid results: ')

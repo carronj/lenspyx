@@ -6,17 +6,28 @@
 
 Curved-sky python lensed CMB maps simulation package by Julien Carron.
 
-This allows one to build very easily (if familiar with healpy) lensed CMB simulations. Parallelization is done with openmp.
-The numerical cost is approximately that of an high-res harmonic transform.
+This allows one to build very easily lensed CMB simulations. 
 
-The package basically provides two methods. Check the [doc](https://lenspyx.readthedocs.io/en/latest). There is also an example notebook [demo_lenspyx](examples/demo_lenspyx.ipynb).
+**From v2 onwards (april 2023)**: 
 
-(NB: This implementation is independent from the similar-sounding [lenspix](https://github.com/cmbant/lenspix) package by A.Lewis)
+Lenspyx now essentially only wraps extremely efficient routines from [ducc](https://gitlab.mpcdf.mpg.de/mtr/ducc) by M.Reinecke,
+with massive speed-ups and accuracy improvements (see Reinecke, Belkner & Carron 2023), in a way incompatible from v1 which is abandoned.
+
+The package explicitly provides two methods for most basic usage. Check the [doc](https://lenspyx.readthedocs.io/en/latest). 
+There is also an example notebook [demo_lenspyx](examples/demo_lenspyx.ipynb).
+
+There are further tools for CMB lensing reconstruction (adjoint lensing etc.)
 
 ### Installation
+
+Editable installation from source: clone the repo and
     
+    pip install -e ./ [--user]
+
+From pypi
+
     pip install lenspyx [--user]
 
-The –-user is required only if you don’t have write permission to your main python installation. A fortran compiler is required for a successful installation.
+The –-user is required only if you don’t have write permission to your main python installation.
 
-![ERC logo](https://erc.europa.eu/sites/default/files/content/erc_banner-vertical.jpg)
+![SNSF logo](./docs/SNF_logo_standard_web_color_neg_e.svg)

@@ -11,12 +11,13 @@ assert HAS_THETA_INTERPOL, 'ducc0 version incompatible for this test'
 lmax_unl = 5120
 single_prec = False
 spin = 2
+ncomp = 2
 nthreads = min(4, cpu_count())
-sht_mode = 'STANDARD' if spin == 0 else 'GRAD_ONLY'
+sht_mode = 'STANDARD' if spin == 0 or ncomp == 2 else 'GRAD_ONLY'
 
-geom = utils_geom.Geom.get_thingauss_geometry(lmax_unl, spin)
+geom = utils_geom.Geom.get_healpix_geometry(2048)
 nrings = geom.theta.size
-eblm = helper.syn_alms(spin, lmax_unl=lmax_unl, ctyp=np.complex64 if single_prec else np.complex128)[:1]
+eblm = helper.syn_alms(spin, lmax_unl=lmax_unl, ctyp=np.complex64 if single_prec else np.complex128)[:ncomp]
 
 tim = timer('', False)
 
