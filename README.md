@@ -2,7 +2,7 @@
 
 # lenspyx
 
-[![PyPI version](https://badge.fury.io/py/lenspyx.svg)](https://badge.fury.io/py/lenspyx)[![alt text](https://readthedocs.org/projects/lenspyx/badge/?version=latest)](https://lenspyx.readthedocs.io/en/latest)[![Build Status](https://travis-ci.com/carronj/lenspyx.svg?branch=master)](https://travis-ci.com/carronj/lenspyx)
+[![PyPI version](https://badge.fury.io/py/lenspyx.svg)](https://badge.fury.io/py/lenspyx)[![alt text](https://readthedocs.org/projects/lenspyx/badge/?version=latest)](https://lenspyx.readthedocs.io/en/latest)![Build Status](https://github.com/carronj/lenspyx/actions/workflows/pytest.yaml/badge.svg)
 
 Curved-sky python lensed CMB maps simulation package by Julien Carron.
 
