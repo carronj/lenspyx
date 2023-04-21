@@ -219,7 +219,7 @@ def camb_clfile(fname, lmax=None):
     keys = [i.lower() for i in firstline.split(' ') if i.isalpha()][1:]
     cols = np.loadtxt(fname).transpose()
 
-    ell = np.int_(cols[0])
+    ell = cols[0].astype(np.int64)
     if lmax is None: lmax = ell[-1]
     assert ell[-1] >= lmax, (ell[-1], lmax)
 
@@ -227,8 +227,8 @@ def camb_clfile(fname, lmax=None):
 
     idc = np.where(ell <= lmax) if lmax is not None else np.arange(len(ell), dtype=int)
 
-    w = lambda ell :ell * (ell + 1) / (2. * np.pi)
-    wpp = lambda ell : ell ** 2 * (ell + 1) ** 2 / (2. * np.pi)
+    w = lambda ell :ell * (ell + 1.) / (2. * np.pi)
+    wpp = lambda ell : ell ** 2 * (ell + 1.) ** 2 / (2. * np.pi)
     wptpe = lambda ell :np.sqrt(ell.astype(float) ** 3 * (ell + 1.) ** 3) / (2. * np.pi) 
     for i, k in enumerate(keys):
         if k == 'pp':
