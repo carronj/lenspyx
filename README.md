@@ -23,6 +23,8 @@ For best performance, please refer to the [DUCC page](https://gitlab.mpcdf.mpg.d
 
 ### Installation
 
+The code should hopefully be platform independent.
+
 Editable installation from source: clone the repo and
     
     pip install --no-binary ducc0 -e ./ [--user]
