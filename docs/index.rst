@@ -5,7 +5,7 @@ Welcome to lenspyx's documentation!
 
    This allows one to build very easily lensed CMB simulations, and contains other tools for CMB lensing reconstruction.
 
-   Lenspyx now essentially only wraps extremely efficient routines from DUCC by M.Reinecke
+   Lenspyx now essentially only wraps extremely efficient routines from DUCC by M.Reinecke. See `this paper <https://arxiv.org/abs/2304.10431)>`_.
 
 .. toctree::
    :maxdepth: 2
