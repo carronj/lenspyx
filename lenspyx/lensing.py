@@ -40,7 +40,8 @@ def alm2lenmap(alm, dlms, geometry:tuple[str, dict]=('healpix', {'nside':2048}),
             epsilon(optional): target accuracy of the result (defaults to 1e-7)
             verbose(optional): If set, prints a bunch of timing and other info. Defaults to 0.
             nthreads(optional): number of threads to use (defaults to os.cpu_count())
-            pol: if True, input arrays are interpreted as T and E if there are two, T E B if there are 3, otherwise performs only spin-0 transforms.
+            pol(optional): if True, input arrays are interpreted as T and E if there are two, T E B if there are 3, otherwise performs only spin-0 transforms.
+                           Defaults to True.
 
 
         Returns:
