@@ -10,7 +10,7 @@ from ducc0.sht.experimental import alm2leg
 def wignerpos(cl: np.ndarray, theta: np.ndarray, s1: int, s2: int):
     r"""Produces Wigner small-d transform defined by
 
-        :math:`\sum_\ell \frac{2\ell + 1}{4\pi} c_\ell d^\ell_{s_1 s_2}(\theta)`
+        :math:`\sum_\ell \frac{2\ell + 1}{4\pi} C_\ell d^\ell_{s_1 s_2}(\theta)`
 
         Args:
             cl: spectrum of Wigner small-d transform
@@ -24,6 +24,7 @@ def wignerpos(cl: np.ndarray, theta: np.ndarray, s1: int, s2: int):
 
     """
     if s1 < 0 or (s1 == 0 and s2 > 0):
+        # TODO
         # second cond. branching resulting in spin-0 eval. The case 0 -2 is still not optimal
         t_cl = cl if (s1 + s2) % 2 == 0 else -cl
         if s2 < 0:
