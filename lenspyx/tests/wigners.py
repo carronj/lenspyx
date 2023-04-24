@@ -1,3 +1,6 @@
+"""Compares the Wigner functions to Plancklens's
+
+"""
 try:
     from plancklens.wigners import wigners as wigners_pl
 except:
@@ -16,7 +19,7 @@ for lmax in lmaxs:
     tht = GL_thetas(npts)[::-1]
     wg = GL_weights(npts, 1)[::-1] / (2 * np.pi)
     xg = np.cos(tht)
-    cl_in = gauss_beam(1./180 / 60 * np.pi,lmax=lmax)
+    cl_in = gauss_beam(1./180 / 60 * np.pi, lmax=lmax)
     maxdevs = []
     for s1 in range(-3, 4):
         for s2 in range(-3, 4):
@@ -29,20 +32,20 @@ for lmax in lmaxs:
     print('lmax %s %.3e'%(lmax, np.max(maxdevs)))
     assert np.max(maxdevs) < 1e-9, np.max(maxdevs)
     if lmax == 4000:
-        for s1s2 in [(0, 0), (0, 2), (2, 0), (2, 2), (0, -2), (-2, 0), (-2, -2), (1, 3)]:
-            s1, s2 = s1s2
-            t0 = time.time()
-            xi12 = wigners.wignerpos(cl_in, tht, s1, s2)
-            dt1 = time.time() - t0
-            t0 = time.time()
-            xi12 = wigners_pl.wignerpos(cl_in, xg, s1, s2)
-            dt2 = time.time() - t0
-            print('%2s %2s fwd speed-up %.3f'%(s1, s2, dt2 / dt1))
-            s1, s2 = s1s2
-            t0 = time.time()
-            cl = wigners.wignercoeff(xi12, tht, s1, s2, lmax)
-            dt1 = time.time() - t0
-            t0 = time.time()
-            cl = wigners_pl.wignercoeff(xi12, xg, s1, s2, lmax)
-            dt2 = time.time() - t0
-            print('%2s %2s adj speed-up %.3f'%(s1, s2, dt2 / dt1))
+        print('speed-ups')
+        for s1 in range(-3, 4):
+            for s2 in range(-3, 4):
+                t0 = time.time()
+                xi12 = wigners.wignerpos(cl_in, tht, s1, s2)
+                dt1 = time.time() - t0
+                t0 = time.time()
+                xi12 = wigners_pl.wignerpos(cl_in, xg, s1, s2)
+                dt2 = time.time() - t0
+                print('%2s %2s fwd %.3f'%(s1, s2, dt2 / dt1))
+                t0 = time.time()
+                cl = wigners.wignercoeff(xi12, tht, s1, s2, lmax)
+                dt1 = time.time() - t0
+                t0 = time.time()
+                cl = wigners_pl.wignercoeff(xi12, xg, s1, s2, lmax)
+                dt2 = time.time() - t0
+                print('%2s %2s adj %.3f'%(s1, s2, dt2 / dt1))
