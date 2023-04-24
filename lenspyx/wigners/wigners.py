@@ -8,6 +8,7 @@
 from __future__ import annotations
 import numpy as np
 from ducc0.sht.experimental import alm2leg, leg2alm
+from ducc0.misc import GL_thetas, GL_weights
 
 
 def wignerpos(cl: np.darray[float], theta: np.darray[float], s1: int, s2: int):
@@ -86,4 +87,21 @@ def wignercoeff(xi: np.ndarray[float], theta: np.ndarray[float], s1: int, s2: in
                      mode='GRAD_ONLY').squeeze().real
         sgn = -1 if s2 > 0 else (-1 if abs(s2) % 2 == 0 else 1)
         return sgn * cl * fac
+
+
+def get_thgwg(npts: int):
+    """Gauss-Legendre integration points and weights from ducc0
+
+        Args:
+            number of points of quadrature rule
+
+        Returns:
+            tht: co-latitude points (array of size npts)
+            wg: quadrature weights (array of size npts)
+
+
+    """
+    tht = GL_thetas(npts)
+    wg = GL_weights(npts, 1) / (2 * np.pi)
+    return tht, wg
 
