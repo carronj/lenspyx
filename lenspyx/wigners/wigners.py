@@ -7,7 +7,7 @@ import numpy as np
 from ducc0.sht.experimental import alm2leg
 
 
-def wignerpos(cl: np.ndarray, theta: np.ndarray, s1: int, s2: int):
+def wignerpos(cl, theta, s1, s2):
     r"""Produces Wigner small-d transform defined by
 
         :math:`\sum_\ell \frac{2\ell + 1}{4\pi} C_\ell d^\ell_{s_1 s_2}(\theta)`
@@ -23,25 +23,25 @@ def wignerpos(cl: np.ndarray, theta: np.ndarray, s1: int, s2: int):
 
 
     """
-    if s1 < 0 or (s1 == 0 and s2 > 0):
-        # TODO
-        # second cond. branching resulting in spin-0 eval. The case 0 -2 is still not optimal
+    if s1 == 0 and s2 != 0:
+        # always want a spin 0 on the SHT side
         t_cl = cl if (s1 + s2) % 2 == 0 else -cl
-        if s2 < 0:
-            return wignerpos(t_cl, theta, -s1, -s2)
-        else:
-            return wignerpos(t_cl, theta, s2, s1)
-    else:
-        mval = np.array([abs(s1)], dtype=int)
+        return wignerpos(t_cl, theta, s2, s1)
+    if s1 < 0:
+        t_cl = cl if (s1 + s2) % 2 == 0 else -cl
+        return wignerpos(t_cl, theta, -s1, -s2)
+    if s1 >= 0:
         lmax = len(cl) - 1
-        sgn = (-1) ** (1 + (s2 if s2 < 0 else 0) + (s2 == 0))
-        gl = sgn * cl * np.sqrt(np.arange(1, 2 * lmax + 3, 2)) / np.sqrt(4 * np.pi)
-        glm_r = gl.astype(np.complex128)
-        if s2 != 0:
-            glm_i = (1j * np.sign(s2)) * gl
-            glm = np.stack([glm_r, glm_i])
-        else:
-            glm = np.atleast_2d(glm_r)
+        s = abs(s2)
         mstart = np.array([0], dtype=int)
-        leg = alm2leg(alm=glm, spin=abs(s2), lmax=lmax, mval=mval, mstart=mstart, theta=theta)
-        return leg.squeeze()[0].real if s2 != 0 else leg.squeeze().real
+        mval = np.array([abs(s1)], dtype=int)
+        glm_r = (cl * np.sqrt(np.arange(1, 2 * lmax + 3, 2)) / np.sqrt(4 * np.pi)).astype(complex)
+        mode = 'GRAD_ONLY' if s else 'STANDARD'
+        leg = alm2leg(alm=np.atleast_2d(glm_r), spin=s, lmax=lmax, mval=mval, mstart=mstart, theta=theta, mode=mode).squeeze()
+        if s2 == 0:
+            return leg.real
+        if s2 > 0:
+            return -(leg[0].real + leg[1].imag)
+        return (-1 if s % 2 == 0 else 1) * (leg[0].real - leg[1].imag)
+
+    assert 0, (s1, s2)

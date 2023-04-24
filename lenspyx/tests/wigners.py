@@ -26,16 +26,14 @@ for lmax in lmaxs:
             maxdevs.append(np.max(np.abs(clv2[t_ls] / cl_in[t_ls] - 1.)))
     print('lmax %s %.3e'%(lmax, np.max(maxdevs)))
     assert np.max(maxdevs) < 1e-9, np.max(maxdevs)
-    if lmax == lmaxs[-1]:
-        for s1s2 in [(0, 0), (0, 2), (2, 0), (0, -2), (-2, 0), (-2, -2)]:
+    if lmax == 2000:
+        for s1s2 in [(0, 0), (0, 2), (2, 0), (2, 2), (0, -2), (-2, 0), (-2, -2), (1, 3)]:
             s1, s2 = s1s2
             print('Timings s1 s2  %s %s'%(s1, s2))
             t0 = time.time()
             xi12 = wigners.wignerpos(cl_in, tht, s1, s2)
-            t1 = time.time()
-            print('DUCC       %.1e ms' % ((t1 - t0) * 1e3))
+            dt1 = time.time() - t0
             t0 = time.time()
             xi12 = wigners_pl.wignerpos(cl_in, xg, s1, s2)
-            t1 = time.time()
-            print('Plancklens %.1e ms' % ((t1 - t0) * 1e3))
-
+            dt2 = time.time() - t0
+            print('speed-up %.3f'%(dt2 / dt1))
