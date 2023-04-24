@@ -10,7 +10,7 @@ import numpy as np
 from ducc0.sht.experimental import alm2leg, leg2alm
 
 
-def wignerpos(cl, theta, s1, s2):
+def wignerpos(cl: np.darray[float], theta: np.darray[float], s1: int, s2: int):
     r"""Produces Wigner small-d transform defined by
 
         :math:`\sum_\ell \frac{2\ell + 1}{4\pi} C_\ell d^\ell_{s_1 s_2}(\theta)`
