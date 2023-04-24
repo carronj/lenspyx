@@ -14,7 +14,7 @@ exec(open('lenspyx/_version.py').read())
 setup(
     name='lenspyx',
     version=__version__,
-    packages=['lenspyx', 'lenspyx.remapping', 'lenspyx.tests'],
+    packages=['lenspyx', 'lenspyx.remapping', 'lenspyx.tests', 'lenspyx.wigners'],
     url='https://github.com/carronj/lenspyx',
     author='Julien Carron',
     data_files=[('lenspyx/data/cls', ['lenspyx/data/cls/FFP10_wdipole_lensedCls.dat',
