@@ -1,7 +1,7 @@
 """This module contains DUCC-based fonctions related to Wigner-small d tranforms
 
     This uses `alm2leg' and `leg2alm' from ducc0. They were not optimized for this, and the code could be improved further,
-    but the compiler optimization is done so well that they still out-perform plancklens code it seems by large amount
+    but the compiler optimization is done so well that they still out-perform plancklens code it seems by large amounts.
 
 
 """
@@ -90,7 +90,7 @@ def wignercoeff(xi: np.ndarray[float], theta: np.ndarray[float], s1: int, s2: in
 
 
 def get_thgwg(npts: int):
-    """Gauss-Legendre integration points and weights from ducc0
+    """Gauss-Legendre integration points and weights from ducc0. Very fast.
 
         Args:
             number of points of quadrature rule
