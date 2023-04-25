@@ -10,6 +10,7 @@ import numpy as np
 from ducc0.sht.experimental import alm2leg, leg2alm
 from ducc0.misc import GL_thetas, GL_weights
 
+GL_cache = {}
 
 def wignerpos(cl: np.darray[float], theta: np.darray[float], s1: int, s2: int):
     r"""Produces Wigner small-d transform defined by
@@ -105,3 +106,38 @@ def get_thgwg(npts: int):
     wg = GL_weights(npts, 1) / (2 * np.pi)
     return tht, wg
 
+def wignerc(cl1, cl2, sp1, s1, sp2, s2, lmax_out=None):
+    """Legendre coeff. of $ (\\xi_{sp1,s1} * \\xi_{sp2,s2})(\\cos \\theta)$ from their harmonic series.
+
+        Uses Gauss-Legendre quadrature to solve this exactly.
+
+    """
+    lmax1 = len(cl1) - 1
+    lmax2 = len(cl2) - 1
+    lmax_out = lmax1 + lmax2 if lmax_out is None else lmax_out
+    lmaxtot = lmax1 + lmax2 + lmax_out
+    spo = sp1 + sp2
+    so = s1 + s2
+    if np.any(cl1) and np.any(cl2):
+        npts = (lmaxtot + 2 - lmaxtot % 2) // 2
+        if not 'tht wg %s' % npts in GL_cache.keys():
+            GL_cache['tht wg %s' % npts] = get_thgwg(npts)
+        tht, wg = GL_cache['tht wg %s' % npts]
+        if np.iscomplexobj(cl1):
+            xi1 = wignerpos(np.real(cl1), tht, sp1, s1) + 1j * wignerpos(np.imag(cl1), tht, sp1, s1)
+        else:
+            xi1 = wignerpos(cl1, tht, sp1, s1)
+        if np.iscomplexobj(cl2):
+            xi2 = wignerpos(np.real(cl2), tht, sp2, s2) + 1j * wignerpos(np.imag(cl2), tht, sp2, s2)
+        else:
+            xi2 = wignerpos(cl2, tht, sp2, s2)
+        xi1xi2w = xi1 * xi2 * wg
+        if np.iscomplexobj(xi1xi2w):
+            ret = wignercoeff(np.real(xi1xi2w), tht, spo, so, lmax_out)
+            ret = ret + 1j * wignercoeff(np.imag(xi1xi2w), tht, spo, so, lmax_out)
+            return ret
+        else:
+            return wignercoeff(xi1xi2w, tht, spo, so, lmax_out)
+
+    else:
+        return np.zeros(lmax_out + 1, dtype=float)
