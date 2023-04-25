@@ -11,6 +11,7 @@ from ducc0.sht.experimental import alm2leg, leg2alm
 from ducc0.misc import GL_thetas, GL_weights
 
 GL_cache = {}
+verbose = False
 
 def wignerpos(cl: np.darray[float], theta: np.darray[float], s1: int, s2: int):
     r"""Produces Wigner small-d transform defined by
@@ -106,8 +107,8 @@ def get_thgwg(npts: int):
     wg = GL_weights(npts, 1) / (2 * np.pi)
     return tht, wg
 
-def wignerc(cl1, cl2, sp1, s1, sp2, s2, lmax_out=None):
-    """Legendre coeff. of $ (\\xi_{sp1,s1} * \\xi_{sp2,s2})(\\cos \\theta)$ from their harmonic series.
+def wignerc(cl1: np.ndarray[float or complex], cl2:np.ndarray[float or complex], sp1: int, s1: int, sp2: int, s2: int, lmax_out: int or None=None):
+    """Spectrum of $ (\\xi_{sp1,s1} * \\xi_{sp2,s2})(\\cos \\theta)$ from their harmonic series.
 
         Uses Gauss-Legendre quadrature to solve this exactly.
 
