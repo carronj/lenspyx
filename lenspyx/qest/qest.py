@@ -185,7 +185,7 @@ def _get_covresp(source, s1, s2, cls, lmax):
         s_source = 0
         prR = 0.25 * cond * np.ones(lmax + 1, dtype=float)
         mrR = 0.25 * cond * np.ones(lmax + 1, dtype=float)
-        cL_scal =  lambda ell : np.ones(len(ell), dtype=float)
+        cL_scal =  lambda ell : 1. if np.isscalar(ell) else np.ones(len(ell), dtype=float)
         return s_source, prR, mrR, cL_scal
     elif source in ['ntt', 'n']:
         assert 0, 'dont think this parametrization works here'
