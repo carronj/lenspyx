@@ -244,6 +244,46 @@ def spin_cls(s1, s2, cls):
         else:
             assert 0
 
+def get_spin_matrix(sout, sin, cls):
+    r"""Spin-space matrix R^{-1} cls[T, E, B] R where R is the mapping from _{0, \pm 2}X to T, E, B.
+
+        cls is dictionary with keys 'tt', 'te', 'ee', 'bb'.
+        If a key is not present the corresponding spectrum is assumed to be zero.
+        ('t' 'e' and 'b' keys also works in place of 'tt' 'ee', 'bb'.)
+
+        Output is complex only when necessary (that is, TB and/or EB present and relevant).
+
+    """
+    assert sin in [0, 2, -2] and sout in [0, 2, -2], (sin, sout)
+    if sin == 0:
+        if sout == 0:
+            return cls.get('tt', cls.get('t', 0.))
+        tb = cls.get('tb', None)
+        return (-cls.get('te', 0.) - 1j * np.sign(sout) * tb) if tb is not None else -cls.get('te', 0.)
+    if sin == 2:
+        if sout == 0:
+            te = cls.get('te', 0.)
+            tb = cls.get('tb', None)
+            return -0.5 * (te - 1j * tb) if tb is not None else -0.5 * te
+        if sout == 2:
+            return 0.5 * (cls.get('ee', cls.get('e', 0.)) + cls.get('bb', cls.get('b', 0.)))
+        if sout == -2:
+            ret =  0.5 * (cls.get('ee', cls.get('e', 0.)) - cls.get('bb', cls.get('b', 0.)))
+            eb = cls.get('eb', None)
+            return ret - 1j * eb if eb is not None else ret
+    if sin == -2:
+        if sout == 0:
+            te = cls.get('te', 0.)
+            tb = cls.get('tb', None)
+            return -0.5 * (te + 1j * tb) if tb is not None else -0.5 * te
+        if sout == 2:
+            ret =  0.5 * (cls.get('ee', cls.get('e', 0.)) - cls.get('bb', cls.get('b', 0.)))
+            eb = cls.get('eb', None)
+            return ret + 1j * eb if eb is not None else ret
+        if sout == -2:
+            return 0.5 * (cls.get('ee', cls.get('e', 0.)) + cls.get('bb', cls.get('b', 0.)))
+    assert 0, (sin, sout)
+
 def get_spin_raise(s, lmax):
     r"""Response coefficient of spin-s spherical harmonic to spin raising operator.
 
@@ -263,3 +303,7 @@ def get_spin_lower(s, lmax):
     ret = np.zeros(lmax + 1, dtype=float)
     ret[abs(s):] = -np.sqrt(np.arange(s + abs(s), lmax + s + 1) * np.arange(abs(s) - s + 1, lmax - s + 2))
     return ret
+
+def joincls(cls_list):
+    lmaxp1 = np.min([len(cl) for cl in cls_list])
+    return np.prod(np.array([cl[:lmaxp1] for cl in cls_list]), axis=0)
