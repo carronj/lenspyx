@@ -92,6 +92,22 @@ class qeleg_multi:
     def get_lmax(self):
         return np.max([len(cl) for cl in self.cls]) - 1
 
+    def is_conjugate(self, leg2: qeleg_multi, rtol=1e-14, atol=0.):
+        """Tests whether leg2 is complex conjugate of leg1
+
+
+        """
+        cond =  self.spin_ou == -leg2.spin_ou
+        cond *= (self.get_lmax() == leg2.get_lmax())
+        if cond:
+            for s1, cl1, s2, cl2 in zip(self.spins_in, self.cls, leg2.spins_in, leg2.cls):
+                cond *= (s1 == -s2)
+                sgn = 1 if (self.spin_ou + s1) % 2 == 0 else -1
+                cond *= np.allclose(cl1, sgn * cl2, rtol=rtol, atol=atol)
+            return cond
+        else:
+            return False
+
 
 class qe:
     def __init__(self, leg_a: qeleg, leg_b: qeleg, cL: callable):
@@ -192,6 +208,12 @@ def qe_compress(qes: list[qe], verbose=True):
     """
     # NB: this only compares first legs.
     skip = []
+    # First removes zero weight QEs
+    for i, qi in enumerate(qes):
+        not_zero = np.any(qi.leg_a.cl) and np.any(qi.leg_b.cl)
+        if not not_zero:
+            skip.append(i)
+    # Then combines remaining QEs
     qes_compressed = []
     for i, qi in enumerate(qes):
         if i not in skip:
