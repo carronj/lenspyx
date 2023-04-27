@@ -13,6 +13,74 @@ from ducc0.misc import GL_thetas, GL_weights
 GL_cache = {}
 verbose = False
 
+
+def wigner4pos(gl: np.ndarray[float], cl: np.ndarray[float] or None, theta: np.ndarray[float], s1: int, s2: int):
+    r"""Compute 4 Wigner correlation functions in one go
+
+        Args:
+            gl: first spectrum
+            cl: second spectrum (can be set to None if irrelevant,  and is ignored if s2 is zero)
+            theta: co-latitude in radians
+            s1: int
+            s2: int
+
+        Returns:
+
+            In the most general case, an array of shape (ncomp, ntheta) with:
+
+            :math:`\sum_l g_l \frac{2l + 1}{4\pi} d^l_{s1, |s2|}(\theta)`
+            :math:`\sum_l g_l \frac{2l + 1}{4\pi} d^l_{s1,-|s2|}(\theta)`
+            :math:`\sum_l c_l \frac{2l + 1}{4\pi} d^l_{s1, |s2|}(\theta)`
+            :math:`\sum_l c_l \frac{2l + 1}{4\pi} d^l_{s1,-|s2|}(\theta)`
+
+            The number of components ncomp in the output is 4 if (s2 !=0 and cl is not None) else (2 if s2 else 1)
+
+
+    """
+
+
+    standard = cl is not None
+    if standard:
+        lmax = (max(len(cl), len(gl)) if s2 else len(cl)) - 1
+        mode = 'STANDARD'
+        nout = 4 if s2 else 1
+    else:
+        lmax = len(gl) - 1
+        mode = 'GRAD_ONLY' if s2 else 'STANDARD'
+        nout = 2 if s2 else 1
+
+    if s1 == 0 and s2:  # Always prefer a faster spin-0 sht
+        sgn_s = 1 if s2 % 2 == 0 else -1
+        wig_g = wigner4pos(gl, None, theta, abs(s2), 0)[0]
+        if standard:
+            wig_c = wigner4pos(cl, None, theta, abs(s2), 0)[0]
+            return np.stack([wig_g * sgn_s, wig_g, sgn_s * wig_c, wig_c])
+        return np.stack([wig_g * sgn_s, wig_g])
+    s1_pos = s1 >= 0
+    sgn_s1 = 1 if s1_pos else (1 if (s1 + s2) % 2 == 0 else -1)
+    ncomp = 1 + (s2 != 0) * standard
+
+    gclm = np.empty((ncomp, lmax + 1), dtype=complex)
+    prefac = np.sqrt(np.arange(1, 2 * lmax + 3, 2)) * (sgn_s1 / np.sqrt(4 * np.pi))
+    gclm[0, :len(gl)] = prefac * gl[:len(gl)]
+    if s2 and standard:
+        gclm[1, :len(cl)] = prefac * cl[:len(cl)]
+    leg = alm2leg(alm=gclm, spin=abs(s2), lmax=lmax, mval=np.array([abs(s1)], dtype=int),
+                  mstart=np.array([0]), theta=theta, mode=mode).squeeze()
+    wig = np.zeros((nout, theta.size), float)
+    if s2:
+        s_sgn = (1 if s2 % 2 == 0 else -1)
+        wig[0 if s1_pos else 1] = -(leg[0].real + leg[1].imag)
+        wig[1 if s1_pos else 0] = -s_sgn * (leg[0].real - leg[1].imag)
+        if standard:
+            wig[2 if s1_pos else 3] = -(leg[1].real - leg[0].imag)
+            wig[3 if s1_pos else 2] = -s_sgn * (leg[1].real + leg[0].imag)
+        return wig
+    else:
+        wig[0] = leg.real
+        return wig
+
+
 def wignerpos(cl: np.darray[float], theta: np.darray[float], s1: int, s2: int):
     r"""Produces Wigner small-d transform defined by
 
