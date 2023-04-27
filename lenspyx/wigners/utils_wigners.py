@@ -45,8 +45,9 @@ class WignerAccumulator:
             print('add xi1', so, to, (s1,  t1), (s2, t2), global_sgn, flip_parity)
         storage = self.data_wflip if flip_parity else self.data_nflip
         if idx not in storage.keys():
-            storage[idx] = np.zeros(tht.size, dtype=float)
-        storage[idx] += xi1 * wignerpos(cl2 * global_sgn, tht, s2, t2)
+            storage[idx] = xi1 * wignerpos(cl2 * global_sgn, tht, s2, t2)
+        else:
+            storage[idx] += xi1 * wignerpos(cl2 * global_sgn, tht, s2, t2)
         self.tim.add('add xi')
 
     def add_xi2(self, cl1:np.ndarray, s1: int, t1: int, xi2:np.ndarray, s2: int, t2: int):
@@ -58,9 +59,23 @@ class WignerAccumulator:
             print('add xi', so, to, (s1,  t1), (s2, t2), global_sgn, flip_parity)
         storage = self.data_wflip if flip_parity else self.data_nflip
         if idx not in storage.keys():
-            storage[idx] = np.zeros(tht.size, dtype=float)
-        storage[idx] += wignerpos(cl1 * global_sgn, tht, s1, t1) * xi2
+            storage[idx] = wignerpos(cl1 * global_sgn, tht, s1, t1) * xi2
+        else:
+            storage[idx] += wignerpos(cl1 * global_sgn, tht, s1, t1) * xi2
         self.tim.add('add xi')
+
+    def add_xi12(self, xi1: np.ndarray, s1: int, t1: int, xi2: np.ndarray, s2: int, t2: int):
+        self.tim.reset()
+        so, to = s1 + s2, t1 + t2  # out-spins
+        idx, flip_parity, global_sgn, L_sign = self._spinids(so, to)
+        if verbose:
+            print('add xi12', so, to, (s1,  t1), (s2, t2), global_sgn, flip_parity)
+        storage = self.data_wflip if flip_parity else self.data_nflip
+        if idx not in storage.keys():
+            storage[idx] = xi1 * xi2 * global_sgn
+        else:
+            storage[idx] += xi1 * xi2 * global_sgn
+        self.tim.add('add xi12')
 
     def accumulate2(self, cl1:np.ndarray, cls2:list[np.ndarray], s1: int, t1: int, s2ts:list[int], t2s: list[int]):
         assert len(s2ts) == len(t2s) == len(cls2)
