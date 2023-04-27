@@ -12,7 +12,7 @@ from lenspyx import utils_hp
 from lenspyx.remapping.utils_geom import Geom
 
 
-def eval_qe(qe_key, lmax_ivf, cls_weight, get_alm, lmax_qlm, verbose=True, get_alm2=None, geometry=None):
+def eval_qe(qe_key, lmax_ivf, cls_weight, get_alm, lmax_qlm, verbose=True, get_alm2=None, geometry: Geom or None=None):
     """Evaluates a quadratic estimator gradient and curl terms.
 
 
