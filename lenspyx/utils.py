@@ -1,7 +1,8 @@
-import time
+import time, os
 from datetime import timedelta
 import numpy as np
 import sys
+import lenspyx
 from lenspyx.utils_hp import Alm
 import json
 
@@ -216,7 +217,7 @@ def camb_clfile(fname, lmax=None):
     """
     with open(fname) as f:
         firstline = next(f)
-    keys = [i.lower() for i in firstline.split(' ') if i.isalpha()][1:]
+    keys = [i.lower() for i in firstline.replace('\n', '').split(' ') if i.isalpha()][1:]
     cols = np.loadtxt(fname).transpose()
 
     ell = cols[0].astype(np.int64)
@@ -262,3 +263,12 @@ class Drop:
         ii = np.where( (eps > 0) & (eps < 1))
         ret[ii] = np.exp(1 - 1. / (1 - eps[ii] ** 2))
         return ret
+
+
+def get_ffp10_cls():
+    path2cls = os.path.dirname(lenspyx.__file__)
+    cls_unl = camb_clfile(path2cls + '/data/cls/FFP10_wdipole_lenspotentialCls.dat')
+    cls_len = camb_clfile(path2cls + '/data/cls/FFP10_wdipole_lensedCls.dat')
+    cls_glen = camb_clfile(path2cls + '/data/cls/FFP10_wdipole_gradlensedCls.dat')
+    assert np.all([k in cls_glen.keys() for k in ['tt', 'te', 'ee', 'bb']])
+    return cls_unl, cls_len, cls_glen
