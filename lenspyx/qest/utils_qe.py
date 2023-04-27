@@ -4,7 +4,6 @@ from os import cpu_count
 from lenspyx.remapping.utils_geom import Geom
 from lenspyx.utils_hp import almxfl, alm_copy, Alm
 
-#FIXME: check if spin-0 conventions are OK
 
 class qeleg:
     def __init__(self, spin_in: int, spin_out:int, cl:np.ndarray[float]):
@@ -180,8 +179,15 @@ def qe_simplify(qe_list: list[qe], _swap=False, verbose=False):
     return [qe(q.leg_b.copy(), q.leg_a.copy(), q.cL) for q in qes_ret]
 
 
-def qe_compress(qes, verbose=True):
+def qe_compress(qes: list[qe], verbose=True):
     """This combines pairs of estimators with identical 1st leg to reduce the number of spin transform in its evaluation
+
+
+        Return:
+            a list of tuples (qeleg_multi, qeleg_multi, cl) with 1st leg, 2nd legs and weights.
+
+        Note:
+            The 1st leg always only have a single component
 
     """
     # NB: this only compares first legs.
@@ -198,7 +204,7 @@ def qe_compress(qes, verbose=True):
                     skip.append(i + 1 + j)
             qes_compressed.append( (lega_m, legb_m, qi.cL))
     if len(skip) > 0 and verbose:
-        print("%s alm2map_spin transforms now required, down from %s"%(2 * (len(qes) -len(skip)) , 2 * len(qes)) )
+        print("%s alm2map_spin transforms now required, down from %s"%(2 * (len(qes) - len(skip)) , 2 * len(qes)) )
     return qes_compressed
 
 
