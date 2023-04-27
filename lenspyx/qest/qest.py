@@ -15,19 +15,16 @@ from lenspyx.remapping.utils_geom import Geom
 def eval_qe(qe_key, lmax_ivf, cls_weight, get_alm, lmax_qlm, verbose=True, get_alm2=None, geometry=None):
     """Evaluates a quadratic estimator gradient and curl terms.
 
-        (see 'library' below for QE estimation coupled to CMB inverse-variance filtered simulation libraries,
-        whose implementation can be faster for some estimators.)
 
         Args:
             qe_key: QE key defining the estimator (as defined in the qresp module), e.g. 'ptt' for lensing TT estimator
             lmax_ivf: CMB multipoles up to lmax are used in the QE
             cls_weight: set of CMB spectra entering the QE estimator weights
             get_alm: callable with 't', 'e', 'b' arguments, returning the corresponding inverse-variance filtered CMB map
-            nside: the estimator are calculated in position space at healpy resolution nside.
             lmax_qlm: gradient and curl terms are obtained up to multipole lmax_qlm.
             verbose(optional): some printout if set
             get_alm2(optional): maps for second leg if different from first. The estimator is symmetrized
-            geometry(optional): intermediate sphere pixelization (defaults to thinned-GL)
+            geometry(optional): custom intermediate sphere pixelization (defaults to thinned-GL)
 
         Returns:
             glm and clm healpy arrays (gradient and curl terms of the QE estimate)
@@ -40,8 +37,7 @@ def eval_qe(qe_key, lmax_ivf, cls_weight, get_alm, lmax_qlm, verbose=True, get_a
     return _eval_qe(qe_list, get_alm, lmax_qlm, verbose=verbose, get_alm2=get_alm2, geo=geometry)
 
 
-def _eval_qe(qe_list, get_alm, lmax_qlm, geo:Geom,
-             verbose=True, get_alm2=None, mmax_qlm:int or None=None, nthreads=0):
+def _eval_qe(qe_list, get_alm, lmax_qlm, geo:Geom, verbose=True, get_alm2=None, mmax_qlm:int or None=None, nthreads=0):
     """Evaluation of a QE from its list of leg definitions.
 
         Args:
@@ -52,6 +48,10 @@ def _eval_qe(qe_list, get_alm, lmax_qlm, geo:Geom,
 
         Returns:
             glm and clm healpy arrays (gradient and curl terms of the QE estimate)
+
+
+        Note:
+            For zero-spin estimator there is no curl and the output has shape (1, alm_size)
 
     """
     if nthreads <= 0:
@@ -77,6 +77,7 @@ def _eval_qe(qe_list, get_alm, lmax_qlm, geo:Geom,
         dr = np.zeros((1, npix,), dtype=float)
         dc = dr
     for i, q in enumerate(qes):
+        assert (len(q[0].spins_in) == 1) or (len(q[1].spins_in) == 1), (q[0].spins_in, q[1].spins_in)
         if verbose:
             print("QE %s out of %s :"%(i + 1, len(qes)))
             print("in-spins 1st leg and out-spin", q[0].spins_in, q[0].spin_ou)
@@ -88,11 +89,10 @@ def _eval_qe(qe_list, get_alm, lmax_qlm, geo:Geom,
     if symmetrize:
         gclm *= 0.5
     if qe_spin == 0:
-        gclm *= -1 # We use here different spin-0 gradient convention than ducc
+        gclm *= -1  # We use here the sgn convention - (-1)^s G +- iC also for spin-0
     assert gclm.ndim == 2 and len(gclm) == ncomp
-    utils_hp.almxfl(gclm[0], cL_out, mmax_qlm, inplace=True)
-    if ncomp == 2:
-        utils_hp.almxfl(gclm[1], cL_out, mmax_qlm, inplace=True)
+    for alm in gclm:
+        utils_hp.almxfl(alm, cL_out, mmax_qlm, inplace=True)
     return gclm
 
 
