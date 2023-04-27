@@ -104,24 +104,22 @@ def _eval_qe(qe_list:list[uqe.qe], get_alm, lmax_qlm, geo:Geom, verbose=True, ge
             if len(conjugate) > 0:
                 for j in conjugate:
                     print("in-spins conjugate leg and out-spin", qes[j][1].spins_in, qes[j][1].spin_ou)
+        a = q[0](get_alm, geo)
         if qe_spin:
-            a = q[0](get_alm, geo)
             dc += fac1 * a * q[1](get_alm2, geo)
             for j in conjugate:
                 dc += a.conj() * qes[j][1](get_alm2, geo)
         else: # We must consider the real part only
-            a = q[0](get_alm, geo)
             dc += fac1 * (a * q[1](get_alm2, geo)).real
             for j in conjugate:
                 dc += (a.conj() * qes[j][1](get_alm2, geo)).real
         if symmetrize: # same, swapping alm2 and alm1
+            a = q[0](get_alm2, geo)
             if qe_spin:
-                a = q[0](get_alm2, geo)
                 dc += fac1 * a * q[1](get_alm, geo)
                 for j in conjugate:
                     dc += a.conj() * qes[j][1](get_alm, geo)
             else:
-                a = q[0](get_alm2, geo)
                 dc += fac1 * (a * q[1](get_alm, geo)).real
                 for j in conjugate:
                     dc += (a.conj() * qes[j][1](get_alm, geo)).real
