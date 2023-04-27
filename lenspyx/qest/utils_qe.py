@@ -98,12 +98,15 @@ class qeleg_multi:
 
         """
         cond =  self.spin_ou == -leg2.spin_ou
+        cond *= (len(self.spins_in) == len(self.spins_in))
         cond *= (self.get_lmax() == leg2.get_lmax())
         if cond:
-            for s1, cl1, s2, cl2 in zip(self.spins_in, self.cls, leg2.spins_in, leg2.cls):
-                cond *= (s1 == -s2)
-                sgn = 1 if (self.spin_ou + s1) % 2 == 0 else -1
-                cond *= np.allclose(cl1, sgn * cl2, rtol=rtol, atol=atol)
+            ix = np.argsort(self.spins_in)
+            jx = np.argsort(self.spins_in)[::-1]
+            for i, j in zip(ix, jx): # Should cover relevant cases
+                cond *= (self.spins_in[i] == -leg2.spins_in[j])
+                sgn = 1 if (self.spin_ou + self.spins_in[i]) % 2 == 0 else -1
+                cond *= np.allclose(self.cls[i], sgn * leg2.cls[j], rtol=rtol, atol=atol)
             return cond
         else:
             return False
