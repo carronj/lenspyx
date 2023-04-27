@@ -12,7 +12,7 @@ def wigner_pos(cl, theta, s1: np.ndarray[int], s2:int, nthreads=0): # version re
         mval = s1.astype(int)
         cls = cl
     sgn_fac = -1 if s2 else 1
-    lmax = len(cls[0]) - 1 # FIXME: now all same lmax's
+    lmax = len(cls[0]) - 1
     mstart = np.arange(len(mval), dtype=int) * (lmax + 1)
     glm_r = np.empty((1,len(mval) * (lmax + 1)), dtype=complex)
     prefac = np.sqrt(np.arange(1, 2 * lmax + 3, 2)) * (sgn_fac / np.sqrt(4 * np.pi))
