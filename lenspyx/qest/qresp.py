@@ -75,11 +75,9 @@ def _get_response(qes:list[(ut.qeleg_multi, ut.qeleg_multi, callable)], source, 
     Ls = np.arange(lmax_qlm + 1, dtype=int)
     Ls_test = Ls[lmax_qlm:lmax_qlm+1]
 
-    npts = (2 * lmax_ivf + lmax_qlm) // 2 + 1
-
     qe_spin, source_spin, prefac = None, None, None
-    Rpr_st_acc = WignerAccumulator(npts)
-    Rmr_st_acc = WignerAccumulator(npts)
+    Rpr_st_acc = WignerAccumulator((2 * lmax_ivf + lmax_qlm) // 2 + 1)
+    Rmr_st_acc = WignerAccumulator((2 * lmax_ivf + lmax_qlm) // 2 + 1)
     tht = Rmr_st_acc.tht
     tim.add('setup')
     for qe in qes:
@@ -99,12 +97,11 @@ def _get_response(qes:list[(ut.qeleg_multi, ut.qeleg_multi, callable)], source, 
                 f_as[spin] = f_a
             if np.any(f_b):
                 f_bs[spin] = f_b
-        cls2_ms, cls2_ps = {}, {}
+        cls2_ms, cls2_ps, cls1_ms, cls1_ps = {}, {}, {}, {}
         for s2 in f_as:
             assert -s2 in f_as
             cls2_ms[s2] = np.zeros_like(f_as[s2])
             cls2_ps[s2] = np.zeros_like(f_as[s2])
-        cls1_ms, cls1_ps = {}, {}
         for t2 in f_bs:
             assert -t2 in f_bs
             cls1_ms[t2] = np.zeros_like(f_bs[t2])
