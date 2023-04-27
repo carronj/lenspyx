@@ -5,6 +5,7 @@
 
 
 """
+from __future__ import annotations
 from os import cpu_count
 import numpy as np
 from lenspyx.qest import utils_qe as uqe
@@ -12,7 +13,7 @@ from lenspyx import utils_hp
 from lenspyx.remapping.utils_geom import Geom
 
 
-def eval_qe(qe_key, lmax_ivf, cls_weight, get_alm, lmax_qlm, verbose=True, get_alm2=None, geometry: Geom or None=None):
+def eval_qe(qe_key, lmax_ivf, cls_weight, get_alm, lmax_qlm, verbose=False, get_alm2=None, geometry: Geom or None=None):
     """Evaluates a quadratic estimator gradient and curl terms.
 
 
@@ -36,8 +37,7 @@ def eval_qe(qe_key, lmax_ivf, cls_weight, get_alm, lmax_qlm, verbose=True, get_a
         geometry = Geom.get_thingauss_geometry((2 * lmax_ivf + lmax_qlm) // 2 + 1, qe_spin)
     return _eval_qe(qe_list, get_alm, lmax_qlm, verbose=verbose, get_alm2=get_alm2, geo=geometry)
 
-
-def _eval_qe(qe_list, get_alm, lmax_qlm, geo:Geom, verbose=True, get_alm2=None, mmax_qlm:int or None=None, nthreads=0):
+def _eval_qe(qe_list:list[uqe.qe], get_alm, lmax_qlm, geo:Geom, verbose=True, get_alm2=None, mmax_qlm:int or None=None, nthreads=0):
     """Evaluation of a QE from its list of leg definitions.
 
         Args:
@@ -70,6 +70,90 @@ def _eval_qe(qe_list, get_alm, lmax_qlm, geo:Geom, verbose=True, get_alm2=None, 
         assert np.all(q[-1](np.arange(lmax_qlm + 1)) == cL_out)
         assert q[0].spin_ou + q[1].spin_ou == qe_spin
     ncomp, npix = 1 + (qe_spin != 0), geo.npix()
+    # find companions of first legs, in order to reuse SHTs:
+    qe_toconsider = []
+    skip = []
+    for i1, qe1 in enumerate(qes):
+        fac1 = 1
+        if i1 not in skip:
+            conjugates = []
+            for i2, qe2 in enumerate(qes[i1+1:]):
+                a2a = qe2[0].is_conjugate(qe1[0])
+                b2b = qe2[1].is_conjugate(qe1[1])
+                if a2a and b2b:
+                    # This mean we can take twice the real part of qe1 and drop qe2 altogether
+                    assert qe_spin == 0
+                    skip.append(i2 + i1 + 1)
+                    fac1 += 1
+                elif a2a:
+                    conjugates.append( (i2 + i1 + 1))
+                    skip.append(i2 + i1 + 1)
+            qe_toconsider.append((i1, fac1, conjugates))
+    if qe_spin:
+        dc = np.zeros((1, npix,), dtype=complex)
+        dr = dc.view(float).reshape((npix, 2)).T # Real view onto complex array
+    else:
+        dr = np.zeros((1, npix,), dtype=float)
+        dc = dr
+    for idx, (i, fac1, conjugate) in enumerate(qe_toconsider):
+        q = qes[i]
+        if verbose:
+            print("QE %s out of %s, %s conjugate(s) :"%(i + 1, len(qe_toconsider), len(conjugate)))
+            print("in-spins 1st leg and out-spin", q[0].spins_in, q[0].spin_ou)
+            print("in-spins 2nd leg and out-spin", q[1].spins_in, q[1].spin_ou)
+            if len(conjugate) > 0:
+                for j in conjugate:
+                    print("in-spins conjugate leg and out-spin", qes[j][1].spins_in, qes[j][1].spin_ou)
+        if qe_spin:
+            a = q[0](get_alm, geo)
+            dc += fac1 * a * q[1](get_alm2, geo)
+            for j in conjugate:
+                dc += a.conj() * qes[j][1](get_alm2, geo)
+        else: # We must consider the real part only
+            a = q[0](get_alm, geo)
+            dc += fac1 * (a * q[1](get_alm2, geo)).real
+            for j in conjugate:
+                dc += (a.conj() * qes[j][1](get_alm2, geo)).real
+        if symmetrize: # same, swapping alm2 and alm1
+            if qe_spin:
+                a = q[0](get_alm2, geo)
+                dc += fac1 * a * q[1](get_alm, geo)
+                for j in conjugate:
+                    dc += a.conj() * qes[j][1](get_alm, geo)
+            else:
+                a = q[0](get_alm2, geo)
+                dc += fac1 * (a * q[1](get_alm, geo)).real
+                for j in conjugate:
+                    dc += (a.conj() * qes[j][1](get_alm, geo)).real
+
+    gclm = geo.adjoint_synthesis(m=dr, spin=qe_spin, lmax=lmax_qlm, mmax=mmax_qlm, nthreads=nthreads)
+    if symmetrize:
+        gclm *= 0.5
+    if qe_spin == 0:
+        gclm *= -1  # We use here the sgn convention - (-1)^s G +- iC also for spin-0
+    assert gclm.ndim == 2 and len(gclm) == ncomp
+    for alm in gclm:
+        utils_hp.almxfl(alm, cL_out, mmax_qlm, inplace=True)
+    return gclm
+
+
+def _eval_qe_pl(qe_list, get_alm, lmax_qlm, geo:Geom, verbose=True, get_alm2=None, mmax_qlm:int or None=None, nthreads=0):
+    if nthreads <= 0:
+        nthreads = cpu_count()
+    if get_alm2 is None:
+        get_alm2 = get_alm
+    if mmax_qlm is None:
+        mmax_qlm = lmax_qlm
+
+    symmetrize = not (get_alm2 is get_alm)
+    qes = uqe.qe_compress(qe_list, verbose=verbose)
+    qe_spin = qes[0][0].spin_ou + qes[0][1].spin_ou
+    cL_out = qes[0][-1](np.arange(lmax_qlm + 1))
+    assert qe_spin >= 0, qe_spin
+    for q in qes[1:]:
+        assert np.all(q[-1](np.arange(lmax_qlm + 1)) == cL_out)
+        assert q[0].spin_ou + q[1].spin_ou == qe_spin
+    ncomp, npix = 1 + (qe_spin != 0), geo.npix()
     if qe_spin != 0:
         dc = np.zeros((1, npix,), dtype=complex)
         dr = dc.view(float).reshape((npix, 2)).T # Real view onto complex array
@@ -82,7 +166,10 @@ def _eval_qe(qe_list, get_alm, lmax_qlm, geo:Geom, verbose=True, get_alm2=None, 
             print("QE %s out of %s :"%(i + 1, len(qes)))
             print("in-spins 1st leg and out-spin", q[0].spins_in, q[0].spin_ou)
             print("in-spins 2nd leg and out-spin", q[1].spins_in, q[1].spin_ou)
-        dc += q[0](get_alm, geo) * q[1](get_alm2, geo)
+        if qe_spin:
+            dc += q[0](get_alm, geo) * q[1](get_alm2, geo)
+        else:
+            dc += (q[0](get_alm, geo) * q[1](get_alm2, geo)).real
         if symmetrize:
             dc += q[0](get_alm2, geo) * q[1](get_alm, geo)
     gclm = geo.adjoint_synthesis(m=dr, spin=qe_spin, lmax=lmax_qlm, mmax=mmax_qlm, nthreads=nthreads)
@@ -94,7 +181,6 @@ def _eval_qe(qe_list, get_alm, lmax_qlm, geo:Geom, verbose=True, get_alm2=None, 
     for alm in gclm:
         utils_hp.almxfl(alm, cL_out, mmax_qlm, inplace=True)
     return gclm
-
 
 def _get_qes(qe_key: str, lmax: int, cls_weight:dict):
     """ Defines the quadratic estimator weights for quadratic estimator key.
