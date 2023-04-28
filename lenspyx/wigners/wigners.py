@@ -169,11 +169,11 @@ def wignerc(cl1: np.ndarray[float or complex], cl2:np.ndarray[float or complex],
     lmax1 = len(cl1) - 1
     lmax2 = len(cl2) - 1
     lmax_out = lmax1 + lmax2 if lmax_out < 0 else lmax_out
-    lmaxtot = lmax1 + lmax2 + lmax_out
+    lmax_tot = lmax1 + lmax2 + lmax_out
     so = s1 + s2
     to = t1 + t2
     if np.any(cl1) and np.any(cl2):
-        npts = (lmaxtot + 2 - lmaxtot % 2) // 2
+        npts = (lmax_tot + 2 - lmax_tot % 2) // 2
         if not 'tht wg %s' % npts in GL_cache.keys():
             GL_cache['tht wg %s' % npts] = get_thgwg(npts)
         tht, wg = GL_cache['tht wg %s' % npts]
