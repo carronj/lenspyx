@@ -14,6 +14,27 @@ GL_cache = {}
 verbose = False
 
 
+def wignerpos(cl: np.darray[float], theta: np.darray[float], s1: int, s2: int):
+    r"""Produces Wigner small-d transform defined by
+
+        :math:`\sum_\ell \frac{2\ell + 1}{4\pi} C_\ell d^\ell_{s_1 s_2}(\theta)`
+
+        Args:
+            cl: spectrum of Wigner small-d transform
+            theta: co-latitude in radians (in [0, pi])
+            s1: first spin
+            s2: second spin
+
+        Returns:
+            real array of same size than theta
+
+        Note:
+            You can use *wigner4pos* instead if you also need the result for -s2 (e.g. for :math:`\xi_{\pm}`)
+
+    """
+    return wigner4pos(cl, None, theta, s1, s2)[0 if s2 >= 0 else 1]
+
+
 def wigner4pos(gl: np.ndarray[float], cl: np.ndarray[float] or None, theta: np.ndarray[float], s1: int, s2: int):
     r"""Compute 4 Wigner correlation functions in one go
 
@@ -81,27 +102,6 @@ def wigner4pos(gl: np.ndarray[float], cl: np.ndarray[float] or None, theta: np.n
         return wig
 
 
-def wignerpos(cl: np.darray[float], theta: np.darray[float], s1: int, s2: int):
-    r"""Produces Wigner small-d transform defined by
-
-        :math:`\sum_\ell \frac{2\ell + 1}{4\pi} C_\ell d^\ell_{s_1 s_2}(\theta)`
-
-        Args:
-            cl: spectrum of Wigner small-d transform
-            theta: co-latitude in radians (in [0, pi])
-            s1: first spin
-            s2: second spin
-
-        Returns:
-            real array of same size than theta
-
-        Note:
-            You can use *wigner4pos* instead if you also need the result for -s2 (e.g. for :math:`\xi_{\pm}`)
-
-    """
-    return wigner4pos(cl, None, theta, s1, s2)[0 if s2 >= 0 else 1]
-
-
 def wignercoeff(xi: np.ndarray[float], theta: np.ndarray[float], s1: int, s2: int, lmax: int):
     r"""Computes spectrum of Wigner small-d correlation function (adjoint to `wignerpos')
 
@@ -140,6 +140,62 @@ def wignercoeff(xi: np.ndarray[float], theta: np.ndarray[float], s1: int, s2: in
         return sgn * cl * fac
 
 
+def wignerc(cl1: np.ndarray[float or complex], cl2:np.ndarray[float or complex], s1: int, t1: int, s2: int, t2: int,
+            lmax_out: int or None=None):
+    r"""Convolution of two Wigner small-d correlation function
+
+        Returns spectrum of
+
+            :math:`\xi_{s_1 t_1}(\mu) \xi_{s_2 t_2}(\mu)`
+
+        where
+
+            :math:`\xi_{s_1 t_1}(\mu) = \sum_{\ell} C_{1,\ell} \frac{2\ell + 1}{4\pi} d^\ell_{s_1 t_1}`
+            :math:`\xi_{s_2 t_2}(\mu) = \sum_{\ell} C_{2,\ell} \frac{2\ell + 1}{4\pi} d^\ell_{s_2 t_2}`
+
+        Gauss-Legendre quadrature is used to solve this exactly.
+
+        Args:
+            cl1: spectrum of first Wigner small-d function
+            cl2: spectrum of second Wigner small-d function
+            s1: first spin of first function
+            t1: second spin of first function
+            s2: first spin of second function
+            t2: second spin of second function
+            lmax_out(optional): Result is provided up to lmax. Defaults to len(cl1) + len(cl2) -2
+
+
+    """
+    lmax1 = len(cl1) - 1
+    lmax2 = len(cl2) - 1
+    lmax_out = lmax1 + lmax2 if lmax_out is None else lmax_out
+    lmaxtot = lmax1 + lmax2 + lmax_out
+    so = s1 + s2
+    to = t1 + t2
+    if np.any(cl1) and np.any(cl2):
+        npts = (lmaxtot + 2 - lmaxtot % 2) // 2
+        if not 'tht wg %s' % npts in GL_cache.keys():
+            GL_cache['tht wg %s' % npts] = get_thgwg(npts)
+        tht, wg = GL_cache['tht wg %s' % npts]
+        if np.iscomplexobj(cl1):
+            xi1 = wignerpos(np.real(cl1), tht, s1, t1) + 1j * wignerpos(np.imag(cl1), tht, s1, t1)
+        else:
+            xi1 = wignerpos(cl1, tht, s1, t1)
+        if np.iscomplexobj(cl2):
+            xi2 = wignerpos(np.real(cl2), tht, s2, t2) + 1j * wignerpos(np.imag(cl2), tht, s2, t2)
+        else:
+            xi2 = wignerpos(cl2, tht, s2, t2)
+        xi1xi2w = xi1 * xi2 * wg
+        if np.iscomplexobj(xi1xi2w):
+            ret = wignercoeff(np.real(xi1xi2w), tht, so, to, lmax_out)
+            ret = ret + 1j * wignercoeff(np.imag(xi1xi2w), tht, so, to, lmax_out)
+            return ret
+        else:
+            return wignercoeff(xi1xi2w, tht, so, to, lmax_out)
+    else:
+        return np.zeros(lmax_out + 1, dtype=float)
+
+
 def get_thgwg(npts: int):
     """Gauss-Legendre integration points and weights from ducc0. Very fast.
 
@@ -155,39 +211,3 @@ def get_thgwg(npts: int):
     tht = GL_thetas(npts)
     wg = GL_weights(npts, 1) / (2 * np.pi)
     return tht, wg
-
-def wignerc(cl1: np.ndarray[float or complex], cl2:np.ndarray[float or complex], sp1: int, s1: int, sp2: int, s2: int, lmax_out: int or None=None):
-    """Spectrum of $ (\\xi_{sp1,s1} * \\xi_{sp2,s2})(\\cos \\theta)$ from their harmonic series.
-
-        Uses Gauss-Legendre quadrature to solve this exactly.
-
-    """
-    lmax1 = len(cl1) - 1
-    lmax2 = len(cl2) - 1
-    lmax_out = lmax1 + lmax2 if lmax_out is None else lmax_out
-    lmaxtot = lmax1 + lmax2 + lmax_out
-    spo = sp1 + sp2
-    so = s1 + s2
-    if np.any(cl1) and np.any(cl2):
-        npts = (lmaxtot + 2 - lmaxtot % 2) // 2
-        if not 'tht wg %s' % npts in GL_cache.keys():
-            GL_cache['tht wg %s' % npts] = get_thgwg(npts)
-        tht, wg = GL_cache['tht wg %s' % npts]
-        if np.iscomplexobj(cl1):
-            xi1 = wignerpos(np.real(cl1), tht, sp1, s1) + 1j * wignerpos(np.imag(cl1), tht, sp1, s1)
-        else:
-            xi1 = wignerpos(cl1, tht, sp1, s1)
-        if np.iscomplexobj(cl2):
-            xi2 = wignerpos(np.real(cl2), tht, sp2, s2) + 1j * wignerpos(np.imag(cl2), tht, sp2, s2)
-        else:
-            xi2 = wignerpos(cl2, tht, sp2, s2)
-        xi1xi2w = xi1 * xi2 * wg
-        if np.iscomplexobj(xi1xi2w):
-            ret = wignercoeff(np.real(xi1xi2w), tht, spo, so, lmax_out)
-            ret = ret + 1j * wignercoeff(np.imag(xi1xi2w), tht, spo, so, lmax_out)
-            return ret
-        else:
-            return wignercoeff(xi1xi2w, tht, spo, so, lmax_out)
-
-    else:
-        return np.zeros(lmax_out + 1, dtype=float)
