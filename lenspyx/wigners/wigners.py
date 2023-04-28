@@ -141,7 +141,7 @@ def wignercoeff(xi: np.ndarray[float], theta: np.ndarray[float], s1: int, s2: in
 
 
 def wignerc(cl1: np.ndarray[float or complex], cl2:np.ndarray[float or complex], s1: int, t1: int, s2: int, t2: int,
-            lmax_out: int or None=None):
+            lmax_out: int = -1):
     r"""Convolution of two Wigner small-d correlation function
 
         Returns spectrum of
@@ -168,7 +168,7 @@ def wignerc(cl1: np.ndarray[float or complex], cl2:np.ndarray[float or complex],
     """
     lmax1 = len(cl1) - 1
     lmax2 = len(cl2) - 1
-    lmax_out = lmax1 + lmax2 if lmax_out is None else lmax_out
+    lmax_out = lmax1 + lmax2 if lmax_out < 0 else lmax_out
     lmaxtot = lmax1 + lmax2 + lmax_out
     so = s1 + s2
     to = t1 + t2
