@@ -198,7 +198,7 @@ def qe_simplify(qe_list: list[qe], _swap=False, verbose=False):
     return [qe(q.leg_b.copy(), q.leg_a.copy(), q.cL) for q in qes_ret]
 
 
-def qe_compress(qes: list[qe], verbose=True):
+def qe_compress(qes: list[qe], verbose=False):
     """This combines pairs of estimators with identical 1st leg to reduce the number of spin transform in its evaluation
 
 
@@ -275,6 +275,7 @@ def spin_cls(s1, s2, cls):
         else:
             assert 0
 
+
 def get_spin_matrix(sout, sin, cls):
     r"""Spin-space matrix R^{-1} cls[T, E, B] R where R is the mapping from _{0, \pm 2}X to T, E, B.
 
@@ -315,6 +316,7 @@ def get_spin_matrix(sout, sin, cls):
             return 0.5 * (cls.get('ee', cls.get('e', 0.)) + cls.get('bb', cls.get('b', 0.)))
     assert 0, (sin, sout)
 
+
 def get_spin_raise(s, lmax):
     r"""Response coefficient of spin-s spherical harmonic to spin raising operator.
 
@@ -325,6 +327,7 @@ def get_spin_raise(s, lmax):
     ret[abs(s):] = np.sqrt(np.arange(abs(s) -s, lmax - s + 1) * np.arange(abs(s) + s + 1, lmax + s + 2))
     return ret
 
+
 def get_spin_lower(s, lmax):
     r"""Response coefficient of spin-s spherical harmonic to spin lowering operator.
 
@@ -334,6 +337,7 @@ def get_spin_lower(s, lmax):
     ret = np.zeros(lmax + 1, dtype=float)
     ret[abs(s):] = -np.sqrt(np.arange(s + abs(s), lmax + s + 1) * np.arange(abs(s) - s + 1, lmax - s + 2))
     return ret
+
 
 def joincls(cls_list):
     lmaxp1 = np.min([len(cl) for cl in cls_list])
