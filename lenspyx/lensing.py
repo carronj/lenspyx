@@ -4,7 +4,9 @@ import numpy as np
 from lenspyx.remapping.utils_geom import Geom
 from lenspyx.remapping.deflection_029 import deflection
 from lenspyx import cachers
-from lenspyx.utils_hp import synalm, almxfl
+from lenspyx.utils_hp import almxfl, Alm
+from lenspyx.utils import timer
+from numpy.random import default_rng
 
 
 def get_geom(geometry: tuple[str, dict]=('healpix', {'nside':2048})):
@@ -146,7 +148,8 @@ def alm2lenmap_spin(gclm: np.ndarray or list, dlms:np.ndarray or list, spin:int,
     return ret
 
 
-def synfast(cls: dict, lmax=None, mmax=None, geometry=('healpix', {'nside': 2048}), epsilon=1e-7, nthreads=0, alm=False):
+def synfast(cls: dict, lmax=None, mmax=None, geometry=('healpix', {'nside': 2048}),
+            epsilon=1e-7, nthreads=0, alm=False, seed=None, verbose=0):
     r"""Generate a set of lensed maps according to input spectra
 
         Args:
@@ -170,14 +173,17 @@ def synfast(cls: dict, lmax=None, mmax=None, geometry=('healpix', {'nside': 2048
             epsilon(float, optional): desired accuracy of the output map (exec. time only has a weak dependence on this)
             nthreads(int, optional): number of threads used for non-uniform SHTs, defaults to os.cpu_count
             alm(bool, optional): returns also unlensed alms if True
+            seed(int, optional): random generator seed for reproducible results, defaults to None
+            verbose(bool, optional): some timing info if set, defaults to zero
 
         Returns:
             A dictionary with lensed maps, which contains
                 'T' if 'TT' were present in the input cls and non-zero
                 'QU  if 'EE' or 'BB' were present and non-zero
-            if alm is set to True, returns a dictionary of the unlensed alms as well
+            if alm is set to True, returns the unlensed alms as well
 
     """
+    tim = timer('synfast', False)
     lmax_cls = np.max([len(cl) - 1 for cl in cls.values()])
     if lmax is None:
         lmax = lmax_cls
@@ -209,8 +215,6 @@ def synfast(cls: dict, lmax=None, mmax=None, geometry=('healpix', {'nside': 2048
     for f in 'tebpx':  # This just sorts the present labels according to 'tebpx'
         labels += f * (f in labelsf)
 
-    print(labels, zros)
-    print(lmax, mmax)
     ncomp = len(labels)
     mat = np.empty((lmax + 1, ncomp, ncomp), dtype=float)
     for i, f in enumerate(labels):
@@ -220,7 +224,16 @@ def synfast(cls: dict, lmax=None, mmax=None, geometry=('healpix', {'nside': 2048
     assert np.all(ts >= 0.)  # Matrix not positive semidefinite
     for m, t, v in zip(mat, ts, vs):
         m[:] = np.dot(v, np.dot(np.diag(np.sqrt(t)), v.T))
-    phases = [synalm(np.ones(lmax + 1, dtype=float), lmax, mmax) for i in range(ncomp)]
+    tim.add('cl matrix')
+    # Build phases:
+    alm_size = Alm.getsize(lmax, mmax)
+    rng = default_rng(seed)
+    phases = 1j * rng.standard_normal((ncomp, alm_size), dtype=float)
+    phases += rng.standard_normal((ncomp, alm_size), dtype=float)
+    phases *= np.sqrt(2.)
+    real_idcs = Alm.getidx(lmax, np.arange(lmax + 1, dtype=int), 0)
+    phases[:, real_idcs] = phases[:, real_idcs].real * np.sqrt(2.)
+    tim.add('phases generation')
 
     # Now builds alms. We might need more since we cannot handle now curl only transforms
     labels_wgrad = labels
@@ -236,8 +249,9 @@ def synfast(cls: dict, lmax=None, mmax=None, geometry=('healpix', {'nside': 2048
         for j in range(ncomp):
             fl = mat[:, i, j]
             if i != j and np.any(fl):
-                print(i, j)
                 alms[idx] += almxfl(phases[j], fl, mmax, False)
+    del phases
+    tim.add('alms generation')
     maps = {}
     if 'p' in labels_wgrad or 'o' in labels_wgrad:  # There is actual lensing
         p2d = np.sqrt(np.arange(lmax + 1) * np.arange(1, lmax + 2, dtype=float))
@@ -261,6 +275,7 @@ def synfast(cls: dict, lmax=None, mmax=None, geometry=('healpix', {'nside': 2048
         if 'e' in labels_wgrad:
             i = labels_wgrad.index('e')
             maps['QU'] = defl.gclm2lenmap(alms[i:i + 1 + ('b' in labels_wgrad)], mmax, 2, False)
+        tim.add('alm2lenmap')
     else:  # no lensing here
         geom = get_geom(geometry)
         if 't' in labels_wgrad:
@@ -269,4 +284,7 @@ def synfast(cls: dict, lmax=None, mmax=None, geometry=('healpix', {'nside': 2048
             i = labels_wgrad.index('e')
             sht_mode = 'STANDARD' if 'b' in labels_wgrad else 'GRAD_ONLY'
             maps['QU'] = geom.synthesis(alms[i:i + 1 + ('b' in labels_wgrad)], 2, lmax, mmax, False, mode=sht_mode)
-    return maps if not alm else (maps, {f.upper(): alms[i] for i, f in enumerate(labels_wgrad)})
+        tim.add('alm2map')
+    if verbose:
+        print(tim)
+    return maps if not alm else (maps, (alms, labels_wgrad))
