@@ -192,7 +192,7 @@ def synfast(cls: dict, lmax=None, mmax=None, geometry=('healpix', {'nside': 2048
     if mmax is None:
         mmax = lmax
     lmax = min(lmax, lmax_cls)
-    cmb_labels = ['t', 'e', 'b', 'p', 'x']
+    cmb_labels = ['t', 'e', 'b', 'p', 'o']
     spec_labels = [k.lower() for k in cls.keys()]
     # First remove zero fields:
     zros = []
@@ -214,7 +214,7 @@ def synfast(cls: dict, lmax=None, mmax=None, geometry=('healpix', {'nside': 2048
                         labelsf.append(field)
     assert len(labelsf) <= 4
     labels = ''
-    for f in 'tebpx':  # This just sorts the present labels according to 'tebpx'
+    for f in 'tebpo':  # This just sorts the present labels according to 'tebpx'
         labels += f * (f in labelsf)
 
     ncomp = len(labels)
