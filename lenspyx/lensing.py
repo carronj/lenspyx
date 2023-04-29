@@ -150,27 +150,23 @@ def alm2lenmap_spin(gclm: np.ndarray or list, dlms:np.ndarray or list, spin:int,
 
 def synfast(cls: dict, lmax=None, mmax=None, geometry=('healpix', {'nside': 2048}),
             epsilon=1e-7, nthreads=0, alm=False, seed=None, verbose=0):
-    r"""Generate a set of lensed maps according to input spectra
+    r"""Generate a set of lensed maps from scratch according to input spectra
 
         Args:
             cls(dict): dict of spectra and cross-spectra with keys of the form 'TT', 'TE', 'EE',  etc.
                        Recognized field keys are:
 
-                             'T' (or 't'): spin-0 intensity
+                            | 'T' (or 't'): spin-0 intensity
+                            | 'E' (or 'e'):  E-polarization
+                            | 'B' (or 'e'):  B-polarization
+                            | 'P' (or 'p'):  lensing potential
+                            | 'O' (or 'o'):  lensing curl potential
 
-                             'E':  E-polarization
-
-                             'B':  B-polarization
-
-                             'P':  lensing potential
-
-                             'O':  lensing curl potential
-
-                       The array must be the :math:`C_\ell`, not :math:`D_\ell`
+                       The arrays must be the :math:`C_\ell`, not :math:`D_\ell`
 
 
-                       If the auto-spectrum 'AA' is not present the 'A' field is assumed to be zero
-                       If neither 'P' and 'O' are present then the output maps are not lensed
+                       If the auto-spectrum 'AA' is not present the 'A' field is assumed to be zero.
+                       If neither 'P' and 'O' are present then the output maps are not lensed.
 
             lmax(int, optional): band-limit of the unlensed alms, infered from length of cls by default
             mmax(int, optional): maximum m of the unlensed alms, defaults to lmax
