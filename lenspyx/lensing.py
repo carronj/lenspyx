@@ -180,7 +180,7 @@ def synfast(cls: dict, lmax=None, mmax=None, geometry=('healpix', {'nside': 2048
             A dictionary with lensed maps, which contains
                 'T' if 'TT' were present in the input cls and non-zero
                 'QU  if 'EE' or 'BB' were present and non-zero
-            if alm is set to True, returns the unlensed alms as well
+            if alm is set to True, returns the unlensed alms, together with a string indicating the ordering
 
     """
     tim = timer('synfast', False)
@@ -230,7 +230,7 @@ def synfast(cls: dict, lmax=None, mmax=None, geometry=('healpix', {'nside': 2048
     rng = default_rng(seed)
     phases = 1j * rng.standard_normal((ncomp, alm_size), dtype=float)
     phases += rng.standard_normal((ncomp, alm_size), dtype=float)
-    phases *= np.sqrt(2.)
+    phases *= np.sqrt(0.5)
     real_idcs = Alm.getidx(lmax, np.arange(lmax + 1, dtype=int), 0)
     phases[:, real_idcs] = phases[:, real_idcs].real * np.sqrt(2.)
     tim.add('phases generation')
@@ -238,9 +238,9 @@ def synfast(cls: dict, lmax=None, mmax=None, geometry=('healpix', {'nside': 2048
     # Now builds alms. We might need more since we cannot handle now curl only transforms
     labels_wgrad = labels
     if 'b' in labels and 'e' not in labels:
-        labels_wgrad.replace('b', 'eb')
+        labels_wgrad = labels_wgrad.replace('b', 'eb')
     if 'o' in labels and 'p' not in labels:
-        labels_wgrad.replace('o', 'po')
+        labels_wgrad = labels_wgrad.replace('o', 'po')
     alms = np.zeros((len(labels_wgrad), phases[0].size), dtype=complex)
     #    for L in Ls: #L @ L.T is full matrx
     for i, f in enumerate(labels):
@@ -251,7 +251,7 @@ def synfast(cls: dict, lmax=None, mmax=None, geometry=('healpix', {'nside': 2048
             if i != j and np.any(fl):
                 alms[idx] += almxfl(phases[j], fl, mmax, False)
     del phases
-    tim.add('alms generation')
+    tim.add('alms from phases')
     maps = {}
     if 'p' in labels_wgrad or 'o' in labels_wgrad:  # There is actual lensing
         p2d = np.sqrt(np.arange(lmax + 1) * np.arange(1, lmax + 2, dtype=float))
