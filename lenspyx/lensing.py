@@ -154,18 +154,23 @@ def synfast(cls: dict, lmax=None, mmax=None, geometry=('healpix', {'nside': 2048
 
         Args:
             cls(dict): dict of spectra and cross-spectra with keys of the form 'TT', 'TE', 'EE',  etc.
-                       Accepted keys are:
+                       Recognized field keys are:
 
                              'T' (or 't'): spin-0 intensity
-                             'E': E-polarization
-                             'B': B-polarization
-                             'P': lensing potential
-                             'O': lensing curl potential
+
+                             'E':  E-polarization
+
+                             'B':  B-polarization
+
+                             'P':  lensing potential
+
+                             'O':  lensing curl potential
 
                        The array must be the :math:`C_\ell`, not :math:`D_\ell`
 
+
                        If the auto-spectrum 'AA' is not present the 'A' field is assumed to be zero
-                       (as a consequence, if neither 'P' and 'O' are present then the output maps are not lensed)
+                       If neither 'P' and 'O' are present then the output maps are not lensed
 
             lmax(int, optional): band-limit of the unlensed alms, infered from length of cls by default
             mmax(int, optional): maximum m of the unlensed alms, defaults to lmax
@@ -177,9 +182,10 @@ def synfast(cls: dict, lmax=None, mmax=None, geometry=('healpix', {'nside': 2048
             verbose(bool, optional): some timing info if set, defaults to zero
 
         Returns:
-            A dictionary with lensed maps, which contains
-                'T' if 'TT' were present in the input cls and non-zero
-                'QU  if 'EE' or 'BB' were present and non-zero
+
+             Dictionary with lensed maps, which contains 'T' if 'TT' were present in the input cls and non-zero,
+             and 'QU  if 'EE' or 'BB' were present and non-zero.
+
             if alm is set to True, returns the unlensed alms, together with a string indicating the ordering
 
     """
