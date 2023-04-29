@@ -4,9 +4,12 @@ import numpy as np
 from lenspyx.remapping.utils_geom import Geom
 from lenspyx.remapping.deflection_029 import deflection
 from lenspyx import cachers
+from lenspyx.utils_hp import almxfl, Alm
+from lenspyx.utils import timer
+from numpy.random import default_rng
 
 
-def get_geom(geometry:tuple[str, dict]=('healpix', {'nside':2048})):
+def get_geom(geometry: tuple[str, dict]=('healpix', {'nside':2048})):
     r"""Returns sphere pixelization geometry instance from name and arguments
 
         Note:
@@ -19,7 +22,7 @@ def get_geom(geometry:tuple[str, dict]=('healpix', {'nside':2048})):
     return geo(**geometry[1])
 
 
-def alm2lenmap(alm, dlms, geometry:tuple[str, dict]=('healpix', {'nside':2048}), epsilon=1e-7, verbose=0, nthreads:int=0, pol=True):
+def alm2lenmap(alm, dlms, geometry: tuple[str, dict]=('healpix', {'nside':2048}), epsilon=1e-7, verbose=0, nthreads: int=0, pol=True):
     r"""Computes lensed CMB maps from their alm's and deflection field alm's.
 
         Args:
@@ -83,7 +86,7 @@ def alm2lenmap(alm, dlms, geometry:tuple[str, dict]=('healpix', {'nside':2048}),
     return ret
 
 
-def alm2lenmap_spin(gclm:np.ndarray or list, dlms:np.ndarray or list, spin:int, geometry:tuple[str, dict]=('healpix', {'nside':2048}), epsilon:float=1e-7, verbose=0, nthreads:int=0):
+def alm2lenmap_spin(gclm: np.ndarray or list, dlms:np.ndarray or list, spin:int, geometry: tuple[str, dict] = ('healpix', {'nside':2048}), epsilon: float=1e-7, verbose=0, nthreads: int=0):
     r"""Computes a deflected spin-weight lensed CMB map from its gradient and curl modes and deflection field alm.
 
         Args:
@@ -144,3 +147,146 @@ def alm2lenmap_spin(gclm:np.ndarray or list, dlms:np.ndarray or list, spin:int, 
         print(defl.tim)
     return ret
 
+
+def synfast(cls: dict, lmax=None, mmax=None, geometry=('healpix', {'nside': 2048}),
+            epsilon=1e-7, nthreads=0, alm=False, seed=None, verbose=0):
+    r"""Generate a set of lensed maps from scratch according to input spectra
+
+        Args:
+            cls(dict): dict of spectra and cross-spectra with keys of the form 'TT', 'TE', 'EE',  etc.
+                       Recognized field keys are:
+
+                            | 'T' (or 't'): spin-0 intensity
+                            | 'E' (or 'e'):  E-polarization
+                            | 'B' (or 'e'):  B-polarization
+                            | 'P' (or 'p'):  lensing potential
+                            | 'O' (or 'o'):  lensing curl potential
+
+                       The arrays must be the :math:`C_\ell`, not :math:`D_\ell`
+
+
+                       If the auto-spectrum 'AA' is not present the 'A' field is assumed to be zero.
+                       If neither 'P' and 'O' are present then the output maps are not lensed.
+
+            lmax(int, optional): band-limit of the unlensed alms, infered from length of cls by default
+            mmax(int, optional): maximum m of the unlensed alms, defaults to lmax
+            geometry(tuple, optional): tuple of geometry name and parameters (defaults to healpix at nside 2048)
+            epsilon(float, optional): desired accuracy of the output map (exec. time only has a weak dependence on this)
+            nthreads(int, optional): number of threads used for non-uniform SHTs, defaults to os.cpu_count
+            alm(bool, optional): returns also unlensed alms if True
+            seed(int, optional): random generator seed for reproducible results, defaults to None
+            verbose(bool, optional): some timing info if set, defaults to zero
+
+        Returns:
+
+             Dictionary with lensed maps, which contains 'T' if 'TT' were present in the input cls and non-zero,
+             and 'QU  if 'EE' or 'BB' were present and non-zero.
+
+            if alm is set to True, returns the unlensed alms, together with a string indicating the ordering
+
+    """
+    tim = timer('synfast', False)
+    lmax_cls = np.max([len(cl) - 1 for cl in cls.values()])
+    if lmax is None:
+        lmax = lmax_cls
+    if mmax is None:
+        mmax = lmax
+    lmax = min(lmax, lmax_cls)
+    cmb_labels = ['t', 'e', 'b', 'p', 'o']
+    spec_labels = [k.lower() for k in cls.keys()]
+    # First remove zero fields:
+    zros = []
+    for fg in spec_labels:
+        assert len(fg) == 2 and fg[0] in cmb_labels and fg[1] in cmb_labels
+        if fg[0] == fg[1]:
+            assert np.all(cls[fg] >= 0), 'auto spectrum of %s must be >= 0' % fg
+            if not np.any(cls[fg]):
+                zros.append(fg[0])
+    labelsf = []
+    for fg in spec_labels:
+        assert len(fg) == 2 and fg[0] in cmb_labels and fg[1] in cmb_labels
+        if fg[0] not in zros and fg[1] not in zros:
+            assert fg[0] + fg[0] in spec_labels, 'must have %s auto-spectrum' % fg[0]
+            assert fg[1] + fg[1] in spec_labels, 'must have %s auto-spectrum' % fg[1]
+            if fg[0] == fg[1]:
+                for field in fg:
+                    if field not in labelsf:
+                        labelsf.append(field)
+    assert len(labelsf) <= 4
+    labels = ''
+    for f in 'tebpo':  # This just sorts the present labels according to 'tebpx'
+        labels += f * (f in labelsf)
+
+    ncomp = len(labels)
+    mat = np.empty((lmax + 1, ncomp, ncomp), dtype=float)
+    for i, f in enumerate(labels):
+        for j, g in enumerate(labels[i:]):
+            mat[:, i + j, i] = cls.get(f + g, cls.get(g + f, np.zeros(lmax + 1, dtype=float)))[:lmax + 1]
+    ts, vs = np.linalg.eigh(mat)
+    assert np.all(ts >= 0.)  # Matrix not positive semidefinite
+    for m, t, v in zip(mat, ts, vs):
+        m[:] = np.dot(v, np.dot(np.diag(np.sqrt(t)), v.T))
+    tim.add('cl matrix')
+    # Build phases:
+    alm_size = Alm.getsize(lmax, mmax)
+    rng = default_rng(seed)
+    phases = 1j * rng.standard_normal((ncomp, alm_size), dtype=float)
+    phases += rng.standard_normal((ncomp, alm_size), dtype=float)
+    phases *= np.sqrt(0.5)
+    real_idcs = Alm.getidx(lmax, np.arange(lmax + 1, dtype=int), 0)
+    phases[:, real_idcs] = phases[:, real_idcs].real * np.sqrt(2.)
+    tim.add('phases generation')
+
+    # Now builds alms. We might need more since we cannot handle now curl only transforms
+    labels_wgrad = labels
+    if 'b' in labels and 'e' not in labels:
+        labels_wgrad = labels_wgrad.replace('b', 'eb')
+    if 'o' in labels and 'p' not in labels:
+        labels_wgrad = labels_wgrad.replace('o', 'po')
+    alms = np.zeros((len(labels_wgrad), phases[0].size), dtype=complex)
+    #    for L in Ls: #L @ L.T is full matrx
+    for i, f in enumerate(labels):
+        idx = labels_wgrad.index(f)
+        alms[idx] += almxfl(phases[i], mat[:, i, i], mmax, False)
+        for j in range(ncomp):
+            fl = mat[:, i, j]
+            if i != j and np.any(fl):
+                alms[idx] += almxfl(phases[j], fl, mmax, False)
+    del phases
+    tim.add('alms from phases')
+    maps = {}
+    if 'p' in labels_wgrad or 'o' in labels_wgrad:  # There is actual lensing
+        p2d = np.sqrt(np.arange(lmax + 1) * np.arange(1, lmax + 2, dtype=float))
+        dglm, dclm = None, None
+        if 'p' in labels_wgrad:
+            dglm = alms[labels_wgrad.index('p')]
+            almxfl(dglm, p2d, mmax, True)
+        if 'o' in labels_wgrad:
+            dclm = alms[labels_wgrad.index('o')]
+            almxfl(dclm, p2d, mmax, True)
+        if dglm is None:
+            dglm = np.zeros_like(dclm)
+        if dclm is None:
+            dclm = np.zeros_like(dglm)
+        if nthreads <= 0:
+            nthreads = cpu_count()
+        defl = deflection(get_geom(geometry), dglm, None, dclm=dclm, epsilon=epsilon, numthreads=nthreads, verbosity=0,
+                          cacher=cachers.cacher_mem(safe=False))
+        if 't' in labels_wgrad:
+            maps['T'] = defl.gclm2lenmap(alms[0:1], mmax, 0, False).squeeze()
+        if 'e' in labels_wgrad:
+            i = labels_wgrad.index('e')
+            maps['QU'] = defl.gclm2lenmap(alms[i:i + 1 + ('b' in labels_wgrad)], mmax, 2, False)
+        tim.add('alm2lenmap')
+    else:  # no lensing here
+        geom = get_geom(geometry)
+        if 't' in labels_wgrad:
+            maps['T'] = geom.synthesis(alms[0:1], 0, lmax, mmax, nthreads)
+        if 'e' in labels_wgrad:
+            i = labels_wgrad.index('e')
+            sht_mode = 'STANDARD' if 'b' in labels_wgrad else 'GRAD_ONLY'
+            maps['QU'] = geom.synthesis(alms[i:i + 1 + ('b' in labels_wgrad)], 2, lmax, mmax, False, mode=sht_mode)
+        tim.add('alm2map')
+    if verbose:
+        print(tim)
+    return maps if not alm else (maps, (alms, labels_wgrad))
