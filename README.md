@@ -8,7 +8,7 @@ Curved-sky python lensed CMB maps simulation package by Julien Carron.
 
 This allows one to build very easily lensed CMB simulations. 
 
-The package explicitly provides two methods for most basic usage. Check the [doc](https://lenspyx.readthedocs.io/en/latest) (which refers to the repo master branch). 
+The package explicitly provides a few methods for most basic usage (such alm2lenmap and synfast). Check the [doc](https://lenspyx.readthedocs.io/en/latest) (which refers to the repo master branch). 
 There is also a notebook [demo_lenspyx](examples/demo_lenspyx.ipynb) for examples and sanity checks.
 
 There are further tools for CMB lensing reconstruction (adjoint lensing etc.) which may be useful to CMB-lensing intensive applications.
