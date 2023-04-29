@@ -27,7 +27,6 @@ class OpFilt:
 
         """
         # Example geom input: 'harmonic', 'healpix_2048'
-        assert len(job) <= 3 and np.all([f in ['t', 'e', 'b'] for f in job])
         harmonic = geom.lower() == 'harmonic'
         for i, f in enumerate(job):
             assert (f + f) in cls_filt
@@ -45,9 +44,17 @@ class OpFilt:
             nthreads = cpu_count()
         lmaxs_wted = {field: len(transfs[field]) - 1 for field in job}
         lmaxs_ivfs = {field: len(transfs[field]) - 1 for field in job}
-        if 'e' in job and 'b' in job:
-            lmaxs_ivfs['e'] = max(lmaxs_ivfs['e'], lmaxs_ivfs['b'])
-            lmaxs_ivfs['b'] = max(lmaxs_ivfs['e'], lmaxs_ivfs['b'])
+
+        if harmonic:
+            self.maps_labels = job # FIXME: this need not be
+            self.nmaps = len(job)
+        else:
+            assert len(job) <= 3 and np.all([f in ['t', 'e', 'b'] for f in job])
+            self.maps_labels = ['t'] * ('t' in job) + ['q', 'u'] * (('e' in job) or ('b' in job))
+            self.nmaps = (1 * ('t' in job) + 2 * ('e' in job or 'b' in job))
+            if 'e' in job and 'b' in job:
+                lmaxs_ivfs['e'] = max(lmaxs_ivfs['e'], lmaxs_ivfs['b'])
+                lmaxs_ivfs['b'] = max(lmaxs_ivfs['e'], lmaxs_ivfs['b'])
 
         self.job = job
         self.cls = cls_filt
@@ -59,7 +66,6 @@ class OpFilt:
         self.mmax_ivfs = lmaxs_ivfs # TODO: not necessary
 
         self.nalm  = len(job)
-        self.nmaps = len(job) if geom.lower() == 'harmonic' else (1 * ('t' in job) + 2 * ('e' in job or 'b' in job))
 
 
         self.transfs = transfs
@@ -68,11 +74,6 @@ class OpFilt:
         self.geom = Geom.get_healpix_geometry(2048) #FIXME
 
         self.nthreads = nthreads
-
-        if harmonic:
-            self.maps_labels = job # FIXME: this need not be
-        else:
-            self.maps_labels = ['t'] * ('t' in self.job) + ['q', 'u'] * (('e' in self.job) or ('b' in self.job))
 
         self.harmonic = harmonic
         self._fal = None
@@ -150,6 +151,7 @@ class OpFilt:
                 ivf_alms[f] = self._almxflcopy(f, self._fal[f+f], maps[f])
             for fg in self._fal:
                 if fg[0] != fg[1]:  # off-diagonals, explicitly assuming symmetry
+                    assert fg[1] + fg[0] not in self._fal
                     ivf_alms[fg[0]] += self._almxflcopy(fg[0], 2 * self._fal[fg], maps[fg[1]])
             return ivf_alms
         else:
@@ -237,10 +239,10 @@ class Qlms:
                 qe_key: label of the QE (e.g. 'ptt' for lensing TT QE, see Plancklens doc for this)
                 source_key: label of the anisotropy source (e.g. 'p' for lensing)
                 cls_cmb: dictionary of cls describing the sky response to the anisotropy
-                         (typically lensed cls or grad cls for lensing)
+                         (typically lensed cls or better grad cls for lensing)
 
             Returns:
-                Response of gradient and curl modes
+                Response of gradient and curl modes to gradient and curl modes
 
 
         """
@@ -257,12 +259,12 @@ class Qlms:
                 verbose: some printout if set
 
             Returns:
-                gradient and curl mode of the estimator, array of shape (1 if spin 0 else 2, qlm_size)
+                gradient and curl mode of the estimator, array of shape (1 if spin==0 else 2, qlm_size)
 
 
         """
         for f in self.opfilt_1.maps_labels + self.opfilt_2.maps_labels:
-            assert f in maps, 'inconsistent inputs'
+            assert f in maps, 'missing input: ' + f
 
         if self.opfilt_1 is self.opfilt_2:
             alms_1 = self.opfilt_1(maps).get
