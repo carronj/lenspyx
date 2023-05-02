@@ -92,6 +92,25 @@ class qeleg_multi:
     def get_lmax(self):
         return np.max([len(cl) for cl in self.cls]) - 1
 
+    def is_conjugate(self, leg2: qeleg_multi, rtol=1e-14, atol=0.):
+        """Tests whether leg2 is complex conjugate of leg1
+
+
+        """
+        cond =  self.spin_ou == -leg2.spin_ou
+        cond *= (len(self.spins_in) == len(self.spins_in))
+        cond *= (self.get_lmax() == leg2.get_lmax())
+        if cond:
+            ix = np.argsort(self.spins_in)
+            jx = np.argsort(self.spins_in)[::-1]
+            for i, j in zip(ix, jx): # Should cover relevant cases
+                cond *= (self.spins_in[i] == -leg2.spins_in[j])
+                sgn = 1 if (self.spin_ou + self.spins_in[i]) % 2 == 0 else -1
+                cond *= np.allclose(self.cls[i], sgn * leg2.cls[j], rtol=rtol, atol=atol)
+            return cond
+        else:
+            return False
+
 
 class qe:
     def __init__(self, leg_a: qeleg, leg_b: qeleg, cL: callable):
@@ -179,7 +198,7 @@ def qe_simplify(qe_list: list[qe], _swap=False, verbose=False):
     return [qe(q.leg_b.copy(), q.leg_a.copy(), q.cL) for q in qes_ret]
 
 
-def qe_compress(qes: list[qe], verbose=True):
+def qe_compress(qes: list[qe], verbose=False):
     """This combines pairs of estimators with identical 1st leg to reduce the number of spin transform in its evaluation
 
 
@@ -192,6 +211,12 @@ def qe_compress(qes: list[qe], verbose=True):
     """
     # NB: this only compares first legs.
     skip = []
+    # First removes zero weight QEs
+    for i, qi in enumerate(qes):
+        not_zero = np.any(qi.leg_a.cl) and np.any(qi.leg_b.cl)
+        if not not_zero:
+            skip.append(i)
+    # Then combines remaining QEs
     qes_compressed = []
     for i, qi in enumerate(qes):
         if i not in skip:
@@ -250,6 +275,7 @@ def spin_cls(s1, s2, cls):
         else:
             assert 0
 
+
 def get_spin_matrix(sout, sin, cls):
     r"""Spin-space matrix R^{-1} cls[T, E, B] R where R is the mapping from _{0, \pm 2}X to T, E, B.
 
@@ -290,6 +316,7 @@ def get_spin_matrix(sout, sin, cls):
             return 0.5 * (cls.get('ee', cls.get('e', 0.)) + cls.get('bb', cls.get('b', 0.)))
     assert 0, (sin, sout)
 
+
 def get_spin_raise(s, lmax):
     r"""Response coefficient of spin-s spherical harmonic to spin raising operator.
 
@@ -300,6 +327,7 @@ def get_spin_raise(s, lmax):
     ret[abs(s):] = np.sqrt(np.arange(abs(s) -s, lmax - s + 1) * np.arange(abs(s) + s + 1, lmax + s + 2))
     return ret
 
+
 def get_spin_lower(s, lmax):
     r"""Response coefficient of spin-s spherical harmonic to spin lowering operator.
 
@@ -309,6 +337,7 @@ def get_spin_lower(s, lmax):
     ret = np.zeros(lmax + 1, dtype=float)
     ret[abs(s):] = -np.sqrt(np.arange(s + abs(s), lmax + s + 1) * np.arange(abs(s) - s + 1, lmax - s + 2))
     return ret
+
 
 def joincls(cls_list):
     lmaxp1 = np.min([len(cl) for cl in cls_list])
