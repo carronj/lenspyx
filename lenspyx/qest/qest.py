@@ -8,9 +8,10 @@
 from __future__ import annotations
 from os import cpu_count
 import numpy as np
-from lenspyx.qest import utils_qe as uqe
+from lenspyx.qest import qresp, utils_qe as uqe
 from lenspyx import utils_hp
 from lenspyx.remapping.utils_geom import Geom
+from lenspyx.qest.ivfs import OpFilt
 
 
 def eval_qe(qe_key, lmax_ivf, cls_weight, get_alm, lmax_qlm, verbose=False, get_alm2=None, geometry: Geom or None=None):
@@ -275,3 +276,64 @@ def _get_covresp(source, s1, s2, cls, lmax):
         assert 0, 'dont think this parametrization works here'
     else:
         assert 0, 'source ' + source + ' cov. response not implemented'
+
+
+class Qlms:
+    def __init__(self, opfilt_1: OpFilt, opfilt_2: OpFilt, cls_weight: dict, lmax_qlm: int):
+        """Calculator of quadratic estimator from CMB inverse-variance filtering instance
+
+                Args:
+                    opfilt_1(OpFilt): filtering instance for the first leg
+                    opfilt_2(OpFilt): filtering instance for the second leg (can be the same)
+                    cls_weight(dict): spectra used as weights when buildingt the QE (e.g. lensed CMB spectra)
+                    lmax_qlm(int): QE's are computed down to this
+
+
+        """
+        lmax_ivf1 = np.max([lmax for lmax in opfilt_1.lmax_ivfs.values()])
+        lmax_ivf2 = np.max([lmax for lmax in opfilt_2.lmax_ivfs.values()])
+
+        self.opfilt_1 = opfilt_1
+        self.opfilt_2 = opfilt_2
+        self.lmax_ivf = max(lmax_ivf1, lmax_ivf2)
+
+        self.cls_weight = cls_weight
+        self.lmax_qlm = lmax_qlm
+
+    def get_response(self, qe_key: str, source_key: str, cls_cmb: dict):
+        """Calculate response of QE to anisotropy source
+
+            Args:
+                qe_key: label of the QE (e.g. 'ptt' for lensing TT QE, see Plancklens doc for this)
+                source_key: label of the anisotropy source (e.g. 'p' for lensing)
+                cls_cmb: dictionary of cls describing the sky response to the anisotropy
+                         (typically lensed cls or better grad cls for lensing)
+
+            Returns:
+                Response of gradient and curl modes to gradient and curl modes
+
+
+        """
+        fal1 = self.opfilt_1.get_fal()
+        fal2 = fal1 if self.opfilt_1 is self.opfilt_2 else self.opfilt_2.get_fal()
+        qresp.get_response(qe_key, self.lmax_ivf, source_key, self.cls_weight, cls_cmb, fal1, fal_leg2=fal2, lmax_qlm=self.lmax_qlm)
+
+    def get_qlms(self, qe_key: str, maps: dict, verbose=False):
+        """Calculates a quadratic estimator
+
+            Args:
+                qe_key: label of the QE (e.g. 'ptt' for lensing TT QE, see Plancklens doc for this)
+                maps: input maps, as a dictionary. Must be consistent with what the filter expects to see
+                verbose: some printout if set
+
+            Returns:
+                gradient and curl mode of the estimator, array of shape (1 if spin==0 else 2, qlm_size)
+
+
+        """
+        for f in self.opfilt_1.maps_labels + self.opfilt_2.maps_labels:
+            assert f in maps, 'missing input map: ' + f
+        alms_1 = self.opfilt_1(maps).get
+        alms_2 = alms_1 if self.opfilt_1 is self.opfilt_2 else self.opfilt_2(maps).get
+        return eval_qe(qe_key, self.lmax_ivf, self.cls_weight, alms_1, self.lmax_qlm,
+                            verbose=verbose, get_alm2=alms_2)
