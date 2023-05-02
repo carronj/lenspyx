@@ -278,6 +278,11 @@ def synfast(cls: dict, lmax=None, mmax=None, geometry=('healpix', {'nside': 2048
             i = labels_wgrad.index('e')
             maps['QU'] = defl.gclm2lenmap(alms[i:i + 1 + ('b' in labels_wgrad)], mmax, 2, False)
         tim.add('alm2lenmap')
+        # undo deflection weighting otherwise unlensed plm array would be dlm instead
+        d2p = np.zeros_like(p2d)
+        d2p[1:] = 1. / p2d[1:]
+        almxfl(dglm, d2p, mmax, True)
+        almxfl(dclm, d2p, mmax, True)
     else:  # no lensing here
         geom = get_geom(geometry)
         if 't' in labels_wgrad:
