@@ -32,11 +32,13 @@ class OpFilt:
             assert f + f in inoise or f in inoise
             if f in inoise:
                 inoise[f + f] = inoise[f]
-            for g in job[i + 1:]:  # always want f + g in the keys
-                for cl in [cls_filt, inoise]:
-                    if g + f in cl:
-                        cl[f + g] = cl[g + f]
-
+            for g in job:  # always want f + g in the keys
+                if g != f:
+                    for cl in [cls_filt, inoise]:
+                        if g + f in cl:
+                            cl[f + g] = cl[g + f]
+                        if f + g in cl:
+                            cl[g + f] = cl[f + g]
 
         lmaxs_wted = {field: len(transfs[field]) - 1 for field in job}
         lmaxs_ivfs = {field: len(transfs[field]) - 1 for field in job}
@@ -53,7 +55,7 @@ class OpFilt:
 
         self.lmax_wted = lmaxs_wted
         self.lmax_ivfs = lmaxs_ivfs
-        self.mmax_ivfs = lmaxs_ivfs # TODO: not necessary
+        self.mmax_ivfs = lmaxs_ivfs  # not necessary
 
         self.nalm = len(job)
 
@@ -102,6 +104,7 @@ class OpFilt:
                 for j, g in enumerate(self.job[i:]):
                     if np.any(ni[:self.lmax_ivfs[f] + 1, i, i + j]):
                         fal[f + g] = ni[:self.lmax_ivfs[f] + 1, i, i + j]
+                        fal[g + f] = fal[f + g]
             self._fal = fal
         return self._fal
 
@@ -144,7 +147,8 @@ class OpFilt:
         for fg in self._fal:
             assert len(fg) % 2 == 0, fg
             f, g = fg[:len(fg) // 2], fg[len(fg) // 2:]
-            if f != g:  # off-diagonals, explicitly assuming symmetry
-                assert (g + f not in self._fal)
-                ivf_alms[f] += self._almxflcopy(f, 2 * self._fal[fg], alms[g])
+            if f != g:  # off-diagonals, checking explicitly symmetry
+                fac = 1 if (g + f) in self._fal else 2
+                assert (g + f not in self._fal) or (self._fal[g + f] is self._fal[f + g])
+                ivf_alms[f] += self._almxflcopy(f, fac * self._fal[fg], alms[g])
         return ivf_alms
