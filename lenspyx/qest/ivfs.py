@@ -17,11 +17,10 @@ class OpFilt:
             Args:
                 cls_filt(dict): dictionary of fiducial set of spectra used in the filtering
                 transfs(dict): dictionary of transfer functions. Here only diagonal in harmonic space is supported
-                inoise(dict): inverse noise variance maps (or inverse noise cls if in harmonic space) May be scalar
+                inoise(dict):  Inverse noise cls of transfer-convovled maps. May be scalars if white.
 
 
         """
-        # Example geom input: 'harmonic', 'healpix_2048'
         job = []
         for f in transfs:
             if f + f in cls_filt:
@@ -37,6 +36,7 @@ class OpFilt:
                 for cl in [cls_filt, inoise]:
                     if g + f in cl:
                         cl[f + g] = cl[g + f]
+
 
         lmaxs_wted = {field: len(transfs[field]) - 1 for field in job}
         lmaxs_ivfs = {field: len(transfs[field]) - 1 for field in job}
@@ -59,13 +59,14 @@ class OpFilt:
 
         self.transfs = transfs
 
-        self._fal = None
-        self._fal = self._build_fal()
         print('OpFilt setup')
         for f in self.job:
             print(f + ' lmax %s' % lmaxs_ivfs[f])
         print('expected input maps: ' + ' '.join(maps_labels))
         print('filtered alms      : ' + ' '.join(alms_labels))
+
+        self._fal = None
+        self._fal = self._build_fal()
 
     def get_fal(self):
         self._build_fal()
@@ -87,6 +88,8 @@ class OpFilt:
                         ino = self.inoise[f + g]
                         ni[:, i, j] = self._joincls([ino, transf_f, transf_g], lmax)
                         ni[:, j, i] = self._joincls([ino, transf_f, transf_g], lmax)
+                    if i == j:
+                        ni[:, i, i] *= (self.cls[f + f][:lmax+1] > 0)
                     if f + g in self.cls:
                         s[:, i, j] = self._joincls([self.cls[f + g]], lmax)
                         s[:, j, i] = self._joincls([self.cls[f + g]], lmax)
@@ -104,7 +107,11 @@ class OpFilt:
 
     @staticmethod
     def _joincls(cls: list[np.ndarray or float], lmax: int):
-        """Multiplies inputs arrays up to lmax. Outputs has shape lmax + 1"""
+        """Multiplies inputs arrays up to lmax.
+
+                Output has shape lmax + 1
+
+        """
         ret = np.ones(lmax + 1, dtype=float)
         for cl in cls:
             if np.isscalar(cl):

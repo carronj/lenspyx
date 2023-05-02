@@ -265,10 +265,10 @@ class Drop:
         return ret
 
 
-def get_ffp10_cls():
+def get_ffp10_cls(lmax=None):
     path2cls = os.path.dirname(lenspyx.__file__)
-    cls_unl = camb_clfile(path2cls + '/data/cls/FFP10_wdipole_lenspotentialCls.dat')
-    cls_len = camb_clfile(path2cls + '/data/cls/FFP10_wdipole_lensedCls.dat')
-    cls_glen = camb_clfile(path2cls + '/data/cls/FFP10_wdipole_gradlensedCls.dat')
+    cls_unl = camb_clfile(path2cls + '/data/cls/FFP10_wdipole_lenspotentialCls.dat', lmax=lmax)
+    cls_len = camb_clfile(path2cls + '/data/cls/FFP10_wdipole_lensedCls.dat', lmax=lmax)
+    cls_glen = camb_clfile(path2cls + '/data/cls/FFP10_wdipole_gradlensedCls.dat', lmax=lmax)
     assert np.all([k in cls_glen.keys() for k in ['tt', 'te', 'ee', 'bb']])
     return cls_unl, cls_len, cls_glen

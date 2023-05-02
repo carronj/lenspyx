@@ -316,7 +316,7 @@ class Qlms:
         """
         fal1 = self.opfilt_1.get_fal()
         fal2 = fal1 if self.opfilt_1 is self.opfilt_2 else self.opfilt_2.get_fal()
-        qresp.get_response(qe_key, self.lmax_ivf, source_key, self.cls_weight, cls_cmb, fal1, fal_leg2=fal2, lmax_qlm=self.lmax_qlm)
+        return qresp.get_response(qe_key, self.lmax_ivf, source_key, self.cls_weight, cls_cmb, fal1, fal_leg2=fal2, lmax_qlm=self.lmax_qlm)
 
     def get_qlms(self, qe_key: str, maps: dict, verbose=False):
         """Calculates a quadratic estimator
