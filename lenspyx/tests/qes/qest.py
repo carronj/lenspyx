@@ -16,7 +16,7 @@ def copy_cls(cls, include=()):
 
 
 lmax_unl = 3000
-lmax_filt, lmax_qlm = 2048, 2048
+lmax_filt, lmax_qlm = 2048, 1000
 geom_info = ('thingauss', {'lmax': 4000, 'smax': 2})
 
 cls_unl, cls_len, cls_glen = get_ffp10_cls(lmax=lmax_unl)
