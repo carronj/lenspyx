@@ -90,7 +90,7 @@ class OpFilt:
                     if f + g in self.cls:
                         s[:, i, j] = self._joincls([self.cls[f + g]], lmax)
                         s[:, j, i] = self._joincls([self.cls[f + g]], lmax)
-            sipni_il = np.linalg.pinv(np.linalg.pinv(s) + ni)
+            sipni_il = np.linalg.pinv(np.linalg.pinv(s, hermitian=True) + ni, hermitian=True)
             for tni, sipni_i in zip(ni, sipni_il):
                 tni -= np.dot(tni, np.dot(sipni_i, tni))
 
@@ -138,6 +138,6 @@ class OpFilt:
             assert len(fg) % 2 == 0, fg
             f, g = fg[:len(fg) // 2], fg[len(fg) // 2:]
             if f != g:  # off-diagonals, explicitly assuming symmetry
-                assert (g + f not in self._fal) or (self._fal[g + f] is self._fal[f + g])
+                assert (g + f not in self._fal)
                 ivf_alms[f] += self._almxflcopy(f, 2 * self._fal[fg], alms[g])
         return ivf_alms
