@@ -46,6 +46,12 @@ class OpFilt:
         maps_labels = job  # input map labels
         alms_labels = job  # filtered solutions labels
 
+        lmax = np.max([lmax for lmax in lmaxs_ivfs.values()])
+        transfs_i = {lab: np.zeros(lmax + 1) for lab in transfs}
+        for lab in transfs:
+            ls = np.where(transfs[lab] != 0)
+            transfs_i[lab][ls] = 1. / transfs[lab][ls]
+
         self.job = job
         self.maps_labels = maps_labels
 
@@ -60,6 +66,8 @@ class OpFilt:
         self.nalm = len(job)
 
         self.transfs = transfs
+        self.transfs_i = transfs_i
+
 
         print('OpFilt setup')
         for f in self.job:
@@ -142,7 +150,7 @@ class OpFilt:
         for f in self.maps_labels:
             assert f in alms, alms.keys()
             assert alms[f].ndim == 1
-            ivf_alms[f] = self._almxflcopy(f, self._fal[f+f], alms[f])
+            ivf_alms[f] = self._almxflcopy(f, self._fal[f+f] * self.transfs_i[f], alms[f])
         self._build_fal()
         for fg in self._fal:
             assert len(fg) % 2 == 0, fg
@@ -150,5 +158,5 @@ class OpFilt:
             if f != g:  # off-diagonals, checking explicitly symmetry
                 fac = 1 if (g + f) in self._fal else 2
                 assert (g + f not in self._fal) or (self._fal[g + f] is self._fal[f + g])
-                ivf_alms[f] += self._almxflcopy(f, fac * self._fal[fg], alms[g])
+                ivf_alms[f] += self._almxflcopy(f, fac * self._fal[fg] * self.transfs_i[g], alms[g])
         return ivf_alms

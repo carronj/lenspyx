@@ -28,3 +28,4 @@ jobs:
           python lenspyx/tests/splits.py
           python lenspyx/tests/test_funkypointing.py
           python lenspyx/tests/cmplxvsreal.py
+          python lenspyx/tests/qes/qest.py
