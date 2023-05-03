@@ -13,11 +13,18 @@
 
 """
 import numpy as np
-import pylab as pl
 from lenspyx import synfast, get_geom
 from lenspyx.utils import get_ffp10_cls
 from lenspyx.utils_hp import gauss_beam, almxfl, alm2cl, alm_copy, synalm
 from lenspyx.qest.qest import Qlms, OpFilt
+
+try:
+    import pylab as pl
+    PLOT = True
+
+except ImportError:
+    pl = None
+    PLOT = False
 
 
 def copy_cls(cls, include=()):
@@ -81,15 +88,16 @@ for qe_key, qe_lab in zip(['ptt', 'p_p', 'p'], [r'$\hat \phi^{TT}$', r'$\hat \ph
     rp, ro = qlms_dd.get_response(qe_key, 'p', cls_len)
 
     # plots
-    pl.plot(ls, wls / rp[ls] * alm2cl(plm, plm_in, lmax_qlm, lmax_qlm, lmax_qlm)[ls],
-            label=r'$C_L^{\hat \phi \cdot \phi^{\rm in}}$')
-    pl.plot(ls, wls / rp[ls] ** 2 * alm2cl(plm, plm, lmax_qlm, lmax_qlm, lmax_qlm)[ls],
-            label=r'$C_L^{\hat \phi \hat \phi}$')
-    pl.plot(ls, wls * cls_unl['pp'][ls], c='k', label=r'$C_L^{\phi\phi}$')
-    pl.plot(ls, wls / rp[ls], ls='--', c='k', label = r'$R^{-1}_L$')
-    pl.plot(ls, wls * (1. / rp[ls] + cls_unl['pp'][ls]), ls='-.', c='k', label = r'$C_L^{\phi\phi}+ R^{-1}_L$')
-    pl.xlabel(r'$L$')
-    pl.ylabel(r'$10^7\cdot L^2(L + 1)^2 C_L^{\phi\phi} / 2\pi$')
-    pl.legend()
-    pl.title(qe_lab)
-    pl.show()
+    if PLOT:
+        pl.plot(ls, wls / rp[ls] * alm2cl(plm, plm_in, lmax_qlm, lmax_qlm, lmax_qlm)[ls],
+                label=r'$C_L^{\hat \phi \cdot \phi^{\rm in}}$')
+        pl.plot(ls, wls / rp[ls] ** 2 * alm2cl(plm, plm, lmax_qlm, lmax_qlm, lmax_qlm)[ls],
+                label=r'$C_L^{\hat \phi \hat \phi}$')
+        pl.plot(ls, wls * cls_unl['pp'][ls], c='k', label=r'$C_L^{\phi\phi}$')
+        pl.plot(ls, wls / rp[ls], ls='--', c='k', label = r'$R^{-1}_L$')
+        pl.plot(ls, wls * (1. / rp[ls] + cls_unl['pp'][ls]), ls='-.', c='k', label = r'$C_L^{\phi\phi}+ R^{-1}_L$')
+        pl.xlabel(r'$L$')
+        pl.ylabel(r'$10^7\cdot L^2(L + 1)^2 C_L^{\phi\phi} / 2\pi$')
+        pl.legend()
+        pl.title(qe_lab)
+        pl.show()
