@@ -9,7 +9,7 @@ from lenspyx.wigners.utils_wigners import WignerAccumulator
 uspin = ut
 
 
-def get_response(qe_key, lmax_ivf, source, cls_weight, cls_cmb, fal, fal_leg2=None, lmax_qlm=None):
+def get_response(qe_key: str, lmax_ivf: int, source: str, cls_weight: dict, cls_cmb:dict, fal:dict, fal_leg2=None, lmax_qlm=None):
     r"""QE response calculation
 
         Args:
@@ -25,7 +25,8 @@ def get_response(qe_key, lmax_ivf, source, cls_weight, cls_cmb, fal, fal_leg2=No
                     for temperature if filtered independently from polarization.
 
             fal_leg2(dict): Same as *fal* but for the second leg, if different.
-            lmax_qlm(optional): responses are calculated up to this multipole. Defaults to lmax_ivf + lmax_ivf2
+            lmax_qlm(optional): responses are calculated up to this multipole. Defaults to lmax_ivf
+
 
         Note:
             The result is *not* symmetrized with respect to the 'fals', if not the same on the two legs.
@@ -57,6 +58,23 @@ def get_response(qe_key, lmax_ivf, source, cls_weight, cls_cmb, fal, fal_leg2=No
     return _get_response(qes, source, cls_cmb, fal, lmax_ivf, lmax_qlm, fal_leg2=fal_leg2)
 
 
+def get_dresponse_dlncl(qe_key: str, cmb_l: int, cl_key: str, lmax_ivf: int, source: str, cls_weight: dict, cls_cmb: dict, fal_leg1: dict,
+                        fal_leg2=None, lmax_qlm=None):
+    """QE isotropic response derivative function
+
+            :math:`\frac{dR_L} { dlnC_l}'
+
+            for each L and input cmb_l
+
+
+    """
+    if lmax_qlm is None : lmax_qlm = lmax_ivf
+    dcls_cmb = {k: np.zeros_like(cls_cmb[k]) for k in cls_cmb.keys()}
+    dcls_cmb[cl_key][cmb_l] = cls_cmb[cl_key][cmb_l]
+    qes = ut.qe_compress(qest._get_qes(qe_key, lmax_ivf, cls_weight))
+    return _get_response(qes, source, dcls_cmb, fal_leg1, lmax_ivf, lmax_qlm, fal_leg2=fal_leg2)
+
+
 def _accumulate_f(spin_ins, s2, fal, cls):
     assert len(spin_ins) == len(cls), (len(spin_ins), len(cls))
     f = 0
@@ -85,6 +103,7 @@ def _get_response(qes:list[(ut.qeleg_multi, ut.qeleg_multi, callable)], source, 
         legs_a, legs_b, cL = qe
         sis, tis = (legs_a.spins_in, legs_b.spins_in)
         so, to  = (legs_a.spin_ou, legs_b.spin_ou)
+        assert (len(sis) == 1) or (len(tis) == 1)
         if qe_spin is None:
             qe_spin = so + to
         assert qe_spin == so + to
