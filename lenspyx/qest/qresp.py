@@ -60,11 +60,11 @@ def get_response(qe_key: str, lmax_ivf: int, source: str, cls_weight: dict, cls_
 
 def get_dresponse_dlncl(qe_key: str, cmb_l: int, cl_key: str, lmax_ivf: int, source: str, cls_weight: dict, cls_cmb: dict, fal_leg1: dict,
                         fal_leg2=None, lmax_qlm=None):
-    """QE isotropic response derivative function
+    r"""QE isotropic response derivative function
 
-            :math:`\frac{dR_L} { dlnC_l}'
+            :math:`\frac{dR_L} { d\ln C_l}`
 
-            for each L and input cmb_l
+            for each L up to lmax_qlm and where l is the input cmb_l
 
 
     """
