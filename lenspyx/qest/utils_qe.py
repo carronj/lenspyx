@@ -260,18 +260,18 @@ def spin_cls(s1, s2, cls):
         tb = cls.get('tb', None)
         assert 'te' in cls.keys() or 'et' in cls.keys()
         te = cls.get('te', cls.get('et'))
-        return  -te if tb is None else  -te + 1j * np.sign(s2) * tb
+        return -te if tb is None else  (-te + 1j * np.sign(s2) * tb)
     elif s1 == 2:
         if s2 == 0:
             assert 'te' in cls.keys() or 'et' in cls.keys()
             tb = cls.get('bt', cls.get('tb', None))
             et = cls.get('et', cls.get('te'))
-            return -et if tb is None else -et - 1j * tb
+            return -et if tb is None else (-et - 1j * tb)
         elif s2 == 2:
             return cls['ee'] + cls['bb']
         elif s2 == -2:
             eb = cls.get('be', cls.get('eb', None))
-            return  cls['ee'] - cls['bb'] if eb is None else  cls['ee'] - cls['bb'] + 2j * eb
+            return  (cls['ee'] - cls['bb']) if eb is None else (cls['ee'] - cls['bb'] + 2j * eb)
         else:
             assert 0
 
@@ -296,13 +296,13 @@ def get_spin_matrix(sout, sin, cls):
         if sout == 0:
             te = cls.get('te', 0.)
             tb = cls.get('tb', None)
-            return -0.5 * (te - 1j * tb) if tb is not None else -0.5 * te
+            return (-0.5 * (te - 1j * tb)) if tb is not None else (-0.5 * te)
         if sout == 2:
             return 0.5 * (cls.get('ee', cls.get('e', 0.)) + cls.get('bb', cls.get('b', 0.)))
         if sout == -2:
             ret =  0.5 * (cls.get('ee', cls.get('e', 0.)) - cls.get('bb', cls.get('b', 0.)))
             eb = cls.get('eb', None)
-            return ret - 1j * eb if eb is not None else ret
+            return (ret - 1j * eb) if eb is not None else ret
     if sin == -2:
         if sout == 0:
             te = cls.get('te', 0.)
@@ -311,7 +311,7 @@ def get_spin_matrix(sout, sin, cls):
         if sout == 2:
             ret =  0.5 * (cls.get('ee', cls.get('e', 0.)) - cls.get('bb', cls.get('b', 0.)))
             eb = cls.get('eb', None)
-            return ret + 1j * eb if eb is not None else ret
+            return (ret + 1j * eb) if eb is not None else ret
         if sout == -2:
             return 0.5 * (cls.get('ee', cls.get('e', 0.)) + cls.get('bb', cls.get('b', 0.)))
     assert 0, (sin, sout)
