@@ -505,20 +505,18 @@ class deflection:
             assert backwards
         if mmax_out is None:
             mmax_out = lmax_out
-        if self.sig_d <= 0 and np.abs(self.geom.fsky() - 1.) < 1e-6: # no actual deflection and single-precision full-sky
-            if spin == 0:
-                ret = alm_copy(gclm, mmax, lmax_out, mmax_out)
-                self.tim.close(stri)
-                return ret
-            gclm = np.atleast_2d(gclm)
-            if out_sht_mode == 'GRAD_ONLY':
-                ret = alm_copy(gclm[0], mmax, lmax_out, mmax_out)
-            else:
-                ret = np.empty((2, Alm.getsize(lmax_out, mmax_out)), gclm.dtype)
-                ret[0] = alm_copy(gclm[0], mmax, lmax_out, mmax_out)
-                ret[1] = 0. if input_sht_mode == 'GRAD_ONLY' else alm_copy(gclm[1], mmax, lmax_out, mmax_out)
+        if self.sig_d <= 0 and np.abs(self.geom.fsky() - 1.) < 1e-6:
+            # no actual deflection and single-precision full-sky
+            ncomp_out = 1 + (spin != 0) * (out_sht_mode == 'STANDARD')
+            if gclm_out is None:
+                gclm_out = np.empty((ncomp_out, Alm.getsize(lmax_out, mmax_out)),  dtype=gclm.dtype)
+            assert gclm_out.ndim == 2 and gclm_out.shape[0] == ncomp_out, (gclm_out.shape, ncomp_out)
+            gclm_2d = np.atleast_2d(gclm)
+            gclm_out[0] = alm_copy(gclm_2d[0], mmax, lmax_out, mmax_out)
+            if ncomp_out > 1:
+                gclm_out[1] = 0. if input_sht_mode == 'GRAD_ONLY' else alm_copy(gclm[1], mmax, lmax_out, mmax_out)
             self.tim.close(stri)
-            return ret
+            return gclm_out.squeeze()
         if not backwards:
             m = self.gclm2lenmap(gclm, mmax, spin, backwards, polrot=polrot)
             self.tim.reset()
