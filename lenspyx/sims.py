@@ -7,7 +7,7 @@ from plancklens.sims import cmbs
 from lenspyx import utils_hp
 from lenspyx.remapping.deflection import deflection
 from lenspyx.remapping.utils_geom import Geom
-from lenscarf import cachers
+from lenspyx import cachers
 
 class sims_cmb_len(object):
     """Lensed CMB skies simulation library.
