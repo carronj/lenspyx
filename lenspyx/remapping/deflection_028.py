@@ -514,7 +514,7 @@ class deflection:
             gclm_2d = np.atleast_2d(gclm)
             gclm_out[0] = alm_copy(gclm_2d[0], mmax, lmax_out, mmax_out)
             if ncomp_out > 1:
-                gclm_out[1] = 0. if input_sht_mode == 'GRAD_ONLY' else alm_copy(gclm[1], mmax, lmax_out, mmax_out)
+                gclm_out[1] = 0. if input_sht_mode == 'GRAD_ONLY' else alm_copy(gclm_2d[1], mmax, lmax_out, mmax_out)
             self.tim.close(stri)
             return gclm_out.squeeze()
         if not backwards:
