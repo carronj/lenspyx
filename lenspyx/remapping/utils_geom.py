@@ -153,6 +153,7 @@ class Geom:
         """Wrapper to ducc synthesis_deriv1
 
         """
+        alm = np.atleast_2d(alm)
         return synthesis_deriv1(alm=alm, theta=self.theta, lmax=lmax, mmax=mmax, nphi=self.nph, phi0=self.phi0,
                          nthreads=nthreads, ringstart=self.ofs, **kwargs)
 
