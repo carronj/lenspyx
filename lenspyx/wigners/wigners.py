@@ -127,16 +127,19 @@ def wignercoeff(xi: np.ndarray[float], theta: np.ndarray[float], s1: int, s2: in
     mstart = np.array([0], dtype=int)
     fac = (2 * np.pi * np.sqrt(4 * np.pi)) / np.sqrt(np.arange(1, 2 * lmax + 3, 2))
     xis = xi.astype(complex)
+    lmin = max(abs(s2), abs(s1))
     if s2 == 0:
         cl = leg2alm(leg=np.reshape(xis, (1, xi.size, 1)), spin=0, mval=mval, mstart=mstart, theta=theta,
                        lmax=lmax,  mode='STANDARD').squeeze().real
         sgn = 1 if s1 > 0 else (1 if abs(s1) % 2 == 0 else -1)
+        cl[:lmin] = 0.
         return sgn * cl * fac
     else:
         xis = np.stack([xis, (1j * np.sign(s2)) * xis]).reshape((2, xi.size, 1))
         cl = leg2alm(leg=xis, spin=abs(s2), mval=mval, mstart=mstart, theta=theta, lmax=lmax,
                      mode='GRAD_ONLY').squeeze().real
         sgn = -1 if s2 > 0 else (-1 if abs(s2) % 2 == 0 else 1)
+        cl[:lmin] = 0.
         return sgn * cl * fac
 
 
