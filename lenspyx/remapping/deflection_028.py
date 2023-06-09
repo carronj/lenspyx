@@ -526,7 +526,7 @@ class deflection:
                                                    mode=out_sht_mode)
             self.tim.add('adjoint_synthesis')
             self.tim.close('lengclm ' + 'bwd' * backwards + 'fwd' * (not backwards))
-            return gclm_out
+            return gclm_out.squeeze()
         else:
             if self.single_prec and gclm.dtype != np.complex64:
                 gclm = gclm.astype(np.complex64)
