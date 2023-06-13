@@ -102,6 +102,20 @@ def wigner4pos(gl: np.ndarray[float], cl: np.ndarray[float] or None, theta: np.n
         return wig
 
 
+def wignerd(l: int, s1: int, s2: int, theta: np.ndarray):
+    r"""Returns Wigner small-d functions
+
+        :math:`(2l + 1) / (4pi) d^l_{s1, |s2|}(\theta)`
+        :math:`(2l + 1) / (4pi) d^l_{s1,-|s2|}(\theta)`
+
+        (or one of these if s2 is zero)
+
+    """
+    gl = np.zeros(l + 1)
+    gl[-1] = 1.
+    return wigner4pos(gl, None, theta, s1, s2)
+
+
 def wignercoeff(xi: np.ndarray[float], theta: np.ndarray[float], s1: int, s2: int, lmax: int):
     r"""Computes spectrum of Wigner small-d correlation function (adjoint to `wignerpos')
 
@@ -214,3 +228,11 @@ def get_thgwg(npts: int):
     tht = GL_thetas(npts)
     wg = GL_weights(npts, 1) / (2 * np.pi)
     return tht, wg
+
+
+def get_xgwg(a: float, b:float, npts: int):
+    tht = GL_thetas(npts)
+    wg = GL_weights(npts, 1) / (2 * np.pi)
+    c = 0.5 * (a + b)
+    d = 0.5 * (b - a)
+    return (c + np.cos(tht) * d)[::-1], (wg * d)[::-1]
