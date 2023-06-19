@@ -213,6 +213,14 @@ def wignerc(cl1: np.ndarray[float or complex], cl2:np.ndarray[float or complex],
         return np.zeros(lmax_out + 1, dtype=float)
 
 
+def wignerdl(s1: int, s2: int, theta: float, lmax: int):
+    """Returns d^l_{s1s2}(theta) for all l from 0 to lmax
+
+    """
+    assert np.isscalar(theta), 'scalar theta input here'
+    return wignercoeff(np.array([1.]), np.array([theta]), s1, s2, lmax) / (2 * np.pi)
+
+
 def get_thgwg(npts: int):
     """Gauss-Legendre integration points and weights from ducc0. Very fast.
 
@@ -230,7 +238,14 @@ def get_thgwg(npts: int):
     return tht, wg
 
 
-def get_xgwg(a: float, b:float, npts: int):
+def get_xgwg(a: float, b: float, npts: int):
+    """Gauss-Legendre points and weights for GL integration over an interval [a, b]
+
+        Returns:
+            xg: points within (a,b)
+            wg: quadrature weights
+
+    """
     tht = GL_thetas(npts)
     wg = GL_weights(npts, 1) / (2 * np.pi)
     c = 0.5 * (a + b)
