@@ -3,8 +3,8 @@ import time
 import numpy as np
 
 from lenspyx import utils
-from lenspyx.qest import qest, qresp, nhl, utils_qe as ut
-from plancklens import qresp as qresp_pl, nhl as nhl_pl
+from lenspyx.qest import qest,  nhl, utils_qe as ut
+from plancklens import nhl as nhl_pl
 
 
 cl_unl, cl_len, cl_glen =  utils.get_ffp10_cls()
@@ -22,7 +22,8 @@ fal['ee'][:100] *= 0.
 fal['bb'][:100] *= 0.
 source = 'p'
 
-for k1, k2 in zip(['p_p', 'p'], ['p_p', 'p']):#[source + 'tt', source + '_p', source]:
+for k1, k2 in zip(['p_p', 'p', 'ptt', 'ptt'], ['p_p', 'p', 'ptt', 'p']):#[source + 'tt', source + '_p', source]:
+    print(k1, k2)
     QE1 = qest._get_qes(k1, lmax_ivf, cl_glen)
     QE2 = QE1 if k2 == k1 else qest._get_qes(k2, lmax_ivf, cl_glen)
     QE1cpress = ut.qe_compress(QE1)
@@ -39,6 +40,9 @@ for k1, k2 in zip(['p_p', 'p'], ['p_p', 'p']):#[source + 'tt', source + '_p', so
     print(time.time()-t0)
     t0 = time.time()
     n4= nhl._get_nhl_pl2(QE1 , QE2, fal, lmax_qlm=lmax_qlm)
+    print(time.time()-t0)
+    t0 = time.time()
+    n4= nhl.get_nhl(k1, k2,  cl_glen, fal, lmax_ivf, lmax_ivf, lmax_qlm=lmax_qlm)
     print(time.time()-t0)
     ls = np.arange(2, lmax_qlm + 1)
     pl.loglog(ls, np.abs(n1[0][ls] / n2[0][ls] -1.), label=' x '.join([k1, k2]) + ' grad')
