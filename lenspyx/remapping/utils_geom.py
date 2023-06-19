@@ -311,7 +311,7 @@ class Geom:
 
 
     @staticmethod
-    def get_gl_geometry(lmax:int, good_size_real=True):
+    def get_gl_geometry(lmax:int, good_size_real=True, nphi:int or None =None):
         """Gauss-Legendre pixelization
 
             Args:
@@ -321,7 +321,8 @@ class Geom:
 
         """
         nlatf = lmax + 1  # full meridian GL points
-        nphi = good_size(2 * lmax + 1, good_size_real)
+        if nphi is None:
+            nphi = good_size(2 * lmax + 1, good_size_real)
         tht = GL_thetas(nlatf)
         wt = GL_weights(nlatf, 1)
         phi0 = np.zeros(nlatf, dtype=float)
