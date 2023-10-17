@@ -183,7 +183,7 @@ class Geom:
     def map2alm_spin(self, m:np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int, zbounds=(-1., 1.), **kwargs):
         # FIXME: method only here for backwards compatiblity
         assert zbounds[0] == -1 and zbounds[1] == 1., zbounds
-        return self.adjoint_synthesis(m, spin, lmax, mmax, nthreads, **kwargs)
+        return self.adjoint_synthesis(m.copy(), spin, lmax, mmax, nthreads, **kwargs)
 
     def alm2map(self, gclm:np.ndarray, lmax:int, mmax:int, nthreads:int, zbounds=(-1., 1.), **kwargs):
         # FIXME: method only here for backwards compatiblity
@@ -193,7 +193,7 @@ class Geom:
     def map2alm(self, m:np.ndarray, lmax:int, mmax:int, nthreads:int, zbounds=(-1., 1.), **kwargs):
         # FIXME: method only here for backwards compatiblity
         assert zbounds[0] == -1 and zbounds[1] == 1., zbounds
-        return self.adjoint_synthesis(m, 0, lmax, mmax, nthreads, **kwargs).squeeze()
+        return self.adjoint_synthesis(m.copy(), 0, lmax, mmax, nthreads, **kwargs).squeeze()
 
     @staticmethod
     def rings2pix(geom:Geom, rings:np.ndarray[int]):
