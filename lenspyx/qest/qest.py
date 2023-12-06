@@ -196,7 +196,7 @@ def _get_qes(qe_key: str, lmax: int, cls_weight:dict):
     if qe_key[0] in ['p', 'x', 'a', 'f', 's']:
         if qe_key in ['ptt', 'xtt', 'att', 'ftt', 'stt']:
             s_lefts= [0]
-        elif qe_key in ['p_p', 'x_p', 'a_p', 'f_p']:
+        elif qe_key in ['p_p', 'x_p', 'a_p', 'f_p', 'q_p']:
             s_lefts= [-2, 2]
         else:
             s_lefts = [0, -2, 2]
@@ -218,6 +218,12 @@ def _get_qes(qe_key: str, lmax: int, cls_weight:dict):
             return uqe.qe_simplify(uqe.qe_proj(qes, qe_key[2], qe_key[3]) + uqe.qe_proj(qes, qe_key[3], qe_key[2]))
         else:
             assert 0, 'qe key %s  not recognized'%qe_key
+    elif qe_key in ['qtt']: # lensing QE with opposite sign asym part
+        s_qe, irr1, cl_sosi, cL_out = _get_covresp('p', 0, 0, cls_weight, lmax2)
+        lega = uqe.qeleg(0, 1, -np.sqrt(np.arange(lmax + 1) * np.arange(1, lmax + 2, dtype=float)))
+        legb = uqe.qeleg(0, 0, cls_weight['tt'][:lmax+1])
+        qes = [uqe.qe(lega, legb, cL_out)]
+        return uqe.qe_simplify(qes)
     else:
         assert 0, qe_key + ' not implemented'
 
