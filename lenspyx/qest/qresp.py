@@ -189,7 +189,7 @@ def cli(cl):
     ret[ii] = 1. / cl[ii]
     return ret
 
-def get_mf_resp(qe_key:str, nlev_t:float, beam:float, lmax_ivf:int, lmax_sky:int, cls_unl:dict,
+def get_mf_response(qe_key:str, nlev_t:float, beam:float, lmax_ivf:int, lmax_sky:int, cls_unl:dict,
                 lmin_ivf = 0, nlev_p=None, inoise_cls:dict or None=None, lmax_qlm=None):
     """Delensed-noise mean field perturbative response
 
