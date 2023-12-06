@@ -4,6 +4,7 @@ from lenspyx.utils import timer
 from lenspyx.qest import qest
 from lenspyx.qest import utils_qe as ut
 from lenspyx.wigners.wigners import wignerc, wignerpos, wigner4pos
+from lenspyx import utils_hp
 from lenspyx.wigners.utils_wigners import WignerAccumulator
 
 uspin = ut
@@ -187,3 +188,48 @@ def cli(cl):
     ii = np.where(cl != 0)
     ret[ii] = 1. / cl[ii]
     return ret
+
+def get_mf_resp(qe_key:str, nlev_t:float, beam:float, lmax_ivf:int, lmax_sky:int, cls_unl:dict,
+                lmin_ivf = 0, nlev_p=None, inoise_cls:dict or None=None):
+    """Delensed-noise mean field perturbative response
+
+        Args:
+            qe_key: quadratic estimator key (e.g. 'ptt' for temperature lensing estimator)
+            nlev_t: noise level of T-map in uK amin
+            beam: beam FWHM in amin
+            lmax_ivf: maximum multipole included in the quadratic estimator
+            lmax_sky: maximum multipole of the CMB sky (as used in the likelihood model)
+            cls_unl: dictiornary of unlensed CMB spectra
+            lmin_ivf(optional): sets the inverse noise to zero below this if set
+            inoise_cls(optional): Can sets this to customized inverse noise spectra.
+                                  In this case 'beam', 'nlev' are ignored
+            nlev_p(optional): polarization noise level (defaults to root 2 nlev_t)
+
+        Returns:
+            lensing gradient potential and curl potential perturbative response R
+
+            :math:`<g^{\phi, QD}>_{LM} \sim R_L \phi_{LM}`
+
+            and similarly for the curl
+
+
+    """
+    assert lmax_sky >= lmax_ivf, (lmax_ivf, lmax_sky, 'inconsistent inputs')
+    assert qe_key[0] in ['p'], qe_key + ' not implemented'
+    assert qe_key in ['ptt'], qe_key + ' not implemented'
+    if inoise_cls is None:
+        inoise_cls = dict()
+    if 'tt' not in inoise_cls:
+        inoise_cls['tt'] = np.zeros(lmax_sky + 1, dtype=float)
+        nlev_rad = {'tt': (nlev_t / 60 / 180 * np.pi)}
+        inoise_cls['tt'][:lmax_ivf + 1] = (utils_hp.gauss_beam(beam / 60 / 180 * np.pi, lmax=lmax_ivf) /  nlev_rad['tt']) ** 2
+        inoise_cls['tt'][:lmax_ivf + 1] *= (cls_unl['tt'][:lmax_ivf + 1] > 0)
+        inoise_cls['tt'][:lmin_ivf] *= 0.
+
+    fal = {spec: np.ones(lmax_sky + 1, dtype=float) for spec in inoise_cls.keys()}
+    for spec in list(inoise_cls.keys()):
+        sli = slice(0, lmax_ivf + 1)
+        fal[spec][sli] = cli(inoise_cls[spec][sli]) * cli(cls_unl[spec][sli] + cli(inoise_cls[spec][sli]))
+    return get_response('q' + qe_key[1:], lmax_sky, 'p', inoise_cls, cls_unl, fal)
+
+
