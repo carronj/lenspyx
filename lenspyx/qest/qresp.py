@@ -190,7 +190,7 @@ def cli(cl):
     return ret
 
 def get_mf_resp(qe_key:str, nlev_t:float, beam:float, lmax_ivf:int, lmax_sky:int, cls_unl:dict,
-                lmin_ivf = 0, nlev_p=None, inoise_cls:dict or None=None):
+                lmin_ivf = 0, nlev_p=None, inoise_cls:dict or None=None, lmax_qlm=None):
     """Delensed-noise mean field perturbative response
 
         Args:
@@ -198,12 +198,14 @@ def get_mf_resp(qe_key:str, nlev_t:float, beam:float, lmax_ivf:int, lmax_sky:int
             nlev_t: noise level of T-map in uK amin
             beam: beam FWHM in amin
             lmax_ivf: maximum multipole included in the quadratic estimator
-            lmax_sky: maximum multipole of the CMB sky (as used in the likelihood model)
-            cls_unl: dictiornary of unlensed CMB spectra
+            lmax_sky: maximum multipole of the CMB sky
+                    (as used in the likelihood model. output at L can feel lsky up to lmax_ivf + L)
+            cls_unl: dictionary of unlensed CMB spectra
             lmin_ivf(optional): sets the inverse noise to zero below this if set
             inoise_cls(optional): Can sets this to customized inverse noise spectra.
                                   In this case 'beam', 'nlev' are ignored
             nlev_p(optional): polarization noise level (defaults to root 2 nlev_t)
+            lmax_qlm: maximal output QE multipole (defaults to lmax_sky + lmax_ivf, after which the output should vanish)
 
         Returns:
             lensing gradient potential and curl potential perturbative response R
@@ -217,6 +219,7 @@ def get_mf_resp(qe_key:str, nlev_t:float, beam:float, lmax_ivf:int, lmax_sky:int
     assert lmax_sky >= lmax_ivf, (lmax_ivf, lmax_sky, 'inconsistent inputs')
     assert qe_key[0] in ['p'], qe_key + ' not implemented'
     assert qe_key in ['ptt'], qe_key + ' not implemented'
+    lmax_qlm = lmax_qlm or lmax_sky + lmax_ivf
     if inoise_cls is None:
         inoise_cls = dict()
     if 'tt' not in inoise_cls:
@@ -230,6 +233,6 @@ def get_mf_resp(qe_key:str, nlev_t:float, beam:float, lmax_ivf:int, lmax_sky:int
     for spec in list(inoise_cls.keys()):
         sli = slice(0, lmax_ivf + 1)
         fal[spec][sli] = cli(inoise_cls[spec][sli]) * cli(cls_unl[spec][sli] + cli(inoise_cls[spec][sli]))
-    return get_response('q' + qe_key[1:], lmax_sky, 'p', inoise_cls, cls_unl, fal)
+    return get_response('q' + qe_key[1:], lmax_sky, 'p', inoise_cls, cls_unl, fal, lmax_qlm=lmax_qlm)
 
 
