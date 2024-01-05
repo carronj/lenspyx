@@ -94,6 +94,100 @@ def synalm(cl:np.ndarray, lmax:int, mmax:int or None, rlm_dtype=np.float64):
     return alm
 
 
+def synalms(cls: dict, lmax:int, mmax:int or None, seed=None, rlm_dtype:type = np.float64):
+    """Creates Gaussian field alms from input cl dictionary
+
+    Parametersseed
+    ----------
+    cls : dict
+        The power spectra of the maps (e.g. as coming from CAMB)
+    lmax : int
+        Maximum multipole simulated
+    mmax: int
+        Maximum m defining the alm layout, defaults to lmax if None or < 0
+    rlm_dtype(optional, defaults to np.float64):
+        Precision of real components of the array (e.g. np.float32 for single precision output array)
+
+    Returns
+    -------
+    alm: ndarray
+        harmonic coefficients of Gaussian field with lmax, mmax parameters
+
+    """
+    lmax_cls = np.max([len(cl) - 1 for cl in cls.values()])
+    if lmax is None:
+        lmax = lmax_cls
+    if mmax is None:
+        mmax = lmax
+    lmax = min(lmax, lmax_cls)
+    cmb_labels = ['t', 'e', 'b', 'p', 'o']
+    spec_labels = [k.lower() for k in cls.keys()]
+    # First remove zero fields:
+    zros = []
+    for fg in spec_labels:
+        assert len(fg) == 2 and fg[0] in cmb_labels and fg[1] in cmb_labels
+        if fg[0] == fg[1]:
+            assert np.all(cls[fg] >= 0), 'auto spectrum of %s must be >= 0' % fg
+            if not np.any(cls[fg]):
+                zros.append(fg[0])
+    labelsf = []
+    for fg in spec_labels:
+        assert len(fg) == 2 and fg[0] in cmb_labels and fg[1] in cmb_labels
+        if fg[0] not in zros and fg[1] not in zros:
+            assert fg[0] + fg[0] in spec_labels, 'must have %s auto-spectrum' % fg[0]
+            assert fg[1] + fg[1] in spec_labels, 'must have %s auto-spectrum' % fg[1]
+            if fg[0] == fg[1]:
+                for field in fg:
+                    if field not in labelsf:
+                        labelsf.append(field)
+    assert len(labelsf) <= 4
+    labels = ''
+    for f in 'tebpo':  # This just sorts the present labels according to 'tebpx'
+        labels += f * (f in labelsf)
+
+    ncomp = len(labels)
+    mat = np.empty((lmax + 1, ncomp, ncomp), dtype=rlm_dtype)
+    for i, f in enumerate(labels):
+        for j, g in enumerate(labels[i:]):
+            mat[:, i + j, i] = cls.get(f + g, cls.get(g + f, np.zeros(lmax + 1, dtype=rlm_dtype)))[:lmax + 1]
+    ts, vs = np.linalg.eigh(mat)
+    assert np.all(ts >= 0.)  # Matrix not positive semidefinite
+    for m, t, v in zip(mat, ts, vs):
+        m[:] = np.dot(v, np.dot(np.diag(np.sqrt(t)), v.T))
+    # Build phases:
+    alm_size = Alm.getsize(lmax, mmax)
+    rng = default_rng(seed)
+    phases = 1j * rng.standard_normal((ncomp, alm_size), dtype=rlm_dtype)
+    phases += rng.standard_normal((ncomp, alm_size), dtype=rlm_dtype)
+    phases *= np.sqrt(0.5)
+    real_idcs = Alm.getidx(lmax, np.arange(lmax + 1, dtype=int), 0)
+    phases[:, real_idcs] = phases[:, real_idcs].real * np.sqrt(2.)
+
+    # Now builds alms. We might need more since we cannot handle now curl only transforms
+    labels_wgrad = labels
+    if 'b' in labels and 'e' not in labels:
+        labels_wgrad = labels_wgrad.replace('b', 'eb')
+    if 'o' in labels and 'p' not in labels:
+        labels_wgrad = labels_wgrad.replace('o', 'po')
+    if rlm_dtype == np.float32:
+        dtype_complex = np.complex64
+    elif rlm_dtype == np.float64:
+        dtype_complex = np.complex128
+    else:
+        assert 0, "please either choose np.float32 (single precission), or np.float64 (double precission) as rlm_dtype"
+    alms = np.zeros((len(labels_wgrad), phases[0].size), dtype=dtype_complex)
+    #    for L in Ls: #L @ L.T is full matrx
+    for i, f in enumerate(labels):
+        idx = labels_wgrad.index(f)
+        alms[idx] += almxfl(phases[i], mat[:, i, i], mmax, False)
+        for j in range(ncomp):
+            fl = mat[:, i, j]
+            if i != j and np.any(fl):
+                alms[idx] += almxfl(phases[j], fl, mmax, False)
+    del phases
+    return alms
+
+
 def alm2cl(alm:np.ndarray, blm:np.ndarray or None, lmax:int or None, mmax:int or None, lmaxout:int or None):
     """Auto- or cross-power spectrum between two alm arrays
 
