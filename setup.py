@@ -1,14 +1,12 @@
-import setuptools
-from numpy.distutils.core import setup
-from numpy.distutils.misc_util import Configuration
+from setuptools import setup
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
 
-def configuration(parent_package='', top_path=''):
-    config = Configuration('', parent_package, top_path)
-    return config
+#def configuration(parent_package='', top_path=''):
+#    config = Configuration('', parent_package, top_path)
+#    return config
 
 exec(open('lenspyx/_version.py').read())
 setup(
@@ -22,6 +20,6 @@ setup(
     author_email='to.jcarron@gmail.com',
     description='lensed CMB sims pipe',
     install_requires=['ducc0'],
-    long_description=long_description,
-    configuration=configuration)
+    long_description=long_description,)
+ #   configuration=configuration)
 
