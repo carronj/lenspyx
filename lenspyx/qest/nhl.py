@@ -152,6 +152,9 @@ def _get_nhl_pl2(qes1, qes2, cls_ivfs, lmax_qlm, ret_terms=False, verbose=True):
 def _get_nhl(qes1:list[(ut.qeleg_multi, ut.qeleg_multi, callable)], qes2:list[(ut.qeleg_multi, ut.qeleg_multi, callable)], cls_ivfs, lmax_qlm,
              cls_ivfs_bb=None, cls_ivfs_ab=None, ret_terms=False):
 
+    if min(len(qes1), len(qes2)) <= 0:
+        return np.zeros(lmax_qlm + 1), np.zeros(lmax_qlm + 1)
+
     cls_ivfs_aa = cls_ivfs
     cls_ivfs_bb = cls_ivfs if cls_ivfs_bb is None else cls_ivfs_bb
     cls_ivfs_ab = cls_ivfs if cls_ivfs_ab is None else cls_ivfs_ab
