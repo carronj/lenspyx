@@ -31,6 +31,7 @@ class Geom:
                     nphi: number of pixels in each ring
                     ringstart: index of first pixel of each ring in real space map
                     w: quadrature weight for each ring (used for SHT of 'analysis'-type )
+                    name: identifier for the geometry, used for e.g. debugging
 
 
         """
