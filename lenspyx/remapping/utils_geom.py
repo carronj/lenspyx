@@ -22,7 +22,7 @@ def st2mmax(spin, tht, lmax):
 
 
 class Geom:
-    def __init__(self, theta:np.ndarray[float], phi0:np.ndarray[float], nphi:np.ndarray[np.uint64], ringstart:np.ndarray[np.uint64], w:np.ndarray[float]):
+    def __init__(self, theta:np.ndarray[float], phi0:np.ndarray[float], nphi:np.ndarray[np.uint64], ringstart:np.ndarray[np.uint64], w:np.ndarray[float], name='unnamed'):
         """Iso-latitude pixelisation of the sphere
 
                 Args:
@@ -43,6 +43,7 @@ class Geom:
         self.phi0 = phi0[argsort].astype(np.float64)
         self.nph = nphi[argsort].astype(np.uint64)
         self.ofs = ringstart[argsort].astype(np.uint64)
+        self.name = name
 
     def npix(self):
         """Number of pixels
@@ -103,7 +104,7 @@ class Geom:
         nphi_eq = np.array([good_size(int(np.ceil(stx / dph_eq)), good_size_real) for stx in st])
         nph = np.where((st / nph) > dph_eq, nphi_eq, nph)
         ofs = np.insert(np.cumsum(nph[:-1]), 0, 0)
-        return Geom(tht, self.phi0, nph, ofs, self.weight / nph * self.nph)
+        return Geom(tht, self.phi0, nph, ofs, self.weight / nph * self.nph, name='thinout')
 
     def split(self, nbands, verbose=False):
         """Split the pixelization into chunks
@@ -146,6 +147,7 @@ class Geom:
 
         """
         gclm = np.atleast_2d(gclm)
+        print(gclm.shape, gclm.dtype, gclm)
         return synthesis(alm=gclm, theta=self.theta, lmax=lmax, mmax=mmax, nphi=self.nph, spin=spin, phi0=self.phi0,
                          nthreads=nthreads, ringstart=self.ofs, map=map, **kwargs)
 
@@ -256,7 +258,7 @@ class Geom:
         mmax = np.minimum(np.maximum(st2mmax(smax, tht, lmax), st2mmax(-smax, tht, lmax)), np.ones(nlat) * lmax)
         nph = np.array([good_size(int(np.ceil(2 * m + 1)), good_size_real) for m in mmax])
         ofs = np.insert(np.cumsum(nph[:-1]), 0, 0)
-        return Geom(tht, phi0, nph, ofs, wt / nph)
+        return Geom(tht, phi0, nph, ofs, wt / nph, name='thinguass')
 
     @staticmethod
     def get_healpix_geometry(nside:int):
@@ -270,7 +272,7 @@ class Geom:
         base = ducc0.healpix.Healpix_Base(nside, "RING")
         geom = base.sht_info()
         area = (4 * np.pi) / (12 * nside ** 2)
-        return Geom(w=np.full((geom['theta'].size, ), area), **geom)
+        return Geom(w=np.full((geom['theta'].size, ), area), **geom, name='healpix')
 
     @staticmethod
     def get_cc_geometry(ntheta:int, nphi:int):
@@ -308,7 +310,7 @@ class Geom:
         nph = np.full((ntheta,), nphi, dtype=np.uint64)
         ofs = np.insert(np.cumsum(nph[:-1]), 0, 0)
         w = ducc0.sht.experimental.get_gridweights('F1', ntheta)
-        return Geom(tht, phi0, nph, ofs, w / nphi)
+        return Geom(tht, phi0, nph, ofs, w / nphi, name='f1')
 
 
     @staticmethod
@@ -329,7 +331,7 @@ class Geom:
         phi0 = np.zeros(nlatf, dtype=float)
         nph = np.full((nlatf,), nphi, dtype=np.uint64)
         ofs = np.insert(np.cumsum(nph[:-1]), 0, 0)
-        return Geom(tht, phi0, nph, ofs, wt / nph)
+        return Geom(tht, phi0, nph, ofs, wt / nph, name='gl')
 
     @staticmethod
     def get_tgl_geometry(lmax:int, smax:int, good_size_real=True):
@@ -342,7 +344,7 @@ class Geom:
                                           (very slightly more points if set but largely inconsequential)
 
         """
-        return Geom.get_thingauss_geometry(lmax, smax, good_size_real=good_size_real)
+        return Geom.get_thingauss_geometry(lmax, smax, good_size_real=good_size_real, name='tgl')
 
 
 class pbounds:
