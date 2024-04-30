@@ -306,7 +306,8 @@ class deflection:
             return m.real, m.imag
         return m.squeeze()
 
-    def gclm2lenmap(self, gclm:np.ndarray, mmax:int or None, spin, backwards:bool, polrot=True, ptg=None):
+    def gclm2lenmap(self, gclm:np.ndarray, mmax:int or None, spin, backwards:bool,
+                    polrot=True, ptg=None, ntheta=None,_dfs_ringweights=None, _dfs_scale=1, _forcefancydfs=False):
         """Produces deflected spin-weighted map from alm array and instance pointing information
 
             Args:
@@ -314,6 +315,11 @@ class deflection:
                 mmax: mmax parameter of alm array layout, if different from lmax
                 spin: spin (>=0) of the transform
                 backwards: forward or backward (adjoint) operation
+                ntheta: optional number of theta points for DFS transform, defaults to FFT good size for lmax-unl + 2
+                ptg: optional pointings, if different from deflection instance
+                polrot: apply rotation correction for non-scalar transforms (defaults to true)
+                _dfs_ringweights: optional ring weights for DFS transform
+                (e.g. to be used in conjonction with increased band-limit (ntheta) on a apodized masked-map
 
 
         """
@@ -347,38 +353,50 @@ class deflection:
             self.tim.close('gclm2lenmap')
             return ret
         # transform slm to Clenshaw-Curtis map
-        ntheta = ducc0.fft.good_size(lmax_unl + 2)
-        nphihalf = ducc0.fft.good_size(lmax_unl + 1)
-        nphi = 2 * nphihalf
-        # Is this any different to scarf wraps ?
-        # NB: type of map, map_df, and FFTs will follow that of input gclm
-        mode = ducc_sht_mode(gclm, spin)
-        map = ducc0.sht.experimental.synthesis_2d(alm=gclm, ntheta=ntheta, nphi=nphi,
-                                spin=spin, lmax=lmax_unl, mmax=mmax, geometry="CC", nthreads=self.sht_tr, mode=mode)
-        self.tim.add('experimental.synthesis_2d (%s)'%mode)
-        # extend map to double Fourier sphere map
-        map_dfs = np.empty((2 * ntheta - 2, nphi), dtype=map.dtype if spin == 0 else ctype[map.dtype])
-        if spin == 0:
-            map_dfs[:ntheta, :] = map[0]
-        else:
-            map_dfs[:ntheta, :].real = map[0]
-            map_dfs[:ntheta, :].imag = map[1]
-        del map
+        if _dfs_scale != 1 or _forcefancydfs:
+            print("farming to fancy DFS scheme")
+            from lenspyx.remapping import dfs
+            _, _, map_dfs, thtscal = dfs.gclm2dfs(gclm, mmax, spin, ringw=_dfs_ringweights, ntheta=ntheta,scale=_dfs_scale)
+            self.tim.add('fancy DFS scheme')
 
-        map_dfs[ntheta:, :nphihalf] = map_dfs[ntheta - 2:0:-1, nphihalf:]
-        map_dfs[ntheta:, nphihalf:] = map_dfs[ntheta - 2:0:-1, :nphihalf]
-        if (spin % 2) != 0:
-            map_dfs[ntheta:, :] *= -1
-        self.tim.add('map_dfs build')
-
-        # go to Fourier space
-        if spin == 0:
-            tmp = np.empty(map_dfs.shape, dtype=ctype[map_dfs.dtype])
-            map_dfs = ducc0.fft.c2c(map_dfs, axes=(0, 1), inorm=2, nthreads=self.sht_tr, out=tmp)
-            del tmp
         else:
-            map_dfs = ducc0.fft.c2c(map_dfs, axes=(0, 1), inorm=2, nthreads=self.sht_tr, out=map_dfs)
-        self.tim.add('map_dfs 2DFFT')
+            if ntheta is None:
+                ntheta = ducc0.fft.good_size(lmax_unl + 2)
+            nphihalf = ducc0.fft.good_size(ntheta + 1)
+            nphi = 2 * nphihalf
+            assert ntheta >= (lmax_unl + 2), ('this is weird', lmax_unl, ntheta)
+            # Is this any different to scarf wraps ?
+            # NB: type of map, map_df, and FFTs will follow that of input gclm
+            mode = ducc_sht_mode(gclm, spin)
+            map = ducc0.sht.experimental.synthesis_2d(alm=gclm, ntheta=ntheta, nphi=nphi,
+                                    spin=spin, lmax=lmax_unl, mmax=mmax, geometry="CC", nthreads=self.sht_tr, mode=mode)
+            self.tim.add('experimental.synthesis_2d (%s)'%mode)
+            # extend map to double Fourier sphere map
+            map_dfs = np.empty((2 * ntheta - 2, nphi), dtype=map.dtype if spin == 0 else ctype[map.dtype])
+            if spin == 0:
+                map_dfs[:ntheta, :] = map[0]
+            else:
+                map_dfs[:ntheta, :].real = map[0]
+                map_dfs[:ntheta, :].imag = map[1]
+            del map
+            if _dfs_ringweights is not None: # applies additional weighting to the map
+                assert callable(_dfs_ringweights) or (_dfs_ringweights.size == ntheta)
+                for ir, w in enumerate(_dfs_ringweights):
+                    map_dfs[ir, :] *= w
+            map_dfs[ntheta:, :nphihalf] = map_dfs[ntheta - 2:0:-1, nphihalf:]
+            map_dfs[ntheta:, nphihalf:] = map_dfs[ntheta - 2:0:-1, :nphihalf]
+            if (spin % 2) != 0:
+                map_dfs[ntheta:, :] *= -1
+            self.tim.add('map_dfs build')
+
+            # go to Fourier space
+            if spin == 0:
+                tmp = np.empty(map_dfs.shape, dtype=ctype[map_dfs.dtype])
+                map_dfs = ducc0.fft.c2c(map_dfs, axes=(0, 1), inorm=2, nthreads=self.sht_tr, out=tmp)
+                del tmp
+            else:
+                map_dfs = ducc0.fft.c2c(map_dfs, axes=(0, 1), inorm=2, nthreads=self.sht_tr, out=map_dfs)
+            self.tim.add('map_dfs 2DFFT')
 
         if self.planned: # planned nufft
             assert ptg is None
@@ -389,7 +407,11 @@ class deflection:
             # perform NUFFT
             if ptg is None:
                 ptg = self._get_ptg()
+            if _dfs_scale != 1:
+                ptg = np.copy(ptg)
+                ptg[:, 0] *= thtscal
             self.tim.add('get ptg')
+
             # perform NUFFT
             values = ducc0.nufft.u2nu(grid=map_dfs, coord=ptg, forward=False,
                                       epsilon=self.epsilon, nthreads=self.sht_tr,

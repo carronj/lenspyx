@@ -6,33 +6,39 @@ import pylab as pl
 import healpy as hp
 
 tim = timer(True)
-ffi, _ = syn_ffi_ducc_29()
+ffi, _ = syn_ffi_ducc_29(epsilon=1e-10, dlm_fac=0)
 tim.add('ffi gen.')
 Aunl = ffi.dlm2A()
 
 lmax, mmax = 4096, 4096
-tlm_unl = synalm(cls_unl['tt'][:lmax + 1], lmax, mmax).astype(np.complex64)
+tlm_unl = synalm(cls_unl['tt'][:lmax + 1], lmax, mmax).astype(np.complex128)
 tmap_len = ffi.gclm2lenmap(tlm_unl, mmax, 0, backwards=False)
 tim.add('gen and lensing of Tlm')
 
 points1 = tmap_len.copy()
 for ofs, w, nph in zip(ffi.geom.ofs, ffi.geom.weight, ffi.geom.nph):
     points1[ofs:ofs + nph] *= w
-points1 = points1 + 0j
+points1 = points1 #+ 0j
 points2 = tmap_len * Aunl
 for ofs, w, nph in zip(ffi.geom.ofs, ffi.geom.weight, ffi.geom.nph):
     points2[ofs:ofs + nph] *= w
-points2 = points2 + 0j
+points2 = points2 #+ 0j
 tim.add('weighting')
 
 tlm_unl_1 = ffi.lenmap2gclm(points1, 0, lmax, mmax).astype(np.complex128)
 tlm_unl_2 = ffi.lenmap2gclm(points2, 0, lmax, mmax).astype(np.complex128)
 tim.add('delensing two maps')
 
-pl.plot(hp.alm2cl(tlm_unl_1))
+pl.plot(hp.alm2cl(tlm_unl))
 pl.plot(hp.alm2cl(tlm_unl - tlm_unl_1))
 pl.plot(hp.alm2cl(tlm_unl - tlm_unl_2))
 pl.loglog()
 pl.show()
+pl.plot(hp.alm2cl(tlm_unl))
+pl.plot(hp.alm2cl(tlm_unl_1))
+pl.plot(hp.alm2cl(tlm_unl_2))
+pl.plot(hp.alm2cl(tlm_unl_2) / np.sum(ffi.geom.weight) )
 
+pl.loglog()
+pl.show()
 print(tim)

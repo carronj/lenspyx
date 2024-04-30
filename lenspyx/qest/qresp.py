@@ -94,6 +94,9 @@ def _get_response(qes:list[(ut.qeleg_multi, ut.qeleg_multi, callable)], source, 
     Ls = np.arange(lmax_qlm + 1, dtype=int)
     Ls_test = Ls[lmax_qlm:lmax_qlm+1]
 
+    if len(qes) <= 0:
+        return np.zeros((2, lmax_qlm + 1), dtype=float)
+
     qe_spin, source_spin, prefac = None, None, None
     Rpr_st_acc = WignerAccumulator((2 * lmax_ivf + lmax_qlm) // 2 + 1)
     Rmr_st_acc = WignerAccumulator((2 * lmax_ivf + lmax_qlm) // 2 + 1)

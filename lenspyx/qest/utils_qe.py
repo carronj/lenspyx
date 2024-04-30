@@ -208,6 +208,9 @@ def qe_compress(qes: list[qe], verbose=False):
         Note:
             The 1st leg always only have a single component
 
+        Note:
+            The test on the cL out array is crude
+
     """
     # NB: this only compares first legs.
     skip = []
@@ -217,6 +220,7 @@ def qe_compress(qes: list[qe], verbose=False):
         if not not_zero:
             skip.append(i)
     # Then combines remaining QEs
+    Ls_test = np.arange(900, 1000)
     qes_compressed = []
     for i, qi in enumerate(qes):
         if i not in skip:
@@ -225,8 +229,9 @@ def qe_compress(qes: list[qe], verbose=False):
             legb_m = qeleg_multi([qi.leg_b.spin_in], qi.leg_b.spin_ou, [qi.leg_b.cl])
             for j, qj in enumerate(qes[i + 1:]):
                 if qj.leg_a == lega and legb_m.spin_ou == qj.leg_b.spin_ou:
-                    legb_m += qj.leg_b
-                    skip.append(i + 1 + j)
+                    if np.all(qi.cL(Ls_test) == qj.cL(Ls_test)):
+                        legb_m += qj.leg_b
+                        skip.append(i + 1 + j)
             qes_compressed.append( (lega_m, legb_m, qi.cL))
     if len(skip) > 0 and verbose:
         print("%s alm2map_spin transforms now required, down from %s"%(2 * (len(qes) - len(skip)) , 2 * len(qes)) )
