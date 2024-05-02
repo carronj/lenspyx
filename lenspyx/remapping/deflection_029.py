@@ -39,14 +39,14 @@ class deflection(deflection_28.deflection):
             mmax = lmax_unl
         if ptg is None:
             ptg = self._get_ptg()
-        assert ptg.shape[-1] == 2, ptg.shape
+        assert ptg.shape[-1] == 2 and ptg.ndim == 2, ptg.shape
         assert ptg.dtype == np.float64, 'synthesis_general only accepts float here'
         if spin == 0:
             values = synthesis_general(lmax=lmax_unl, mmax=mmax, alm=gclm, loc=ptg, spin=spin, epsilon=self.epsilon,
                                        nthreads=self.sht_tr, mode=sht_mode, verbose=self.verbosity)
             self.tim.add('synthesis general (%s)' % sht_mode)
         else:
-            npix = self.geom.npix()
+            npix = ptg.shape[0]
             # This is a trick with two views of the same array to get complex values as output to multiply by the phase
             valuesc = np.empty((npix,), dtype=np.complex64 if self.single_prec else np.complex128)
             values = valuesc.view(np.float32 if self.single_prec else np.float64).reshape((npix, 2)).T

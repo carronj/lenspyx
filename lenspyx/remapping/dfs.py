@@ -61,7 +61,7 @@ def gclm2dfs(gclm, mmax, spin, ringw=None, ntheta=None, numthreads=0, verbose=0,
     if scale * thtmax >= np.pi - thtmax:
         print("It seems a bit odd to send theta points past their reflected points...")
 
-    ntheta_dfs = ducc0.fft.good_size(int(ntheta / scale))  # number of rings in CC DFS map
+    ntheta_dfs = ducc0.fft.good_size(int(np.round(ntheta / scale)))  # number of rings in CC DFS map
     print("Setting up DFS grid Nt Np %s %s"%(ntheta_dfs, nphi))
 
     # Is this any different to scarf wraps ?
@@ -69,7 +69,7 @@ def gclm2dfs(gclm, mmax, spin, ringw=None, ntheta=None, numthreads=0, verbose=0,
     # relevant map values:
     map = cc_geom.synthesis(gclm, spin, lmax_unl, mmax, numthreads,  mode=ducc_sht_mode(gclm, spin))
     # we must now patch them onto the doubled fourier sphere
-    map_dfs = np.zeros((2 * ntheta_dfs  - 2, nphi), dtype=rtype[gclm.dtype] if spin == 0 else gclm.dtype)
+    map_dfs = np.zeros((2 * ntheta_dfs - 2, nphi), dtype=map.dtype if spin == 0 else ctype[map.dtype])
     # :Use 1d exluding rings for non trivial weights
     #map = ducc0.sht.experimental.synthesis_2d(alm=gclm, ntheta=ntheta, nphi=nphi,
     #                                          spin=spin, lmax=lmax_unl, mmax=mmax, geometry="CC", nthreads=numthreads,
@@ -81,8 +81,7 @@ def gclm2dfs(gclm, mmax, spin, ringw=None, ntheta=None, numthreads=0, verbose=0,
     if spin == 0:
         map_dfs[nzro_rings, :] = map[0].reshape(cc_geom.theta.size, nphi)
     else:
-        map_dfs[nzro_rings, :].real = map[0].reshape(cc_geom.theta.size, nphi)
-        map_dfs[nzro_rings, :].imag = map[1].reshape(cc_geom.theta.size, nphi)
+        map_dfs[nzro_rings, :] = (map[0] + 1j * map[1]).reshape(cc_geom.theta.size, nphi)
     del map
     assert ringw.size == ntheta
     for ir, w in zip(nzro_rings, ringw[nzro_rings]):
@@ -105,5 +104,5 @@ def gclm2dfs(gclm, mmax, spin, ringw=None, ntheta=None, numthreads=0, verbose=0,
     if verbose:
         print(tim)
     tht_dfs = np.linspace(0, 2 * np.pi, ntheta_dfs * 2 - 2, endpoint=False)
-    thtfac = (ntheta - 1.) / (ntheta_dfs -1.)
+    thtfac = (ntheta - 1.) / (ntheta_dfs -1.) # factor to convert theta of spherical map to theta of dfs
     return tht_dfs, map_dfs_r, map_dfs, thtfac

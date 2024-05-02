@@ -6,6 +6,7 @@ from lenspyx.utils_hp import Alm
 from lenspyx import cachers
 from lenspyx.utils_hp import synalm, almxfl
 from lenspyx.remapping.deflection_028 import deflection as duccd28
+from lenspyx.remapping.deflection_028_bded import deflection as duccd28_bded
 from lenspyx.remapping.deflection_029 import deflection as duccd29
 from lenspyx.remapping import utils_geom
 path2cls = os.path.dirname(lenspyx.__file__)
@@ -40,7 +41,7 @@ def syn_dlm(lmax_unl=5120, ctyp=np.complex128):
 
 
 
-def syn_ffi_ducc(lmax_len = 4096, dlmax=1024, epsilon=1e-5, dlm_fac=1., nthreads=0, dlmax_gl=1024, verbosity=1, planned=False):
+def syn_ffi_ducc(lmax_len = 4096, dlmax=1024, epsilon=1e-5, dlm_fac=1., nthreads=0, dlmax_gl=1024, verbosity=1, planned=False, dphi_bded=None):
     """"Returns realistic LCDM deflection field scaled by dlm_fac
 
     """
@@ -50,7 +51,25 @@ def syn_ffi_ducc(lmax_len = 4096, dlmax=1024, epsilon=1e-5, dlm_fac=1., nthreads
     plm = synalm(_extend_cl(cls_unl['pp'][:lmax_dlm + 1], lmax_dlm), lmax_dlm, mmax_dlm)
     dlm = almxfl(plm, dlm_fac * np.sqrt(np.arange(lmax_dlm + 1, dtype=float) * np.arange(1, lmax_dlm + 2)), mmax_dlm, False)
     ref_geom = utils_geom.Geom.get_thingauss_geometry(lmaxthingauss, 2)
-    ffi_ducc = duccd28(ref_geom, dlm, mmax_dlm, numthreads=nthreads, verbosity=verbosity, dclm=None, epsilon=epsilon,
+    if dphi_bded is not None:
+        ffi_ducc = duccd28_bded(ref_geom, dlm, mmax_dlm, numthreads=nthreads, verbosity=verbosity, dclm=None, epsilon=epsilon,
+                       cacher=cachers.cacher_mem(safe=False), planned=planned, dphi_bd=dphi_bded)
+    else:
+        ffi_ducc = duccd28(ref_geom, dlm, mmax_dlm, numthreads=nthreads, verbosity=verbosity, dclm=None, epsilon=epsilon,
+                       cacher=cachers.cacher_mem(safe=False), planned=planned)
+    return ffi_ducc, ref_geom
+
+def syn_ffi_ducc_bded(lmax_len = 4096, dlmax=1024, epsilon=1e-5, dlm_fac=1., nthreads=0, dlmax_gl=1024, verbosity=1, planned=False):
+    """"Returns realistic LCDM deflection field scaled by dlm_fac
+
+    """
+    lmax_unl = lmax_len + dlmax
+    lmax_dlm, mmax_dlm = lmax_unl, lmax_unl
+    lmaxthingauss = lmax_unl + dlmax_gl
+    plm = synalm(_extend_cl(cls_unl['pp'][:lmax_dlm + 1], lmax_dlm), lmax_dlm, mmax_dlm)
+    dlm = almxfl(plm, dlm_fac * np.sqrt(np.arange(lmax_dlm + 1, dtype=float) * np.arange(1, lmax_dlm + 2)), mmax_dlm, False)
+    ref_geom = utils_geom.Geom.get_thingauss_geometry(lmaxthingauss, 2)
+    ffi_ducc = duccd28_bded(ref_geom, dlm, mmax_dlm, numthreads=nthreads, verbosity=verbosity, dclm=None, epsilon=epsilon,
                        cacher=cachers.cacher_mem(safe=False), planned=planned)
     return ffi_ducc, ref_geom
 
