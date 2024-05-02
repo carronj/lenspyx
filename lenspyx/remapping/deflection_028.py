@@ -308,8 +308,8 @@ class deflection:
 
     def gclm2lenmap(self, gclm:np.ndarray, mmax:int or None, spin, backwards:bool,
                     polrot=True, ptg=None, ntheta=None,
-                    _dfs_ringweights=None, _dfs_scale=1, _forcefancydfs=False,
-                    _returndfs=False):
+                    _dfs_ringweights=None, _dfs_scale=1, _forcefancydfs=False):
+                    #_returndfs=False):
         """Produces deflected spin-weighted map from alm array and instance pointing information
 
             Args:
@@ -356,9 +356,9 @@ class deflection:
             return ret
         # transform slm to Clenshaw-Curtis map
         if _dfs_scale != 1 or _forcefancydfs:
-            print("farming to fancy DFS scheme")
+            print("sending to fancy DFS scheme")
             from lenspyx.remapping import dfs
-            _, map_dfs_r, map_dfs, thtscal = dfs.gclm2dfs(gclm, mmax, spin,
+            tht_dfs, thtscal, map_dfs = dfs.gclm2dfs(gclm, mmax, spin,
                                     ringw=_dfs_ringweights, ntheta=ntheta,scale=_dfs_scale)
             self.tim.add('fancy DFS scheme')
 
@@ -392,8 +392,8 @@ class deflection:
                 map_dfs[ntheta:, :] *= -1
             self.tim.add('map_dfs build')
             # go to Fourier space
-            if _returndfs:
-                return map_dfs
+            #if _returndfs:
+            #    return map_dfs
             if spin == 0:
                 tmp = np.empty(map_dfs.shape, dtype=ctype[map_dfs.dtype])
                 map_dfs = ducc0.fft.c2c(map_dfs, axes=(0, 1), inorm=2, nthreads=self.sht_tr, out=tmp)
@@ -401,8 +401,8 @@ class deflection:
             else:
                 map_dfs = ducc0.fft.c2c(map_dfs, axes=(0, 1), inorm=2, nthreads=self.sht_tr, out=map_dfs)
             self.tim.add('map_dfs 2DFFT')
-        if _returndfs:
-            return map_dfs_r
+        #if _returndfs:
+        #    return map_dfs_r
         if self.planned: # planned nufft
             assert ptg is None
             plan = self.make_plan(lmax_unl, spin)

@@ -1,9 +1,18 @@
+"""This module tests some variations for synthesis_general (and in the future for adjoint_synthesis_general...)
+
+    Tests include:
+
+        * apodization with compactly-supported function
+        * reducing the number of FFT points in the latitude direction
+
+
+"""
 import ducc0
 import numpy as np
-from lenspyx.utils_hp import Alm, alm2cl, almxfl, alm_copy
+from lenspyx.utils_hp import Alm
 from lenspyx.utils import timer
 from lenspyx.remapping.utils_geom import Geom, st2mmax
-from lenspyx.remapping.deflection_028 import ducc_sht_mode, ctype, rtype
+from lenspyx.remapping.deflection_028 import ducc_sht_mode, ctype
 from psutil import cpu_count
 
 
@@ -15,12 +24,13 @@ def _build_cc_geom(ringw, nphi):
     ntheta = len(ringw)
     cc_geom = Geom.get_cc_geometry(ntheta, nphi)
     assert np.all(np.argsort(cc_geom.theta) == np.arange(cc_geom.theta.size))
-    nzro = np.where(ringw != 0)[0]
+    nzro = np.where(ringw != 0)[0] # Number of rings with non-zero weight
     ofs = np.insert(np.cumsum(cc_geom.nph[nzro][:-1]), 0, 0)
     return nzro, Geom(cc_geom.theta[nzro],cc_geom.phi0[nzro], cc_geom.nph[nzro], ofs, ringw[nzro])
 
 def gclm2dfs(gclm, mmax, spin, ringw=None, ntheta=None, numthreads=0, verbose=0, scale=1):
-    """
+    """Send the input gclm array to a DFS map
+
 
     Args:
         gclm: healpy-like alm array
@@ -62,13 +72,12 @@ def gclm2dfs(gclm, mmax, spin, ringw=None, ntheta=None, numthreads=0, verbose=0,
         print("It seems a bit odd to send theta points past their reflected points...")
 
     ntheta_dfs = ducc0.fft.good_size(int(np.round(ntheta / scale)))  # number of rings in CC DFS map
-    print("Setting up DFS grid Nt Np %s %s"%(ntheta_dfs, nphi))
+    print("Setting up DFS grid Nt Np %s %s (effective mmax %s)"%(ntheta_dfs, nphi, mmax))
 
-    # Is this any different to scarf wraps ?
-    # NB: type of map, map_df, and FFTs will follow that of input gclm
-    # relevant map values:
+    # relevant map values, that we will spread onto the DFS map:
     map = cc_geom.synthesis(gclm, spin, lmax_unl, mmax, numthreads,  mode=ducc_sht_mode(gclm, spin))
-    # we must now patch them onto the doubled fourier sphere
+
+    # We patch them onto the doubled fourier sphere
     map_dfs = np.zeros((2 * ntheta_dfs - 2, nphi), dtype=map.dtype if spin == 0 else ctype[map.dtype])
     # :Use 1d exluding rings for non trivial weights
     #map = ducc0.sht.experimental.synthesis_2d(alm=gclm, ntheta=ntheta, nphi=nphi,
@@ -76,15 +85,16 @@ def gclm2dfs(gclm, mmax, spin, ringw=None, ntheta=None, numthreads=0, verbose=0,
     #                                          mode=mode)
     tim.add('experimental.synthesis')
     # extend map to double Fourier sphere map
-    #FIXME: this assumes contiguous values in nzrorings
 
     if spin == 0:
+        # FIXME: this assumes contiguous values in nzrorings
         map_dfs[nzro_rings, :] = map[0].reshape(cc_geom.theta.size, nphi)
     else:
+        # FIXME: this assumes contiguous values in nzrorings
         map_dfs[nzro_rings, :] = (map[0] + 1j * map[1]).reshape(cc_geom.theta.size, nphi)
     del map
     assert ringw.size == ntheta
-    for ir, w in zip(nzro_rings, ringw[nzro_rings]):
+    for ir, w in zip(nzro_rings, ringw[nzro_rings]): # Applies (eg apodization) weights to the DFS map
         map_dfs[ir, :] *= w
     map_dfs[ntheta_dfs:, :nphihalf] = map_dfs[ntheta_dfs - 2:0:-1, nphihalf:]
     map_dfs[ntheta_dfs:, nphihalf:] = map_dfs[ntheta_dfs - 2:0:-1, :nphihalf]
@@ -93,7 +103,6 @@ def gclm2dfs(gclm, mmax, spin, ringw=None, ntheta=None, numthreads=0, verbose=0,
     tim.add('map_dfs build')
 
     # go to Fourier space
-    map_dfs_r = map_dfs.copy() #just saving this in case we want it
     if spin == 0:
         tmp = np.empty(map_dfs.shape, dtype=ctype[map_dfs.dtype])
         map_dfs = ducc0.fft.c2c(map_dfs, axes=(0, 1), inorm=2, nthreads=numthreads, out=tmp)
@@ -103,6 +112,7 @@ def gclm2dfs(gclm, mmax, spin, ringw=None, ntheta=None, numthreads=0, verbose=0,
     tim.add('map_dfs 2DFFT')
     if verbose:
         print(tim)
+    # For convenience, tht coordinates of DFS points, and rescaling factor to convert tht of spherical map to tht of dfs
     tht_dfs = np.linspace(0, 2 * np.pi, ntheta_dfs * 2 - 2, endpoint=False)
     thtfac = (ntheta - 1.) / (ntheta_dfs -1.) # factor to convert theta of spherical map to theta of dfs
-    return tht_dfs, map_dfs_r, map_dfs, thtfac
+    return tht_dfs, thtfac, map_dfs
