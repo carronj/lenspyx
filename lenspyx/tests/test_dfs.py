@@ -19,7 +19,7 @@ thtmax = 40 / 180 * np.pi #159.399 / 180 * np.pi
 dtht = 5. / 180 * np.pi
 
 # parameters
-lmax = 4000
+lmax = 4000 # 4000
 dlmax_gl = 100 # lmax of synthesis general will be lmax + dlmax_gl
 eps = 1e-7
 verbose = False
@@ -55,15 +55,22 @@ if True:
     bounded_geom = BdedGeom(geom, dphi)
     thts_trunc = bounded_geom.theta[np.where(bounded_geom.nph_bded > 0)]
     # Select the pointings to be on this region only
-    ptg = bounded_geom.collectmap((ffi_ducc._get_ptg()[:, :2]).T).T
+    ptg = bounded_geom.collectmap((ffi_jc._get_ptg()[:, :2]).T).T
     ffi_ducc._get_ptg = lambda : ptg
 
     print("%s pointing points, %.1f percent of the sky"%(ptg.shape[0], 100 * ptg.shape[0] / geom.npix() ))
+    #ptg_full = ffi_jc._get_ptg()[:, :2]
+    #ti = time.time()
+    #tlm_len_ducc = np.atleast_2d(ffi_ducc.gclm2lenmap(tlm, None, spin, False, polrot=polrot, ptg=ptg_full))
+    #baseline_ducc_time = (time.time() - ti)
+    #print('%.2f sec for ducc-baseline with no tricks and full-sky pointing' % baseline_ducc_time)
 
     ti = time.time()
     tlm_len_ducc = np.atleast_2d(ffi_ducc.gclm2lenmap(tlm, None, spin, False, polrot=polrot, ptg=ptg))
     baseline_ducc_time = (time.time() - ti)
     print('%.2f sec for ducc-baseline with no tricks' % baseline_ducc_time)
+
+
 
     ti = time.time()
     tlm_len = np.atleast_2d(ffi_jc.gclm2lenmap(tlm, None, spin, False, polrot=polrot, ptg=ptg))
@@ -115,6 +122,7 @@ for band_limit_increase in [0, 100, 500]:
         tlm_len2 = np.atleast_2d(ffi_jc.gclm2lenmap(tlm, None, spin, False, _dfs_ringweights=bump(tht),
                         ntheta=ntheta, _dfs_scale=scale, _forcefancydfs=True, polrot=polrot, ptg=ptg))
         tf = time.time()
+        print(ffi_jc.tim)
         # collect deviations ring per ring
         meanreldev, maxreldev = get_reldev(tlm_ref, tlm_len2)
         print("dN_theta %s, scale %s, %.2f sec" % (band_limit_increase, scale, tf - ti))
@@ -129,5 +137,5 @@ pl.xlabel(r'$\theta$ [deg]')
 pl.ylabel(r'dev to baseline')
 pl.axvline(thtmax / np.pi * 180, c='k', ls='--', label='start of apo')
 pl.legend()
-pl.savefig('../test_dfs.pdf', bbox_inches='tight')
+#pl.savefig('../test_dfs.pdf', bbox_inches='tight')
 pl.show()

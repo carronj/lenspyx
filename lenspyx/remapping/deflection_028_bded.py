@@ -120,3 +120,15 @@ class BdedGeom(Geom):
         for ofs_bd, ofs, nphbd in zip(self.ofs_bded, self.ofs, self.nph_bded):
             ret[:, ofs_bd:ofs_bd+nphbd] = m[:, ofs:ofs+nphbd]
         return ret
+
+    def spread2map(self, m_bded: np.ndarray, m:np.ndarray):
+        """Puts bounded map onto the full pixelization"""
+        m_bded = np.atleast_2d(m_bded)
+        m = np.atleast_2d(m)
+        assert m_bded[0].size == self.npix_bded()
+        for ofs_bd, ofs, nphbd in zip(self.ofs_bded, self.ofs, self.nph_bded):
+           m[:, ofs:ofs+nphbd] =  m_bded[:, ofs_bd:ofs_bd+nphbd]
+        return m
+
+
+
