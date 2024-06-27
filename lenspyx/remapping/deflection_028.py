@@ -31,16 +31,16 @@ if not HAS_DUCCGRADONLY or not HAS_DUCCROTATE:
 
 ctype = {np.dtype(np.float32): np.complex64,
          np.dtype(np.float64): np.complex128,
-         np.dtype(np.longdouble): np.longcomplex,
+         np.dtype(np.longdouble): np.longdouble,
          np.float32: np.complex64,
          np.float64: np.complex128,
-         np.longdouble: np.longcomplex}
+         np.longdouble: np.longdouble}
 rtype = {np.dtype(np.complex64): np.float32,
          np.dtype(np.complex128): np.float64,
-         np.dtype(np.longcomplex): np.longdouble,
+         np.dtype(np.longdouble): np.longdouble,
          np.complex64: np.float32,
          np.complex128: np.float64,
-         np.longcomplex: np.longdouble}
+         np.longdouble: np.longdouble}
 
 def ducc_sht_mode(gclm, spin):
 
