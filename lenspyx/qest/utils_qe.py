@@ -3,7 +3,7 @@ import numpy as np
 from os import cpu_count
 from lenspyx.remapping.utils_geom import Geom
 from lenspyx.utils_hp import almxfl, alm_copy, Alm
-
+from ducc0.misc import wigner3j_int
 
 class qeleg:
     def __init__(self, spin_in: int, spin_out:int, cl:np.ndarray[float]):
@@ -343,6 +343,23 @@ def get_spin_lower(s, lmax):
     ret[abs(s):] = -np.sqrt(np.arange(s + abs(s), lmax + s + 1) * np.arange(abs(s) - s + 1, lmax - s + 2))
     return ret
 
+def sF(s, l2, L):
+    """Spherical geometry trigonometric weightings
+
+        Returns :math:`{}_{s}F^{+} and {}_{s}F^{-}`
+
+        See C10 of spherical bispectrum expansion paper
+
+        Returns values for all possible l1
+
+        Returns:
+            l1_min, {}_{s}F^{+}, {}_{s}F^{-}
+
+    """
+    l1minp, w3p = wigner3j_int(l2, L,  s, 0)
+    l1minm, w3m = wigner3j_int(l2, L, -s, 0)
+    assert l1minp == l1minm
+    return l1minp, (w3p + w3m) * 0.5, (w3p - w3m) * 0.5
 
 def joincls(cls_list):
     lmaxp1 = np.min([len(cl) for cl in cls_list])
