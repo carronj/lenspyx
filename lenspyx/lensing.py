@@ -187,11 +187,9 @@ def synfast(cls: dict, lmax=None, mmax=None, geometry=('healpix', {'nside': 2048
     """
     tim = timer('synfast', False)
     lmax_cls = np.max([len(cl) - 1 for cl in cls.values()])
-    if lmax is None:
-        lmax = lmax_cls
+    lmax = lmax_cls if lmax is None else min(lmax, lmax_cls)
     if mmax is None:
         mmax = lmax
-    lmax = min(lmax, lmax_cls)
     cmb_labels = ['t', 'e', 'b', 'p', 'o']
     spec_labels = [k.lower() for k in cls.keys()]
     # First remove zero fields:
