@@ -5,6 +5,7 @@ import numpy as np
 from lenspyx.utils_hp import Alm
 from lenspyx import cachers
 from lenspyx.remapping import deflection_028 as deflection_28
+from lenspyx.remapping.utils_geom import Geom
 from ducc0.sht import adjoint_synthesis_general, synthesis_general
 import ducc0
 try:
@@ -84,4 +85,19 @@ class deflection(deflection_28.deflection):
     def change_dlm(self, dlm:list or np.ndarray, mmax_dlm:int or None, cacher:cachers.cacher or None=None):
         assert len(dlm) == 2, (len(dlm), 'gradient and curl mode (curl can be none)')
         return deflection(self.geom, dlm[0], mmax_dlm, self.sht_tr, cacher, dlm[1],
-                          verbosity=self.verbosity, epsilon=self.epsilon, single_prec=self.single_prec)
+                          verbosity=self.verbosity, epsilon=self.epsilon, single_prec=self.single_prec,
+                          planned=self.planned)
+
+    def change_geom(self, lens_geom:Geom, cacher:cachers.cacher or None=None):
+        """Returns a deflection instance with a different position-space geometry
+
+                Args:
+                    lens_geom: new geometry
+                    cacher: cacher instance if desired
+
+
+        """
+        print("**** change_geom, DO YOU REALLY WANT THIS??")
+        return deflection(lens_geom, self.dlm, self.mmax_dlm, self.sht_tr, cacher, self.dclm,
+                          verbosity=self.verbosity, epsilon=self.epsilon, single_prec=self.single_prec,
+                          planned=self.planned)
