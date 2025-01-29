@@ -14,7 +14,7 @@ GL_cache = {}
 verbose = False
 
 
-def wignerpos(cl: np.darray[float], theta: np.darray[float], s1: int, s2: int):
+def wignerpos(cl: np.ndarray[float], theta: np.ndarray[float], s1: int, s2: int):
     r"""Produces Wigner small-d transform defined by
 
         :math:`\sum_\ell \frac{2\ell + 1}{4\pi} C_\ell d^\ell_{s_1 s_2}(\theta)`

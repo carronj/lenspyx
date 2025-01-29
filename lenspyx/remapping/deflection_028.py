@@ -477,7 +477,8 @@ class deflection:
         return slm.squeeze()
 
     def lensgclm(self, gclm:np.ndarray, mmax:int or None, spin:int, lmax_out:int, mmax_out:int or None,
-                 gclm_out:np.ndarray=None, backwards=False, nomagn=False, polrot=True, out_sht_mode='STANDARD'):
+                 gclm_out:np.ndarray=None, backwards=False, nomagn=False, polrot=True, out_sht_mode='STANDARD',
+                 m_weights=(None, 1.)):
         """Adjoint remapping operation from lensed alm space to unlensed alm space
 
             Args:
@@ -490,7 +491,8 @@ class deflection:
                 backwards: forward or adjoint (not the same as inverse) lensing operation
                 polrot(optional): includes small rotation of spin-weighted fields (defaults to True)
                 out_sht_mode(optional): e.g. 'GRAD_ONLY' if only the output gradient mode is desired
-
+                m_weights(optional): applies additional weigthing of the real space map.
+                                     If so first entry is slice or pixel indices, second the weights.
 
             Note:
                  nomagn=True is a backward comptability thing to ask for inverse lensing
@@ -501,6 +503,8 @@ class deflection:
         self.tim.start(stri)
         self.tim.reset()
         input_sht_mode = ducc_sht_mode(gclm, spin)
+        weighted = (not np.isscalar(m_weights[1])) or (np.isscalar(m_weights[1]) and  m_weights[1] != 1.)
+
         if nomagn:
             assert backwards
         if mmax_out is None:
@@ -525,6 +529,10 @@ class deflection:
             gclm_out = self.geom.adjoint_synthesis(m, spin, lmax_out, mmax_out, self.sht_tr, alm=gclm_out,
                                                    mode=out_sht_mode)
             self.tim.add('adjoint_synthesis')
+            if weighted:
+                assert gclm_out.ndim == 2
+                gclm_out[:, m_weights[0]] *= m_weights[1]
+                self.tim.add('m_weights')
             self.tim.close('lengclm ' + 'bwd' * backwards + 'fwd' * (not backwards))
             return gclm_out.squeeze()
         else:
@@ -532,6 +540,7 @@ class deflection:
                 gclm = gclm.astype(np.complex64)
                 self.tim.add('type conversion')
             if spin == 0 and self._totalconvolves0:
+                assert not weighted
                 assert out_sht_mode == 'STANDARD', 'cant handle this here'
                 # The code below works for any spin but this seems a little bit faster for non-zero spin
                 # So keeping this for the moment
@@ -586,6 +595,9 @@ class deflection:
             for ofs, w, nph in zip(self.geom.ofs, self.geom.weight, self.geom.nph):
                 points[:, ofs:ofs + nph] *= w
             self.tim.add('weighting')
+            if weighted:
+                points[:, m_weights[0]] *= m_weights[1]
+                self.tim.add('m_weights')
             slm = self.lenmap2gclm(points, spin, lmax_out, mmax_out, sht_mode=out_sht_mode, gclm_out=gclm_out)
             self.tim.close(stri)
             if self.verbosity:
