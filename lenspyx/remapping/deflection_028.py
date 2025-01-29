@@ -18,7 +18,7 @@ except:
 
 HAS_DUCCPOINTING = 'get_deflected_angles' in ducc0.misc.__dict__
 HAS_DUCCROTATE = 'lensing_rotate' in ducc0.misc.__dict__
-HAS_DUCCGRADONLY = 'mode:' in ducc0.sht.experimental.synthesis.__doc__
+HAS_DUCCGRADONLY = 'mode:' in ducc0.sht.synthesis.__doc__
 
 if HAS_DUCCPOINTING:
     from ducc0.misc import get_deflected_angles
@@ -353,9 +353,9 @@ class deflection:
         # Is this any different to scarf wraps ?
         # NB: type of map, map_df, and FFTs will follow that of input gclm
         mode = ducc_sht_mode(gclm, spin)
-        map = ducc0.sht.experimental.synthesis_2d(alm=gclm, ntheta=ntheta, nphi=nphi,
+        map = ducc0.sht.synthesis_2d(alm=gclm, ntheta=ntheta, nphi=nphi,
                                 spin=spin, lmax=lmax_unl, mmax=mmax, geometry="CC", nthreads=self.sht_tr, mode=mode)
-        self.tim.add('experimental.synthesis_2d (%s)'%mode)
+        self.tim.add('synthesis_2d (%s)'%mode)
         # extend map to double Fourier sphere map
         map_dfs = np.empty((2 * ntheta - 2, nphi), dtype=map.dtype if spin == 0 else ctype[map.dtype])
         if spin == 0:
@@ -470,7 +470,7 @@ class deflection:
         self.tim.add('Double Fourier')
 
         # adjoint SHT synthesis
-        slm = ducc0.sht.experimental.adjoint_synthesis_2d(map=map, spin=spin,
+        slm = ducc0.sht.adjoint_synthesis_2d(map=map, spin=spin,
                             lmax=lmax, mmax=mmax, geometry="CC", nthreads=self.sht_tr, mode=sht_mode, alm=gclm_out)
         self.tim.add('adjoint_synthesis_2d (%s)'%sht_mode)
         self.tim.close('lenmap2gclm')

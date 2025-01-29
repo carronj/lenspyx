@@ -5,7 +5,7 @@ import numpy as np
 from lenspyx.utils_hp import Alm
 from lenspyx import cachers
 from lenspyx.remapping import deflection_028 as deflection_28
-from ducc0.sht.experimental import adjoint_synthesis_general, synthesis_general
+from ducc0.sht import adjoint_synthesis_general, synthesis_general
 import ducc0
 try:
     from lenspyx.fortran.remapping import remapping as fremap
