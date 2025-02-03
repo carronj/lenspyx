@@ -43,7 +43,7 @@ if __name__ == '__main__':
     npix = geom.npix()
     nrings = ffi.geom.theta.size
     ncomp = 1 + (args.spin > 0) * (not args.gonly)
-    eblm = syn_alms(args.spin, lmax_unl=lmax_unl, ctyp=ctyp)
+    eblm = syn_alms(args.spin, lmax_unl=lmax_unl, ctyp=ctyp)[:ncomp]
     if args.inplace:
         outsize = Alm.getsize(args.lmax_len, args.lmax_len)
         eblm_out = eblm[:, :outsize] # NB slicing not a must here
