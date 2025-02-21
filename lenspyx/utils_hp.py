@@ -94,10 +94,10 @@ def synalm(cl:np.ndarray, lmax:int, mmax:int or None, rlm_dtype=np.float64):
     return alm
 
 
-def synalms(cls: dict, lmax:int, mmax:int or None, seed=None, rlm_dtype:type = np.float64):
+def synalms(cls: dict, lmax:int, mmax:int or None, seed=None, rlm_dtype:type=np.float64):
     """Creates Gaussian field alms from input cl dictionary
 
-    Parametersseed
+    Parameters
     ----------
     cls : dict
         The power spectra of the maps (e.g. as coming from CAMB)
@@ -105,7 +105,9 @@ def synalms(cls: dict, lmax:int, mmax:int or None, seed=None, rlm_dtype:type = n
         Maximum multipole simulated
     mmax: int
         Maximum m defining the alm layout, defaults to lmax if None or < 0
-    rlm_dtype(optional, defaults to np.float64):
+    seed: (optional, defaults to None)
+        Random generator seed
+    rlm_dtype:(optional, defaults to np.float64)
         Precision of real components of the array (e.g. np.float32 for single precision output array)
 
     Returns
@@ -174,7 +176,7 @@ def synalms(cls: dict, lmax:int, mmax:int or None, seed=None, rlm_dtype:type = n
     elif rlm_dtype == np.float64:
         dtype_complex = np.complex128
     else:
-        assert 0, "please either choose np.float32 (single precission), or np.float64 (double precission) as rlm_dtype"
+        assert 0, "please either choose np.float32 (single precision), or np.float64 (double precision) as rlm_dtype"
     alms = np.zeros((len(labels_wgrad), phases[0].size), dtype=dtype_complex)
     #    for L in Ls: #L @ L.T is full matrx
     for i, f in enumerate(labels):

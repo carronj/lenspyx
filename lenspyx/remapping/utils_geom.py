@@ -177,6 +177,7 @@ class Geom:
 
     def alm2map_spin(self, gclm:np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int, zbounds=(-1., 1.), **kwargs):
         # FIXME: method only here for backwards compatiblity
+        # FIXME: method only here for backwards compatiblity
         assert zbounds[0] == -1 and zbounds[1] == 1., zbounds
         return self.synthesis(gclm, spin, lmax, mmax, nthreads, **kwargs)
 
