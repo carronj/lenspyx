@@ -65,6 +65,9 @@ class deflection:
 
 
         """
+        assert np.iscomplexobj(dglm), 'harmonic coefficients must be complex'
+        if dclm is not None:
+            assert np.iscomplexobj(dclm), 'harmonic coefficients must be complex'
         lmax = Alm.getlmax(dglm.size, mmax_dlm)
         if mmax_dlm is None:
             mmax_dlm = lmax
