@@ -7,7 +7,7 @@
 """
 from __future__ import annotations
 import numpy as np
-from ducc0.sht.experimental import alm2leg, leg2alm
+from ducc0.sht import alm2leg, leg2alm
 from ducc0.misc import GL_thetas, GL_weights
 
 GL_cache = {}
