@@ -47,8 +47,7 @@ def dlm2angles(dlms:np.ndarray, geometry:Geom, mmax=None, nthreads: int=0, calc_
                                      e.g. :math:`{}_{2}{P}(\hat n) \rightarrow e^{2 i \gamma(\hat n)}{}_{2}P(\hat n')`
 
         Returns:
-            array of shape (npix, 2 (or 3 if calc_rotation is set)) with co-latitude, longitude and rotation angle
-                        :math:`\theta, \phi, \gamma`
+            angles: array of shape (npix, 2 (or 3 if calc_rotation is set)) with co-latitude, longitude and rotation angles :math:`\theta, \phi, \gamma`
 
                                  
     """
