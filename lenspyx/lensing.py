@@ -44,7 +44,7 @@ def dlm2angles(dlms:np.ndarray, geometry:Geom, mmax=None, nthreads: int=0, calc_
             geometry(optional): desired sphere pixelization (here only iso-latitude rings)
             nthreads(optional): number of threads to use (defaults to os.cpu_count())
             calc_rotation(optional): also computes the angle gamma by which to rotate non-zero spin fields after deflection
-                                     e.g. :math:`{2}_{P} \rightarrow e^{2 i \gamma}{}_{2}P`
+                                     e.g. :math:`{}_{2}{P}(\hat n) \rightarrow e^{2 i \gamma(\hat n)}{}_{2}P(\hat n')`
 
         Returns:
             array of shape (npix, 2 (or 3 if calc_rotation is set)) with co-latitude, longitude and rotation angle
