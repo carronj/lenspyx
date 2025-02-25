@@ -1,12 +1,15 @@
 from __future__ import print_function, annotations
 from os import cpu_count
 import numpy as np
+from numpy.random import default_rng
+
+from ducc0.misc import get_deflected_angles
+
 from lenspyx.remapping.utils_geom import Geom
 from lenspyx.remapping.deflection_029 import deflection
 from lenspyx import cachers
 from lenspyx.utils_hp import almxfl, Alm
 from lenspyx.utils import timer
-from numpy.random import default_rng
 
 
 def get_geom(geometry: tuple[str, dict]=('healpix', {'nside':2048})):
@@ -21,6 +24,43 @@ def get_geom(geometry: tuple[str, dict]=('healpix', {'nside':2048})):
         assert 0, 'Geometry %s not found, available geometries: '%geometry[0] + Geom.get_supported_geometries()
     return geo(**geometry[1])
 
+
+def dlm2angles(dlms:np.ndarray, geometry:Geom, mmax=None, nthreads: int=0, calc_rotation=False):
+    r"""Returns pointing information from lensing deflection harmonic coefficients
+        
+        Args:
+            dlms: The spin-1 deflection, in the form of one or two arrays.
+
+                    The two arrays are the gradient and curl deflection healpy alms:
+
+                    :math:`\sqrt{L(L+1)}\phi_{LM}` with :math:`\phi` the lensing potential
+
+                    :math:`\sqrt{L(L+1)}\Omega_{LM}` with :math:`\Omega` the lensing curl potential
+
+
+                    The curl can be omitted if zero, resulting in principle in slightly faster execution
+    
+            mmax(optional): maximum m value of dlms, if not equal to lmax    
+            geometry(optional): desired sphere pixelization (here only iso-latitude rings)
+            nthreads(optional): number of threads to use (defaults to os.cpu_count())
+            calc_rotation(optional): also computes the angle gamma by which to rotate non-zero spin fields after deflection
+                                     e.g. :math:`{2}_{P} \rightarrow e^{2 i \gamma}{}_{2}P`
+
+        Returns:
+            array of shape (npix, 2 (or 3 if calc_rotation is set)) with co-latitude, longitude and rotation angle
+                        :math:`\theta, \phi, \gamma`
+
+                                 
+    """
+    if nthreads <= 0:
+        nthreads = cpu_count()
+    dlms2d = np.atleast_2d(dlms)
+    lmax = Alm.getlmax(dlms2d[0].size, mmax=mmax)
+    assert dlms[0].size == Alm.getsize(lmax, mmax), ('Inconsistent input lmax and mmax', (lmax, mmax))
+    tht, phi0, nph, ofs = geometry.theta, geometry.phi0, geometry.nph, geometry.ofs
+    d1 = geometry.synthesis(dlms2d, 1, lmax, mmax, nthreads)
+    return get_deflected_angles(theta=tht, phi0=phi0, nphi=nph, ringstart=ofs, deflect=d1.T, calc_rotation=calc_rotation, nthreads=nthreads)
+    
 
 def alm2lenmap(alm, dlms, geometry: tuple[str, dict]=('healpix', {'nside':2048}), epsilon=1e-7, verbose=0, nthreads: int=0, pol=True):
     r"""Computes lensed CMB maps from their alm's and deflection field alm's.
