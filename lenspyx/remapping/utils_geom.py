@@ -196,7 +196,7 @@ class Geom:
 
     @staticmethod
     def rings2pix(geom:Geom, rings:np.ndarray[int]):
-        return np.concatenate([geom.ofs[ir] + np.arange(geom.nph[ir], dtype=int) for ir in rings])
+        return np.concatenate([geom.ofs[ir] + np.arange(geom.nph[ir], dtype=np.uint64) for ir in rings])
 
     @staticmethod
     def phis(geom:Geom, ir):
