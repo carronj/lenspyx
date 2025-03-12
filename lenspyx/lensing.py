@@ -57,7 +57,7 @@ def dlm2angles(dlms:np.ndarray, geometry:Geom, mmax=None, nthreads: int=0, calc_
     lmax = Alm.getlmax(dlms2d[0].size, mmax=mmax)
     assert dlms[0].size == Alm.getsize(lmax, mmax), ('Inconsistent input lmax and mmax', (lmax, mmax))
     tht, phi0, nph, ofs = geometry.theta, geometry.phi0, geometry.nph, geometry.ofs
-    d1 = geometry.synthesis(dlms2d, 1, lmax, mmax, nthreads)
+    d1 = geometry.synthesis(dlms2d, 1, lmax, mmax, nthreads, mode='STANDARD' if dlms2d.shape[0] == 2 else 'GRAD_ONLY')
     return get_deflected_angles(theta=tht, phi0=phi0, nphi=nph, ringstart=ofs, deflect=d1.T, calc_rotation=calc_rotation, nthreads=nthreads)
     
 
