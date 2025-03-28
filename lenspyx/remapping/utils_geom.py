@@ -4,7 +4,7 @@ from lenspyx import utils_hp
 import ducc0
 from ducc0.misc import GL_thetas, GL_weights
 from ducc0.fft import good_size
-from ducc0.sht.experimental import synthesis, adjoint_synthesis, synthesis_deriv1
+from ducc0.sht import synthesis, adjoint_synthesis, synthesis_deriv1, synthesis_general, adjoint_synthesis_general
 
 def st2mmax(spin, tht, lmax):
     r"""Converts spin, tht and lmax to a maximum effective m, according to libsharp paper polar optimization formula Eqs. 7-8
