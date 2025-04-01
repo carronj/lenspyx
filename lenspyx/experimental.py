@@ -9,8 +9,8 @@ except ImportError:
     print("synthesis_general_cap not found in capsht.experimental, are you up to date?")
 
 def _epsapo(thtcap, epsilon, lmax, dl_7=20):
-    dl = int(np.round(dl_7 * ((- np.log10(epsilon) + 1) / (7 + 1)) ** 2))
-    return np.sqrt(dl / lmax * np.pi / thtcap),
+    dl = dl_7 * ((- np.log10(epsilon) + 1) / (7 + 1)) ** 2
+    return np.sqrt(dl / lmax * np.pi / thtcap)
 
 def synthesis_general_cap(alm: np.ndarray, spin: int, lmax: int, loc: np.ndarray, epsilon: float, **kwargs):
     """Wrapper to capsht synthesis_general_cap function, hiding the choice of eps_apo
