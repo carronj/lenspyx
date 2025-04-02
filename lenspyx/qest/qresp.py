@@ -189,7 +189,64 @@ def cli(cl):
     ret[ii] = 1. / cl[ii]
     return ret
 
+
 def get_mf_response(qe_key:str, nlev_t:float, beam:float, lmax_ivf:int, lmax_sky:int, cls_unl:dict,
+                lmin_ivf = 1, nlev_p=None, inoise_cls:dict or None=None, lmax_qlm=None):
+    """Delensed-noise mean field perturbative response
+
+        Args:
+            qe_key: quadratic estimator key (e.g. 'ptt' for temperature lensing estimator)
+            nlev_t: noise level of T-map in uK amin
+            beam: beam FWHM in amin
+            lmax_ivf: maximum multipole included in the quadratic estimator
+            lmax_sky: maximum multipole of the CMB sky
+                    (as used in the likelihood model. output at L can feel lsky up to lmax_ivf + L)
+            cls_unl: dictionary of unlensed CMB spectra
+            lmin_ivf(optional): sets the inverse noise to zero below this if set
+            inoise_cls(optional): Can sets this to customized inverse noise spectra.
+                                  In this case 'beam', 'nlev' are ignored
+            nlev_p(optional): polarization noise level (defaults to root 2 nlev_t)
+            lmax_qlm: maximal output QE multipole (defaults to lmax_sky + lmax_ivf, after which the output should vanish)
+
+        Returns:
+            lensing gradient potential and curl potential perturbative response R
+
+            :math:`<g^{\phi, QD}>_{LM} \sim R_L \phi_{LM}`
+
+            and similarly for the curl
+
+
+    """
+    assert lmax_sky >= lmax_ivf, (lmax_ivf, lmax_sky, 'inconsistent inputs')
+    lmax_qlm = lmax_qlm or lmax_sky + lmax_ivf
+    if inoise_cls is None:
+        inoise_cls = dict()
+    if 'tt' not in inoise_cls and qe_key[1:] in ['tt', '', ]:
+        inoise_cls['tt'] = np.zeros(lmax_sky + 1, dtype=float)
+        nlev_rad = {'tt': (nlev_t / 60 / 180 * np.pi)}
+        inoise_cls['tt'][:lmax_ivf + 1] = (utils_hp.gauss_beam(beam / 60 / 180 * np.pi, lmax=lmax_ivf) /  nlev_rad['tt']) ** 2
+        inoise_cls['tt'][:lmax_ivf + 1] *= (cls_unl['tt'][:lmax_ivf + 1] > 0)
+        inoise_cls['tt'][:lmin_ivf] *= 0.
+    for spec in ['ee', 'bb']:
+        if nlev_p is None: nlev_p = np.sqrt(2) * nlev_t
+        inoise_cls[spec] = np.zeros(lmax_sky + 1, dtype=float)
+        nlev_rad = {spec: (nlev_p / 60 / 180 * np.pi)}
+        inoise_cls[spec][:lmax_ivf + 1] = (utils_hp.gauss_beam(beam / 60 / 180 * np.pi, lmax=lmax_ivf) /  nlev_rad[spec]) ** 2
+        inoise_cls[spec][:lmax_ivf + 1] *= (cls_unl['ee'][:lmax_ivf + 1] > 0)
+        inoise_cls[spec][:lmin_ivf] *= 0.
+    cls_noise = {spec: cli(inoise_cls[spec]) for spec in inoise_cls.keys()}
+    # Adding non-zero big value
+    for spec in list(inoise_cls.keys()):
+        cls_noise[spec][np.where(cls_noise[spec] == 0)] = np.max(cls_noise[spec]) * 1e8
+    #cls_noise['tt'][np.where(cls_noise['tt'] == 0)] = np.max(cls_noise['tt']) * 1e8
+    fal = {spec: np.zeros(lmax_sky + 1, dtype=float) for spec in inoise_cls.keys()}
+    for spec in list(inoise_cls.keys()):
+        sli = slice(0, lmax_sky + 1)
+        fal[spec][sli] = cli(cls_unl[spec][sli] + cls_noise[spec][sli])
+        #fal[spec][:lmin_ivf] *= 0
+    return get_response('p' + qe_key[1:], lmax_sky, 'p', cls_unl, cls_noise, fal, lmax_qlm=lmax_qlm)
+
+def get_mf_response_old(qe_key:str, nlev_t:float, beam:float, lmax_ivf:int, lmax_sky:int, cls_unl:dict,
                 lmin_ivf = 0, nlev_p=None, inoise_cls:dict or None=None, lmax_qlm=None):
     """Delensed-noise mean field perturbative response
 
