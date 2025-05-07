@@ -94,7 +94,7 @@ def synalm(cl:np.ndarray, lmax:int, mmax:int or None, rlm_dtype=np.float64):
     return alm
 
 
-def synalms(cls: dict, lmax:int, mmax:int or None, seed=None, rlm_dtype:type=np.float64):
+def synalms(cls: dict, lmax:int, mmax:int or None, seed=None, rlm_dtype:type=np.float64, rngen=None):
     """Creates Gaussian field alms from input cl dictionary
 
     Parameters
@@ -109,6 +109,7 @@ def synalms(cls: dict, lmax:int, mmax:int or None, seed=None, rlm_dtype:type=np.
         Random generator seed
     rlm_dtype:(optional, defaults to np.float64)
         Precision of real components of the array (e.g. np.float32 for single precision output array)
+    rngen: (optional, defaults to None) Allows to use a custom random generator, seed is ignored in this case.
 
     Returns
     -------
@@ -116,6 +117,8 @@ def synalms(cls: dict, lmax:int, mmax:int or None, seed=None, rlm_dtype:type=np.
         harmonic coefficients of Gaussian field with lmax, mmax parameters
 
     """
+    if rngen is not None:
+        assert hasattr(rngen, 'standard_normal'), 'rngen must have standard_normal method'
     lmax_cls = np.max([len(cl) - 1 for cl in cls.values()])
     if lmax is None:
         lmax = lmax_cls
@@ -158,7 +161,7 @@ def synalms(cls: dict, lmax:int, mmax:int or None, seed=None, rlm_dtype:type=np.
         m[:] = np.dot(v, np.dot(np.diag(np.sqrt(t)), v.T))
     # Build phases:
     alm_size = Alm.getsize(lmax, mmax)
-    rng = default_rng(seed)
+    rng = default_rng(seed) if rngen is None else rngen
     phases = 1j * rng.standard_normal((ncomp, alm_size), dtype=rlm_dtype)
     phases += rng.standard_normal((ncomp, alm_size), dtype=rlm_dtype)
     phases *= np.sqrt(0.5)

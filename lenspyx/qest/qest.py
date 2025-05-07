@@ -32,6 +32,7 @@ def eval_qe(qe_key, lmax_ivf, cls_weight, get_alm, lmax_qlm, mmax=None, mmax_qlm
             glm and clm healpy arrays (gradient and curl terms of the QE estimate)
 
     """
+    assert mmax in [None, lmax_ivf], 'there is a bug with non-trivial mmmax, fix this first'
     qe_list = _get_qes(qe_key, lmax_ivf, cls_weight)
     if geometry is None:
         qe_spin = np.max([qe[0].spin_ou + qe[1].spin_ou for qe in uqe.qe_compress(qe_list)])

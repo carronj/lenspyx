@@ -22,7 +22,7 @@ class qeleg:
     def __add__(self, other):
         assert self.spin_in == other.spin_in and self.spin_ou == other.spin_ou
         lmax = max(self.get_lmax(), other.get_lmax())
-        cl = np.zeros(lmax + 1, dtype=float)
+        cl = np.zeros(lmax + 1, dtype=self.cl.dtype)
         cl[:len(self.cl)] += self.cl
         cl[:len(other.cl)] += other.cl
         return qeleg(self.spin_in, self.spin_ou, cl)
