@@ -49,6 +49,14 @@ class Geom:
         """
         return int(np.sum(self.nph))
 
+    def mmax(self, spin:int, lmax:int):
+        """Safe value of mmax for a given lmax and spin, given the latitude range of the geometry
+         
+         
+        """
+        return min(int(st2mmax(spin, np.pi * 0.5 - np.min(np.abs(np.pi * 0.5 - self.theta)), lmax)) + 1, lmax)
+
+
     def fsky(self):
         """Fractional area of the sky covered by the pixelization
 
@@ -343,7 +351,7 @@ class Geom:
 
         """
         return Geom.get_thingauss_geometry(lmax, smax, good_size_real=good_size_real)
-
+    
 
 class pbounds:
     """Class to regroup simple functions handling sky maps longitude truncation
