@@ -1,18 +1,83 @@
 import numpy as np
+from ducc0.sht import synthesis_general as syngducc, adjoint_synthesis_general as adjsyngducc
 try:
     import capsht
 except ImportError:
     print("capsht not found, you will not be able to use the functions in this module")
 try:
-    from capsht.experimental import synthesis_general_cap
+    from capsht.experimental import synthesis_general_cap, synthesis_general_band, adjoint_synthesis_general_cap, adjoint_synthesis_general_band
 except ImportError:
-    print("synthesis_general_cap not found in capsht.experimental, are you up to date?")
+    print("synthesis_general_cap or synthesis_general_band not found in capsht.experimental, are you up to date?")
 
-def _epsapo(thtcap, epsilon, lmax, dl_7=20):
-    dl = dl_7 * ((- np.log10(epsilon) + 1) / (7 + 1)) ** 2
+def _epsapo(thtcap, epsilon, lmax, dl_7=15):
+    #dl = dl_7 * ((- np.log10(epsilon) + 1) / (7 + 1)) ** 2
+    dl = dl_7 * ((-np.log10(epsilon) / (7 )) ** 1) ** 0.5
     return np.sqrt(dl / lmax * np.pi / thtcap)
 
-def synthesis_general_cap(alm: np.ndarray, spin: int, lmax: int, loc: np.ndarray, epsilon: float, **kwargs):
+def synthesis_general(alm: np.ndarray, spin: int, lmax: int, loc: np.ndarray, epsilon: float, 
+                      thtcap:float=None, eps_apo:float=None, tht_min:float=None, tht_max:float=None, verbose:bool=False, **kwargs):
+    """Wrapper to capsht synthesis_general function, hiding the choice of eps_apo and SHT algorithm
+    
+
+        See ducc0.sht.synthesis_general for arguments, optional arguments and outputs
+
+        relevant keyword, *mode*, *map*, *mmax*
+    
+    """
+    if tht_min is not None and tht_max is not None: # attempt at synthesis_general_band
+        eps_apo = eps_apo or 1.2 * _epsapo(tht_max-tht_min, epsilon, lmax)
+        thta_p = tht_min - 0.5 * eps_apo * (tht_max - tht_min)
+        thtb_p = tht_max + 0.5 * eps_apo * (tht_max - tht_min)
+        if (thta_p >= 0.) and (thtb_p <= np.pi):
+            if verbose:
+                print('syng type: band %.1f deg %.1f deg' % (thta_p/np.pi*180, thtb_p/np.pi*180))
+            return synthesis_general_band(alm=alm, spin=spin, lmax=lmax, loc=loc, epsilon=epsilon, 
+                                      thta=tht_min, thtb=tht_max, eps_apo=eps_apo, **kwargs)
+        if thta_p < 0.: # Can try synthesis_general_cap later on
+            thtcap = tht_max
+            eps_apo = None
+    if thtcap is not None: # attempt at synthesis_general_cap
+        eps_apo = eps_apo or _epsapo(thtcap, epsilon, lmax)
+        if verbose:
+            print('syng type: sent to cap %.1f epsapo %.2f' % (thtcap/np.pi*180, eps_apo))
+        return synthesis_general_cap(alm=alm, spin=spin, lmax=lmax, loc=loc, epsilon=epsilon, thtcap=thtcap, eps_apo=eps_apo, **kwargs)
+    if verbose:
+        print('syng type : general')
+    return syngducc(alm=alm, spin=spin, lmax=lmax, loc=loc, epsilon=epsilon,  **kwargs)
+
+def adjoint_synthesis_general(map: np.ndarray, spin: int, lmax: int, loc: np.ndarray, epsilon: float, 
+                      thtcap:float=None, eps_apo:float=None, tht_min:float=None, tht_max:float=None, verbose:bool=False, **kwargs):
+    """Wrapper to capsht synthesis_general function, hiding the choice of eps_apo
+    
+
+        See ducc0.sht.synthesis_general for arguments, optional arguments and outputs
+
+        relevant keyword, *mode*, *alm*, *mmax*
+
+    
+    """
+    if tht_min is not None and tht_max is not None: # attempt at synthesis_general_band
+        eps_apo = eps_apo or 1.2 * _epsapo(tht_max-tht_min, epsilon, lmax)
+        thta_p = tht_min - 0.5 * eps_apo * (tht_max - tht_min)
+        thtb_p = tht_max + 0.5 * eps_apo * (tht_max - tht_min)
+        if (thta_p >= 0.) and (thtb_p <= np.pi):
+            if verbose:
+                print('adjsyng type: band %.1f deg %.1f deg' % (thta_p/np.pi*180, thtb_p/np.pi*180))
+            return adjoint_synthesis_general_band(map=map, spin=spin, lmax=lmax, loc=loc, epsilon=epsilon, 
+                                      thta=tht_min, thtb=tht_max, eps_apo=eps_apo, **kwargs)
+        if thta_p < 0.: # Can try synthesis_general_cap later on
+            thtcap = tht_max
+            eps_apo = None
+    if thtcap is not None: # attempt at synthesis_general_cap
+        eps_apo = eps_apo or _epsapo(thtcap, epsilon, lmax)
+        if verbose:
+            print('adjsyng type: sent to cap %.1f deg, eps_apo %.2f' % (thtcap/np.pi*180, eps_apo))
+        return adjoint_synthesis_general_cap(map=map, spin=spin, lmax=lmax, loc=loc, epsilon=epsilon, thtcap=thtcap, eps_apo=eps_apo, **kwargs)
+    if verbose:
+        print('adjsyng type : general')
+    return syngducc(map=map, spin=spin, lmax=lmax, loc=loc, epsilon=epsilon,  **kwargs)
+
+def _synthesis_general_cap(alm: np.ndarray, spin: int, lmax: int, loc: np.ndarray, epsilon: float, **kwargs):
     """Wrapper to capsht synthesis_general_cap function, hiding the choice of eps_apo
     
         If thtcap is not specified, it is set to np.max(loc[:, 0])
@@ -26,7 +91,7 @@ def synthesis_general_cap(alm: np.ndarray, spin: int, lmax: int, loc: np.ndarray
     if eps_apo is None: eps_apo = _epsapo(thtcap, epsilon, lmax)
     return capsht.experimental.synthesis_general_cap(alm=alm, spin=spin, lmax=lmax, loc=loc, epsilon=epsilon, thtcap=thtcap, eps_apo=eps_apo, **kwargs)
 
-def adjoint_synthesis_general_cap(map: np.ndarray, spin: int, lmax: int, loc: np.ndarray, epsilon: float, **kwargs):
+def _adjoint_synthesis_general_cap(map: np.ndarray, spin: int, lmax: int, loc: np.ndarray, epsilon: float, **kwargs):
     """Wrapper to capsht adjoint_synthesis_general_cap function, hiding the choice of eps_apo
     
         If thtcap is not specified, it is set to np.max(loc[:, 0])
@@ -39,3 +104,46 @@ def adjoint_synthesis_general_cap(map: np.ndarray, spin: int, lmax: int, loc: np
     if thtcap  is None: thtcap  = np.max(loc[:, 0])
     if eps_apo is None: eps_apo = _epsapo(thtcap, epsilon, lmax)
     return capsht.experimental.adjoint_synthesis_general_cap(map=map, spin=spin, lmax=lmax, loc=loc, epsilon=epsilon, thtcap=thtcap, eps_apo=eps_apo, **kwargs)
+
+def _synthesis_general_band(alm: np.ndarray, spin: int, lmax: int, loc: np.ndarray, epsilon: float, **kwargs):
+    """Wrapper to capsht synthesis_general_band function, hiding the choice of eps_apo
+    
+        If thtcap is not specified, it is set to np.max(loc[:, 0])
+
+        See ducc0.sht.synthesis_general for arguments, optional arguments and outputs
+    
+    """
+    tht_min  = kwargs.pop('tht_min', None)
+    tht_max  = kwargs.pop('tht_max', None)
+    eps_apo = kwargs.pop('eps_apo', None)
+    if tht_max is None: tht_max  = np.max(loc[:, 0])
+    if tht_min is None: tht_min  = np.min(loc[:, 0])
+    if eps_apo is None: eps_apo = 1.2 * _epsapo(tht_max-tht_min, epsilon, lmax)
+    thta_p = tht_min - 0.5 * eps_apo * (tht_max - tht_min)
+    thtb_p = tht_max + 0.5 * eps_apo * (tht_max - tht_min)
+    if (thta_p >= 0.) and (thtb_p <= np.pi):
+        return capsht.experimental.synthesis_general_band(alm=alm, spin=spin, lmax=lmax, loc=loc, epsilon=epsilon, 
+                                                     thta=tht_min, thtb=tht_max, eps_apo=eps_apo, **kwargs)
+    return syngducc(alm=alm, spin=spin, lmax=lmax, loc=loc, epsilon=epsilon, **kwargs)
+
+def _adjoint_synthesis_general_band(map: np.ndarray, spin: int, lmax: int, loc: np.ndarray, epsilon: float, **kwargs):
+    """Wrapper to capsht adjoint_synthesis_general_band function, hiding the choice of eps_apo
+    
+        If thtcap is not specified, it is set to np.max(loc[:, 0])
+
+        See ducc0.sht.adjoint_synthesis_general for arguments, optional arguments and outputs
+    
+    """
+    tht_min  = kwargs.pop('tht_min', None)
+    tht_max  = kwargs.pop('tht_max', None)
+    eps_apo = kwargs.pop('eps_apo', None)
+    if tht_max  is None: tht_max  = np.max(loc[:, 0])
+    if tht_min  is None: tht_min  = np.min(loc[:, 0])
+    if eps_apo is None: eps_apo = 1.2 * _epsapo(tht_max-tht_min, epsilon, lmax)
+    thta_p = tht_min - 0.5 * eps_apo * (tht_max - tht_min)
+    thtb_p = tht_max + 0.5 * eps_apo * (tht_max - tht_min)
+    if (thta_p >= 0.) and (thtb_p <= np.pi):
+        return capsht.experimental.adjoint_synthesis_general_band(map=map, spin=spin, lmax=lmax, loc=loc, epsilon=epsilon, 
+                                                         thta=tht_min, thtb=tht_max, eps_apo=eps_apo, **kwargs)
+    else:
+        return adjsyngducc(map=map, spin=spin, lmax=lmax, loc=loc, epsilon=epsilon, **kwargs)

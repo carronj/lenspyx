@@ -9,7 +9,7 @@ def almxfl(alm:np.ndarray, fl:np.ndarray, mmax:int or None, inplace:bool):
     Parameters
     ----------
     alm : array
-      The alm to multiply
+      The alm, or alms to multiply
     fl : array
       The function (at l=0..fl.size-1) by which alm must be multiplied.
     mmax : None or int
@@ -24,20 +24,20 @@ def almxfl(alm:np.ndarray, fl:np.ndarray, mmax:int or None, inplace:bool):
       if inplace is True.
 
     """
-    lmax = Alm.getlmax(alm.size, mmax)
+    lmax = Alm.getlmax(alm.shape[-1], mmax)
     if mmax is None or mmax < 0:
         mmax = lmax
     assert fl.size > lmax, (fl.size, lmax)
     if inplace:
         for m in range(mmax + 1):
             b = m * (2 * lmax + 1 - m) // 2 + m
-            alm[b:b + lmax - m + 1] *= fl[m:lmax+1]
+            alm[...,b:b + lmax - m + 1] *= fl[m:lmax+1]
         return
     else:
         ret = np.empty_like(alm)
         for m in range(mmax + 1):
             b = m * (2 * lmax + 1 - m) // 2 + m
-            ret[b:b + lmax - m + 1] = alm[b:b + lmax - m + 1] * fl[m:lmax+1]
+            ret[...,b:b + lmax - m + 1] = alm[...,b:b + lmax - m + 1] * fl[m:lmax+1]
         return ret
 
 
@@ -63,7 +63,7 @@ def gauss_beam(fwhm:float, lmax:int):
     return bl
 
 
-def synalm(cl:np.ndarray, lmax:int, mmax:int or None, rlm_dtype=np.float64):
+def synalm(cl:np.ndarray, lmax:int, mmax:int or None, rlm_dtype=np.float64, seed=None, rngen=None, alms_r:np.ndarray=None):
     """Creates a Gaussian field alm from input cl array
 
     Parameters
@@ -83,14 +83,24 @@ def synalm(cl:np.ndarray, lmax:int, mmax:int or None, rlm_dtype=np.float64):
         harmonic coefficients of Gaussian field with lmax, mmax parameters
 
     """
+    if rngen is not None:
+        assert hasattr(rngen, 'standard_normal'), 'rngen must have standard_normal method'
     assert lmax + 1 <= cl.size
     if mmax is None or mmax < 0:
         mmax = lmax
     alm_size = Alm.getsize(lmax, mmax)
-    alm = rng.standard_normal(alm_size, dtype=rlm_dtype) + 1j * rng.standard_normal(alm_size, dtype=rlm_dtype)
-    almxfl(alm, np.sqrt(cl[:lmax+1] * 0.5), mmax, True)
+    rng = default_rng(seed) if rngen is None else rngen
     real_idcs = Alm.getidx(lmax, np.arange(lmax + 1, dtype=int), 0)
-    alm[real_idcs] = alm[real_idcs].real * np.sqrt(2.)
+    if alms_r is None:
+        alm = rng.standard_normal(alm_size, dtype=rlm_dtype) + 1j * rng.standard_normal(alm_size, dtype=rlm_dtype)
+        almxfl(alm, np.sqrt(cl[:lmax+1] * 0.5), mmax, True)
+    else:
+        assert alms_r.shape == (2, alm_size), alms_r.shape
+        rng.standard_normal((2, alm_size), dtype=rlm_dtype, out=alms_r)
+        almxfl(alms_r[0], np.sqrt(cl[:lmax+1] * 0.5), mmax, True)
+        almxfl(alms_r[1], np.sqrt(cl[:lmax+1] * 0.5), mmax, True)
+        alm = alms_r
+    alm[...,real_idcs] = alm[...,real_idcs].real * np.sqrt(2.)
     return alm
 
 
