@@ -24,7 +24,7 @@ class cacher_none(cacher):
 class cacher_npy(cacher):
     def __init__(self, lib_dir, verbose=False):
         if not os.path.exists(lib_dir):
-            os.makedirs(lib_dir)
+            os.makedirs(lib_dir, exist_ok=True)
         self.lib_dir = lib_dir
         self.verbose = verbose
 

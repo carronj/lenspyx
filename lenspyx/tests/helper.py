@@ -21,14 +21,19 @@ def _extend_cl(cl:np.ndarray, lmax):
         ret[:lmax_cl+1] = cl
         return ret
 
-def syn_alms(spin, lmax_unl=5120, ctyp=np.complex128):
+def syn_alms(spin, lmax_unl=5120, ctyp=np.complex128, white=False):
     ncomp = 1 + (abs(spin) > 0)
     mmax_unl = lmax_unl
     rtyp = lenspyx.remapping.deflection_028.rtype[ctyp]
     eblm = np.empty( (ncomp, Alm.getsize(lmax_unl, mmax_unl)), dtype=ctyp)
-    eblm[0] = synalm(_extend_cl(cls_unl['ee' if abs(spin) > 0 else 'tt'][:lmax_unl + 1], lmax_unl), lmax_unl, mmax_unl, rlm_dtype=rtyp)
+    clgg = _extend_cl(cls_unl['ee' if abs(spin) > 0 else 'tt'][:lmax_unl + 1], lmax_unl)
+    clcc = _extend_cl(cls_unl['bb'][:lmax_unl + 1], lmax_unl)
+    if white:
+        clgg = np.ones_like(clgg)
+        clcc = np.ones_like(clcc)
+    eblm[0] = synalm(clgg, lmax_unl, mmax_unl, rlm_dtype=rtyp)
     if ncomp > 1:
-       eblm[1] = synalm(_extend_cl(cls_unl['bb'][:lmax_unl + 1], lmax_unl), lmax_unl, mmax_unl, rlm_dtype=rtyp)
+       eblm[1] = synalm(clcc, lmax_unl, mmax_unl, rlm_dtype=rtyp)
     return eblm
 
 def syn_dlm(lmax_unl=5120, ctyp=np.complex128):

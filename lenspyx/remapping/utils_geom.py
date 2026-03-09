@@ -4,7 +4,7 @@ from lenspyx import utils_hp
 import ducc0
 from ducc0.misc import GL_thetas, GL_weights
 from ducc0.fft import good_size
-from ducc0.sht.experimental import synthesis, adjoint_synthesis, synthesis_deriv1
+from ducc0.sht import synthesis, adjoint_synthesis, synthesis_deriv1, synthesis_general, adjoint_synthesis_general
 
 def st2mmax(spin, tht, lmax):
     r"""Converts spin, tht and lmax to a maximum effective m, according to libsharp paper polar optimization formula Eqs. 7-8
@@ -48,6 +48,14 @@ class Geom:
 
         """
         return int(np.sum(self.nph))
+
+    def mmax(self, spin:int, lmax:int):
+        """Safe value of mmax for a given lmax and spin, given the latitude range of the geometry
+         
+         
+        """
+        return min(int(st2mmax(spin, np.pi * 0.5 - np.min(np.abs(np.pi * 0.5 - self.theta)), lmax)) + 1, lmax)
+
 
     def fsky(self):
         """Fractional area of the sky covered by the pixelization
@@ -175,6 +183,7 @@ class Geom:
                                  nthreads=nthreads, ringstart=self.ofs, alm=alm,  **kwargs)
 
     def alm2map_spin(self, gclm:np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int, zbounds=(-1., 1.), **kwargs):
+        # FIXME: method only here for backwards compatiblity
         # FIXME: method only here for backwards compatiblity
         assert zbounds[0] == -1 and zbounds[1] == 1., zbounds
         return self.synthesis(gclm, spin, lmax, mmax, nthreads, **kwargs)
@@ -342,7 +351,7 @@ class Geom:
 
         """
         return Geom.get_thingauss_geometry(lmax, smax, good_size_real=good_size_real)
-
+    
 
 class pbounds:
     """Class to regroup simple functions handling sky maps longitude truncation
