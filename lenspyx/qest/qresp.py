@@ -252,3 +252,82 @@ def get_mf_response(qe_key:str, nlev_t:float, beam:float, lmax_ivf:int, lmax_sky
         fal[spec][sli] = cli(cls_unl[spec][sli] + cls_noise[spec][sli])
         #fal[spec][:lmin_ivf] *= 0
     return get_response(qe_key, lmax_sky, 'p', cls_unl, cls_noise, fal, lmax_qlm=lmax_qlm)
+
+
+
+
+def get_mf_response_mix(qe_key: str, nlev_t: float, beam: float, lmax_ivf: int, lmax_sky: int, cls_unl: dict, *, source: str = "p", lmin_ivf: int = 1, nlev_p=None, inoise_cls: dict | None = None, lmax_qlm=None, cls_weight: dict | None = None, fal_leg2=None, transf=None):
+    """
+    Delensed-noise mean-field perturbative response using plancklens full parity response.
+
+    Returns:
+        RGG, RGC, RCG, RCC
+    """
+
+    from plancklens.qresp import get_response as pl_get_response
+
+    assert lmax_sky >= lmax_ivf, (lmax_ivf, lmax_sky, "inconsistent inputs")
+    lmax_qlm = lmax_qlm or (lmax_sky + lmax_ivf)
+    cls_weight = cls_unl if cls_weight is None else cls_weight
+
+    if inoise_cls is None:
+        inoise_cls = {}
+
+    # --- Build inverse-noise cls (unchanged from lenspyx) ---
+    if 'tt' not in inoise_cls and qe_key[1:] in ['tt', '', ]:
+        inoise_cls['tt'] = np.zeros(lmax_sky + 1, dtype=float)
+        nlev_rad = (nlev_t / 60 / 180 * np.pi)
+        inoise_cls['tt'][:lmax_ivf + 1] = (
+            utils_hp.gauss_beam(beam / 60 / 180 * np.pi, lmax=lmax_ivf) / nlev_rad
+        ) ** 2
+        inoise_cls['tt'][:lmax_ivf + 1] *= (cls_unl['tt'][:lmax_ivf + 1] > 0)
+        inoise_cls['tt'][:lmin_ivf] *= 0.
+
+    for spec in ['ee', 'bb']:
+        if spec in inoise_cls:
+            continue
+        if nlev_p is None:
+            nlev_p = np.sqrt(2) * nlev_t
+        inoise_cls[spec] = np.zeros(lmax_sky + 1, dtype=float)
+        nlev_rad = (nlev_p / 60 / 180 * np.pi)
+        inoise_cls[spec][:lmax_ivf + 1] = (
+            utils_hp.gauss_beam(beam / 60 / 180 * np.pi, lmax=lmax_ivf) / nlev_rad
+        ) ** 2
+        inoise_cls[spec][:lmax_ivf + 1] *= (cls_unl['ee'][:lmax_ivf + 1] > 0)
+        inoise_cls[spec][:lmin_ivf] *= 0.
+
+    for k in inoise_cls:
+        inoise_cls[k][lmax_ivf + 1:] *= 0.
+        inoise_cls[k][:lmin_ivf] *= 0.
+
+    # --- Convert to N_ell ---
+    cls_noise = {spec: cli(inoise_cls[spec]) for spec in inoise_cls}
+    for spec in list(cls_noise.keys()):
+        z = (cls_noise[spec] == 0)
+        if np.any(z):
+            cls_noise[spec][z] = np.max(cls_noise[spec]) * 1e8
+
+    # --- Build fal = (C_unl + N)^(-1) ---
+    fal = {spec: np.zeros(lmax_sky + 1, dtype=float) for spec in inoise_cls}
+    for spec in fal:
+        sli = slice(0, lmax_sky + 1)
+        fal[spec][sli] = cli(cls_unl[spec][sli] + cls_noise[spec][sli])
+
+    # ======================================================
+    # FULL PARITY RESPONSE FROM PLANCKLENS
+    # ======================================================
+
+    RGG, RCC, RGC, RCG = pl_get_response(
+        qe_key,
+        lmax_sky,
+        source,
+        cls_weight,
+        cls_noise, 
+        fal,
+        fal_leg2=fal_leg2,
+        lmax_qlm=lmax_qlm,
+        transf=transf,
+    )
+
+    # Return in matrix ordering
+    return RGG, RGC, RCG, RCC
