@@ -36,7 +36,7 @@ capsht : Capped spherical harmonic transforms library
 """
 
 import numpy as np
-from ducc0.sht import synthesis_general as syngducc, adjoint_synthesis_general as adjsyngducc
+import ducc0
 try:
     import capsht
 except ImportError:
@@ -45,6 +45,9 @@ try:
     from capsht.experimental import synthesis_general_cap, synthesis_general_band, adjoint_synthesis_general_cap, adjoint_synthesis_general_band
 except ImportError:
     print("synthesis_general_cap or synthesis_general_band not found in capsht.experimental, are you up to date?")
+rtype = {np.dtype(np.complex128):np.dtype(np.float64), np.dtype(np.complex64):np.dtype(np.float32)}
+ctype = {rtype[ctyp]:ctyp for ctyp in rtype}
+
 
 def _epsapo(thtcap, epsilon, lmax, version=1, dl_7=None):
     r"""Compute the apodization parameter for capped spherical harmonic transforms.
@@ -199,7 +202,7 @@ def synthesis_general(alm: np.ndarray, spin: int, lmax: int, loc: np.ndarray, ep
         return synthesis_general_cap(alm=alm, spin=spin, lmax=lmax, loc=loc, epsilon=epsilon_nufft, thtcap=thtcap, eps_apo=eps_apo, **kwargs)
     if verbose:
         print('syng type : general')
-    return syngducc(alm=alm, spin=spin, lmax=lmax, loc=loc, epsilon=epsilon,  **kwargs)
+    return ducc0.sht.synthesis_general(alm=alm, spin=spin, lmax=lmax, loc=loc, epsilon=epsilon,  **kwargs)
 
 def adjoint_synthesis_general(map: np.ndarray, spin: int, lmax: int, loc: np.ndarray, epsilon: float,
                       thtcap:float=None, eps_apo:float=None, tht_min:float=None, tht_max:float=None, verbose:bool=False, **kwargs):
@@ -300,7 +303,7 @@ def adjoint_synthesis_general(map: np.ndarray, spin: int, lmax: int, loc: np.nda
         return adjoint_synthesis_general_cap(map=map, spin=spin, lmax=lmax, loc=loc, epsilon=epsilon, thtcap=thtcap, eps_apo=eps_apo, **kwargs)
     if verbose:
         print('adjsyng type : general')
-    return syngducc(map=map, spin=spin, lmax=lmax, loc=loc, epsilon=epsilon,  **kwargs)
+    return ducc0.sht.adjoint_synthesis_general(map=map, spin=spin, lmax=lmax, loc=loc, epsilon=epsilon,  **kwargs)
 
 
 
@@ -502,10 +505,10 @@ class Pixelization(object):
         assert self.loc is not None, 'no locations set'
         # relevant kwargs here: epsilon, mode.
         syng_params = {'tht_max': self.thtrange[1], 'tht_min': self.thtrange[0]}
-        return synthesis_general_exp(map=m, lmax=lmax, mmax=mmax, alm=alm, loc=self.loc, spin=spin, nthreads=nthreads, epsilon=self.epsilon, **syng_params, **kwargs)
+        return synthesis_general(map=m, lmax=lmax, mmax=mmax, alm=alm, loc=self.loc, spin=spin, nthreads=nthreads, epsilon=self.epsilon, **syng_params, **kwargs)
 
     def _adjoint_synthesis_loc(self, alm:np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int, m:np.ndarray, **kwargs):
         assert self.loc is not None, 'no locations set'
         # relevant kwargs here: epsilon, mode.
         syng_params = {'tht_max': self.thtrange[1], 'tht_min': self.thtrange[0]}
-        return adjoint_synthesis_general_exp(map=np.atleast_2d(m),lmax=lmax, mmax=mmax, alm=alm, loc=self.loc, spin=spin, nthreads=nthreads, epsilon=self.epsilon, **syng_params, **kwargs)
+        return adjoint_synthesis_general(map=np.atleast_2d(m),lmax=lmax, mmax=mmax, alm=alm, loc=self.loc, spin=spin, nthreads=nthreads, epsilon=self.epsilon, **syng_params, **kwargs)

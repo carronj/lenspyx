@@ -13,6 +13,7 @@ Welcome to lenspyx's documentation!
 
    lensing
    wigners
+   experimental
 
 Indices and tables
 ==================
