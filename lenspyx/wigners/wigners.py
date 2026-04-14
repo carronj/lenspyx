@@ -198,9 +198,14 @@ def wigner4pos(gl: np.ndarray[float], cl: np.ndarray[float] or None, theta: np.n
 def wignerd(l: int, s1: int, s2: int, theta: np.ndarray):
     r"""Returns Wigner small-d functions
 
-        :math:`(2l + 1) / (4pi) d^l_{s1, |s2|}(\theta)`
-        :math:`(2l + 1) / (4pi) d^l_{s1,-|s2|}(\theta)`
+        :math:`(2l + 1) / (4\pi) d^l_{s1, |s2|}(\theta)`
 
+        and 
+
+        :math:`(2l + 1) / (4\pi) d^l_{s1,-|s2|}(\theta)`
+
+        for all \theta.
+        
         (or one of these if s2 is zero)
 
     """
@@ -307,11 +312,11 @@ def wignerc(cl1: np.ndarray[float or complex], cl2:np.ndarray[float or complex],
 
 
 def wignerdl(s1: int, s2: int, theta: float, lmax: int):
-    """Returns the wigner function
+    r"""Returns the wigner function
         
-         :math:`d^l_{s1s2}(theta)`
+         :math:`d^l_{s1s2}(\theta)`
           
-        for all l from 0 to lmax
+        for all \\ell from 0 to lmax
 
     """
     assert np.isscalar(theta), 'scalar theta input here'
