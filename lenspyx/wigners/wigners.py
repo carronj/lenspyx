@@ -1,8 +1,101 @@
-"""This module contains DUCC-based fonctions related to Wigner-small d tranforms
+"""Wigner small-d functions and correlation functions for spin-weighted spherical harmonics.
 
-    This uses `alm2leg' and `leg2alm' from ducc0. They were not optimized for this, and the code could be improved further,
-    but the compiler optimization is done so well that they still out-perform plancklens code it seems by large amounts.
+This module provides efficient implementations of Wigner small-d functions and their associated
+correlation functions, which are fundamental for analyzing spin-weighted fields on the sphere
+(e.g., CMB polarization, gravitational lensing).
 
+The implementation uses DUCC0's `alm2leg` and `leg2alm` functions, which were not originally
+optimized for Wigner transforms but achieve excellent performance through compiler optimization.
+
+Key Concepts
+------------
+Wigner small-d functions :math:`d^\\ell_{s_1 s_2}(\\theta)` are the angular parts of the Wigner D-matrices,
+describing the rotation of spin-weighted spherical harmonics. They appear in:
+
+- Correlation functions of spin-weighted fields (e.g., ξ±  for CMB polarization or galaxy surveys)
+- Angular power spectrum estimators for CMB polarization
+- Lensing reconstruction and delensing operations
+- General spin transformations on the sphere
+
+Main Functions
+--------------
+wignerpos : Compute Wigner correlation function from power spectrum
+    Forward transform: C_ℓ → ξ(θ)
+
+wignercoeff : Compute power spectrum from Wigner correlation function
+    Adjoint transform: ξ(θ) → C_ℓ
+
+wigner4pos : Compute 4 correlation functions simultaneously
+    Efficient for computing ξ+ and ξ- together
+
+wignerc : Convolve two Wigner correlation functions
+    Used for computing products of correlation functions
+
+wignerd : Single Wigner d-function
+    Returns d^ℓ_{s1,s2}(θ) for a specific ℓ
+
+Utility Functions
+-----------------
+get_thgwg : Gauss-Legendre quadrature points and weights
+    For integration over [0, π]
+
+get_xgwg : Gauss-Legendre quadrature over arbitrary interval [a, b]
+
+Examples
+--------
+Compute CMB E-mode correlation function:
+
+>>> import numpy as np
+>>> from lenspyx.wigners import wignerpos
+>>> # E-mode power spectrum
+>>> cl_ee = np.loadtxt('cl_ee.txt')
+>>> theta = np.linspace(0, np.pi, 100)
+>>> # Compute ξ_EE(θ) = Σ_ℓ (2ℓ+1)/(4π) C_ℓ^EE d^ℓ_{2,2}(θ)
+>>> xi_ee = wignerpos(cl_ee, theta, s1=2, s2=2)
+
+Compute ξ± correlation functions:
+
+>>> from lenspyx.wigners import wigner4pos
+>>> # Returns [ξ+, ξ-] where:
+>>> # ξ+ = Σ_ℓ (2ℓ+1)/(4π) C_ℓ d^ℓ_{2,+2}(θ)
+>>> # ξ- = Σ_ℓ (2ℓ+1)/(4π) C_ℓ d^ℓ_{2,-2}(θ)
+>>> xi_plus, xi_minus = wigner4pos(cl_ee, None, theta, s1=2, s2=2)
+
+Invert correlation function to get power spectrum:
+
+>>> from lenspyx.wigners import wignercoeff, get_thgwg
+>>> lmax = 2000
+>>> npts = (lmax + 2) // 2
+>>> theta, weights = get_thgwg(npts)
+>>> # Measure ξ(θ) from data
+>>> xi_measured = measure_correlation(theta)
+>>> # Compute C_ℓ = 2π Σ_θ ξ(θ) d^ℓ_{s1,s2}(θ)
+>>> cl_recovered = wignercoeff(xi_measured, theta, s1=2, s2=2, lmax=lmax)
+
+Convolve two correlation functions:
+
+>>> from lenspyx.wigners import wignerc
+>>> cl1 = cl_ee  # E-mode spectrum
+>>> cl2 = cl_bb  # B-mode spectrum
+>>> # Compute spectrum of ξ_EE(θ) * ξ_BB(θ)
+>>> cl_product = wignerc(cl1, cl2, s1=2, t1=2, s2=2, t2=2)
+
+Notes
+-----
+- Spin values s1, s2 can be positive, negative, or zero
+- The normalization includes (2ℓ+1)/(4π) factors
+- Gauss-Legendre quadrature ensures exact integration for band-limited functions
+- Internal caching of GL points improves performance for repeated calls
+
+References
+----------
+.. [1] Varshalovich, D.A., Moskalev, A.N. and Khersonskii, V.K., 1988.
+       Quantum theory of angular momentum. World Scientific.
+.. [2] Hivon, E., et al., 2002. HEALPix: A Framework for High-Resolution
+       Discretization and Fast Analysis of Data Distributed on the Sphere.
+       ApJ, 567, 2.
+.. [3] Reinecke, M. and Seljebotn, D.S., 2013. Libsharp–spherical harmonic
+       transforms revisited. A&A, 554, A112.
 
 """
 from __future__ import annotations
@@ -214,7 +307,11 @@ def wignerc(cl1: np.ndarray[float or complex], cl2:np.ndarray[float or complex],
 
 
 def wignerdl(s1: int, s2: int, theta: float, lmax: int):
-    """Returns d^l_{s1s2}(theta) for all l from 0 to lmax
+    """Returns the wigner function
+        
+         :math:`d^l_{s1s2}(theta)`
+          
+        for all l from 0 to lmax
 
     """
     assert np.isscalar(theta), 'scalar theta input here'
