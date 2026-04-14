@@ -1,3 +1,52 @@
+"""CMB lensing operations: lensed map synthesis and related utilities.
+
+This module provides functions for computing gravitationally lensed CMB maps from
+spherical harmonic coefficients. Gravitational lensing remaps the CMB temperature
+and polarization by deflecting photon paths according to the intervening mass distribution.
+
+Key Functions
+-------------
+- :func:`alm2lenmap` : Compute lensed maps from unlensed alms and deflection field
+- :func:`alm2lenmap_spin` : Compute lensed spin-weighted maps (general spin-s fields)
+- :func:`dlm2angles` : Convert deflection alms to deflected angles
+- :func:`synfast` : Generate lensed CMB realizations from power spectra
+
+The lensing remapping is exact (non-perturbative) using interpolation on the sphere,
+with configurable accuracy through the epsilon parameter.
+
+Examples
+--------
+Generate a lensed CMB realization:
+
+>>> from lenspyx.lensing import synfast
+>>> from lenspyx.utils import get_ffp10_cls
+>>> cls = get_ffp10_cls()
+>>> maps = synfast(cls, lmax=2048, nside=2048)
+>>> # maps contains 'T' and 'QU' keys with lensed maps
+
+Lens unlensed alms:
+
+>>> from lenspyx.lensing import alm2lenmap
+>>> # alm_t, alm_e, alm_b: unlensed CMB alms
+>>> # phi_lm: lensing potential alms
+>>> import numpy as np
+>>> dlm = utils_hp.almxfl(phi_lm, np.sqrt(np.arange(lmax+1) * np.arange(1, lmax+2)), None, False)
+>>> t_lensed, q_lensed, u_lensed = alm2lenmap([alm_t, alm_e, alm_b], dlm)
+
+References
+----------
+.. [1] Lewis, A., 2005. "Lensed CMB simulation and parameter estimation."
+       Phys. Rev. D 71, 083008. https://arxiv.org/abs/astro-ph/0502469
+.. [2] Reinecke, M., Belkner, S., and Carron, J., 2023. "Improved cosmic microwave background
+       (de-)lensing using general spherical harmonic transforms."
+       arXiv:2304.10431. https://arxiv.org/abs/2304.10431
+
+See Also
+--------
+lenspyx.remapping.deflection_029 : Low-level lensing implementation
+ducc0.misc.get_deflected_angles : DUCC0 deflection angle computation
+
+"""
 from __future__ import print_function, annotations
 from os import cpu_count
 import numpy as np
@@ -13,10 +62,36 @@ from lenspyx.utils import timer
 
 
 def get_geom(geometry: tuple[str, dict]=('healpix', {'nside':2048})):
-    r"""Returns sphere pixelization geometry instance from name and arguments
+    r"""Get sphere pixelization geometry instance from name and arguments.
 
-        Note:
-            Custom geometries can be defined following lenspyx.remapping.utils_geom.Geom
+    Parameters
+    ----------
+    geometry : tuple of (str, dict), optional
+        Tuple containing (geometry_name, parameters_dict). Default: ('healpix', {'nside': 2048})
+
+        Examples of supported geometries:
+
+        - 'healpix' : HEALPix pixelization, parameters: {'nside': int}
+        - 'thingauss' : Thin Gauss-Legendre rings, parameters: {'lmax': int, 'smax': int}
+        - 'gl' : Gauss-Legendre, parameters: {'lmax': int}
+        - Custom geometries following :class:`lenspyx.remapping.utils_geom.Geom`
+
+    Returns
+    -------
+    Geom
+        Geometry object with methods for synthesis, adjoint_synthesis, etc.
+
+    Examples
+    --------
+    >>> from lenspyx.lensing import get_geom
+    >>> # HEALPix geometry
+    >>> geom = get_geom(('healpix', {'nside': 1024}))
+    >>> # Gauss-Legendre geometry
+    >>> geom = get_geom(('gl', {'lmax': 3000}))
+
+    See Also
+    --------
+    lenspyx.remapping.utils_geom.Geom : Base geometry class
 
     """
     geo = getattr(Geom, '_'.join(['get', geometry[0], 'geometry']), None)
@@ -26,30 +101,79 @@ def get_geom(geometry: tuple[str, dict]=('healpix', {'nside':2048})):
 
 
 def dlm2angles(dlms:np.ndarray, geometry:Geom, mmax=None, nthreads: int=0, calc_rotation=False):
-    r"""Returns pointing information from lensing deflection harmonic coefficients
-        
-        Args:
-            dlms: The spin-1 deflection, in the form of one or two arrays.
+    r"""Convert lensing deflection alms to deflected angles.
 
-                    The two arrays are the gradient and curl deflection healpy alms:
+    Computes the deflected pointing directions (and optionally rotation angles) from
+    the deflection field spherical harmonic coefficients.
 
-                    :math:`\sqrt{L(L+1)}\phi_{LM}` with :math:`\phi` the lensing potential
+    Parameters
+    ----------
+    dlms : array_like
+        Spin-1 deflection field in harmonic space. Can be:
 
-                    :math:`\sqrt{L(L+1)}\Omega_{LM}` with :math:`\Omega` the lensing curl potential
+        - Single array: gradient-only deflection :math:`\sqrt{\ell(\ell+1)}\phi_{\ell m}`
+          where :math:`\phi` is the lensing potential
+        - Two arrays: [gradient, curl] with gradient as above and curl
+          :math:`\sqrt{\ell(\ell+1)}\Omega_{\ell m}` where :math:`\Omega` is the curl potential
 
+        The curl can be omitted if zero, resulting in slightly faster execution.
+    geometry : Geom
+        Sphere pixelization geometry (iso-latitude ring structure).
+    mmax : int, optional
+        Maximum m value of dlms. If None, assumes mmax = lmax.
+    nthreads : int, optional
+        Number of threads to use. If 0, uses :func:`os.cpu_count()`.
+    calc_rotation : bool, optional
+        If True, also computes the rotation angle :math:`\gamma` by which to rotate
+        non-zero spin fields after deflection:
 
-                    The curl can be omitted if zero, resulting in principle in slightly faster execution
-    
-            mmax(optional): maximum m value of dlms, if not equal to lmax    
-            geometry(optional): desired sphere pixelization (here only iso-latitude rings)
-            nthreads(optional): number of threads to use (defaults to os.cpu_count())
-            calc_rotation(optional): also computes the angle gamma by which to rotate non-zero spin fields after deflection
-                                     e.g. :math:`{}_{2}{P}(\hat n) \rightarrow e^{2 i \gamma(\hat n)}{}_{2}P(\hat n')`
+        .. math::
 
-        Returns:
-            angles: array of shape (npix, 2 (or 3 if calc_rotation is set)) with co-latitude, longitude and rotation angles :math:`\theta, \phi, \gamma`
+            {}_s P(\hat{n}) \rightarrow e^{is\gamma(\hat{n})} {}_s P(\hat{n}')
 
-                                 
+        Default: False
+
+    Returns
+    -------
+    angles : array_like
+        Array of shape (npix, 2) or (npix, 3) containing:
+
+        - Column 0: Deflected colatitude :math:`\theta'` (radians)
+        - Column 1: Deflected longitude :math:`\phi'` (radians)
+        - Column 2: Rotation angle :math:`\gamma` (radians, only if calc_rotation=True)
+
+    Examples
+    --------
+    >>> from lenspyx.lensing import dlm2angles
+    >>> from lenspyx.remapping.utils_geom import Geom
+    >>> import numpy as np
+    >>> # Create deflection from lensing potential
+    >>> lmax = 2048
+    >>> phi_lm = np.random.randn(Alm.getsize(lmax, lmax)) + \
+    ...          1j * np.random.randn(Alm.getsize(lmax, lmax))
+    >>> utils_hp.almxfl(phi_lm, np.sqrt(np.arange(lmax+1) * np.arange(1, lmax+2)), None, False)
+    >>> # Get deflected angles
+    >>> geom = Geom.get_healpix_geometry(nside=1024)
+    >>> angles = dlm2angles(dlm, geom, nthreads=8)
+    >>> theta_deflected = angles[:, 0]
+    >>> phi_deflected = angles[:, 1]
+    >>> # With rotation angles for polarization
+    >>> angles_rot = dlm2angles(dlm, geom, calc_rotation=True, nthreads=8)
+    >>> gamma = angles_rot[:, 2]
+
+    Notes
+    -----
+    The deflection field is typically derived from the lensing potential via:
+
+    .. math::
+
+        d_{\ell m} = \sqrt{\ell(\ell+1)} \phi_{\ell m}
+
+    See Also
+    --------
+    alm2lenmap : Compute lensed maps directly
+    lenspyx.remapping.utils_geom.Geom : Geometry class
+
     """
     if nthreads <= 0:
         nthreads = cpu_count()
@@ -62,35 +186,91 @@ def dlm2angles(dlms:np.ndarray, geometry:Geom, mmax=None, nthreads: int=0, calc_
     
 
 def alm2lenmap(alm, dlms, geometry: tuple[str, dict]=('healpix', {'nside':2048}), epsilon=1e-7, verbose=0, nthreads: int=0, pol=True):
-    r"""Computes lensed CMB maps from their alm's and deflection field alm's.
+    r"""Compute lensed CMB maps from unlensed alms and deflection field.
 
-        Args:
-            alm: undeflected map healpy alm array or sequence of arrays
-            dlms: The spin-1 deflection, in the form of one or two arrays.
+    This function performs exact (non-perturbative) gravitational lensing of CMB
+    temperature and polarization maps using interpolation on the deflected sphere.
 
-                    The two arrays are the gradient and curl deflection healpy alms:
+    Parameters
+    ----------
+    alm : array_like or list of array_like
+        Unlensed CMB spherical harmonic coefficients. Can be:
 
-                    :math:`\sqrt{L(L+1)}\phi_{LM}` with :math:`\phi` the lensing potential
+        - Single array: Temperature only (spin-0)
+        - List of 2 arrays: [T, E] if pol=True, otherwise two spin-0 fields
+        - List of 3 arrays: [T, E, B] if pol=True, otherwise three spin-0 fields
+    dlms : array_like or list of array_like
+        Spin-1 deflection field in harmonic space:
 
-                    :math:`\sqrt{L(L+1)}\Omega_{LM}` with :math:`\Omega` the lensing curl potential
+        - Single array: Gradient-only deflection :math:`\sqrt{\ell(\ell+1)}\phi_{\ell m}`
+        - List of 2 arrays: [gradient, curl] deflections where curl is
+          :math:`\sqrt{\ell(\ell+1)}\Omega_{\ell m}`
 
+        The curl can be omitted if zero for slightly faster transforms.
+    geometry : tuple of (str, dict), optional
+        Sphere pixelization: (geometry_name, parameters).
+        Default: ('healpix', {'nside': 2048})
+    epsilon : float, optional
+        Target numerical accuracy of the result. Default: 1e-7.
+        Execution time has only weak dependence on this parameter.
+    verbose : int, optional
+        If non-zero, prints timing and diagnostic information. Default: 0.
+    nthreads : int, optional
+        Number of threads to use. If 0, uses :func:`os.cpu_count()`. Default: 0.
+    pol : bool, optional
+        If True, interprets input arrays as CMB fields (T, E, B) and returns
+        lensed T, Q, U. If False, performs spin-0 transforms only. Default: True.
 
-                    The curl can be omitted if zero, resulting in principle in slightly faster transforms
+    Returns
+    -------
+    maps : tuple or array_like
+        Lensed maps, each an array of size npix from the input geometry:
 
-            geometry(optional): sphere pixelization, tuple with geometry name and argument dictionary,
-                                defaults to Healpix with nside 2048
-            epsilon(optional): target accuracy of the result (defaults to 1e-7)
-            verbose(optional): If set, prints a bunch of timing and other info. Defaults to 0.
-            nthreads(optional): number of threads to use (defaults to os.cpu_count())
-            pol(optional): if True, input arrays are interpreted as T and E if there are two, T E B if there are 3, otherwise performs only spin-0 transforms.
-                           Defaults to True.
+        - If pol=True and 2-3 input alms: Returns (T, Q, U) tuple
+        - If pol=False or single alm: Returns single map or list of maps
 
+    Examples
+    --------
+    Lens temperature and polarization:
 
-        Returns:
-            lensed maps, each an array of size given by the number of pixels of input geometry.
-            T, Q, U if pol and there 2 or 3 input arrays, otherwise spin-0 maps
+    >>> from lenspyx.lensing import alm2lenmap
+    >>> from lenspyx.utils_hp import Alm
+    >>> import numpy as np
+    >>> lmax = 3000
+    >>> nalm = Alm.getsize(lmax, lmax)
+    >>> # Create unlensed alms
+    >>> alm_t = np.random.randn(nalm) + 1j * np.random.randn(nalm)
+    >>> alm_e = np.random.randn(nalm) + 1j * np.random.randn(nalm)
+    >>> alm_b = np.zeros(nalm, dtype=complex)
+    >>> # Create deflection from lensing potential
+    >>> phi_lm = np.random.randn(nalm) + 1j * np.random.randn(nalm)
+    >>> dlm = utils_hp.almxfl(phi_lm, np.sqrt(np.arange(lmax+1) * np.arange(1, lmax+2)), None, False)
+    >>> # Compute lensed maps
+    >>> t_lens, q_lens, u_lens = alm2lenmap([alm_t, alm_e, alm_b], dlm,
+    ...                                      geometry=('healpix', {'nside': 2048}),
+    ...                                      nthreads=8)
 
+    Lens temperature only:
 
+    >>> t_lens = alm2lenmap(alm_t, dlm, nthreads=8)
+
+    Notes
+    -----
+    The lensing operation remaps the CMB according to:
+
+    .. math::
+
+        X^{\text{lensed}}(\hat{n}) = X^{\text{unlensed}}(\hat{n} + \nabla\phi(\hat{n}))
+
+    where :math:`\phi` is the lensing potential and :math:`X` is T, E, or B.
+
+    For polarization, the Stokes parameters are rotated by the lensing-induced angle.
+
+    See Also
+    --------
+    alm2lenmap_spin : Lens arbitrary spin-weight fields
+    synfast : Generate lensed realizations from power spectra
+    dlm2angles : Get deflected angles from deflection alms
 
     """
     if nthreads <= 0:
@@ -126,40 +306,74 @@ def alm2lenmap(alm, dlms, geometry: tuple[str, dict]=('healpix', {'nside':2048})
 
 
 def alm2lenmap_spin(gclm: np.ndarray or list, dlms:np.ndarray or list, spin:int, geometry: tuple[str, dict] = ('healpix', {'nside':2048}), epsilon: float=1e-7, verbose=0, nthreads: int=0):
-    r"""Computes a deflected spin-weight lensed CMB map from its gradient and curl modes and deflection field alm.
+    r"""Compute lensed spin-weighted map from gradient/curl modes and deflection field.
 
-        Args:
-            gclm:  undeflected map healpy gradient (and curl, if relevant) modes
-                    (e.g. polarization Elm and Blm).
+    This function lenses arbitrary spin-s fields (not just CMB polarization). For standard
+    CMB lensing (T, Q, U), use :func:`alm2lenmap` instead.
 
-            dlms: The spin-1 deflection, in the form of one or two arrays.
+    Parameters
+    ----------
+    gclm : array_like or list of array_like
+        Unlensed gradient and curl mode alms (E and B modes for spin-2).
 
-                    The two arrays are the gradient and curl deflection healpy alms:
+        - Single array: Gradient-only (e.g., E-mode only)
+        - List of 2 arrays: [gradient, curl] (e.g., [E, B])
+    dlms : array_like or list of array_like
+        Spin-1 deflection field in harmonic space:
 
-                    :math:`\sqrt{L(L+1)}\phi_{LM}` with :math:`\phi` the lensing potential
+        - Single array: Gradient-only deflection :math:`\sqrt{\ell(\ell+1)}\phi_{\ell m}`
+        - List of 2 arrays: [gradient, curl] deflections
+    spin : int
+        Spin weight of the field to deflect (≥ 0). Examples:
 
-                    :math:`\sqrt{L(L+1)}\Omega_{LM}` with :math:`\Omega` the lensing curl potential
+        - spin=0 : Scalar field (temperature)
+        - spin=2 : Polarization (most common)
+        - spin≥3 : Higher-spin fields
+    geometry : tuple of (str, dict), optional
+        Sphere pixelization. Default: ('healpix', {'nside': 2048})
+    epsilon : float, optional
+        Target numerical accuracy. Default: 1e-7
+    verbose : int, optional
+        Print timing information if non-zero. Default: 0
+    nthreads : int, optional
+        Number of threads. If 0, uses :func:`os.cpu_count()`. Default: 0
 
+    Returns
+    -------
+    maps : array_like
+        Lensed maps with shape (2, npix) containing the real and imaginary parts
+        of the spin-s field (or shape (1, npix) for spin-0).
 
-                    The curl can be omitted if zero, resulting in principle in slightly faster transforms
+    Notes
+    -----
+    For a spin-s field, the lensing operation includes both deflection and rotation:
 
+    .. math::
 
-            spin(int >= 0): spin-weight of the maps to deflect (e.g. 2 for polarization).
-            geometry(optional): sphere pixelization, tuple with geometry name and argument dictionary,
-                                defaults to Healpix with nside 2048
-            epsilon(optional): target accuracy of the result (defaults to 1e-7)
-            verbose(optional): If set, prints a bunch of timing and other info. Defaults to 0.
-            nthreads(optional): number of threads to use (defaults to os.cpu_count())
+        {}_s X^{\text{lensed}}(\hat{n}) = e^{is\gamma(\hat{n})} {}_s X^{\text{unlensed}}(\hat{n}')
 
+    where :math:`\gamma` is the rotation angle induced by lensing and
+    :math:`\hat{n}' = \hat{n} + \nabla\phi(\hat{n})` is the deflected direction.
 
-        Returns:
-            lensed maps for input geometry (real and imaginary parts),
-            arrays of size given by the number of pixels of input geometry
+    If curl modes are zero (for either the deflection or the field alms), they can
+    be omitted, resulting in slightly faster transforms.
 
-        Note:
+    Examples
+    --------
+    >>> from lenspyx.lensing import alm2lenmap_spin
+    >>> import numpy as np
+    >>> # Lens polarization (spin-2)
+    >>> e_lm = np.random.randn(nalm) + 1j * np.random.randn(nalm)
+    >>> b_lm = np.zeros_like(e_lm)
+    >>> dlm = phi_lm * np.sqrt(np.arange(lmax+1) * np.arange(1, lmax+2))
+    >>> q_u_lensed = alm2lenmap_spin([e_lm, b_lm], dlm, spin=2, nthreads=8)
+    >>> q_lensed = q_u_lensed[0]
+    >>> u_lensed = q_u_lensed[1]
 
-            If curl modes are zero (deflection and/or alm's to lens), they can be omitted, which can result in slightly faster transforms
-
+    See Also
+    --------
+    alm2lenmap : Standard CMB lensing (T, Q, U)
+    dlm2angles : Get deflected angles and rotation
 
     """
     if spin == 0:
@@ -189,39 +403,110 @@ def alm2lenmap_spin(gclm: np.ndarray or list, dlms:np.ndarray or list, spin:int,
 
 def synfast(cls: dict, lmax=None, mmax=None, geometry=('healpix', {'nside': 2048}),
             epsilon=1e-7, nthreads=0, alm=False, seed=None, verbose=0):
-    r"""Generate a set of lensed maps from scratch according to input spectra
+    r"""Generate lensed CMB realizations from power spectra.
 
-        Args:
-            cls(dict): dict of spectra and cross-spectra with keys of the form 'TT', 'TE', 'EE',  etc.
-                       Recognized field keys are:
+    Creates correlated Gaussian random fields on the sphere and applies gravitational
+    lensing according to the input power spectra. This is the standard way to generate
+    lensed CMB simulations.
 
-                            | 'T' (or 't'): spin-0 intensity
-                            | 'E' (or 'e'):  E-polarization
-                            | 'B' (or 'e'):  B-polarization
-                            | 'P' (or 'p'):  lensing potential
-                            | 'O' (or 'o'):  lensing curl potential
+    Parameters
+    ----------
+    cls : dict
+        Dictionary of auto- and cross-power spectra with string keys.
+        Recognized field labels (case-insensitive):
 
-                       The arrays must be the :math:`C_\ell`, not :math:`D_\ell`
+        - 'T' or 't' : CMB temperature (spin-0 intensity)
+        - 'E' or 'e' : E-mode polarization
+        - 'B' or 'b' : B-mode polarization
+        - 'P' or 'p' : Lensing potential :math:`\phi`
+        - 'O' or 'o' : Lensing curl potential :math:`\Omega`
 
+        Keys are two-character strings like 'TT', 'TE', 'EE', 'PP', etc.
+        Arrays must be :math:`C_\ell` (not :math:`D_\ell = \ell(\ell+1)C_\ell/(2\pi)`).
 
-                       If the auto-spectrum 'AA' is not present the 'A' field is assumed to be zero.
-                       If neither 'P' and 'O' are present then the output maps are not lensed.
+        **Important**:
 
-            lmax(int, optional): band-limit of the unlensed alms, infered from length of cls by default
-            mmax(int, optional): maximum m of the unlensed alms, defaults to lmax
-            geometry(tuple, optional): tuple of geometry name and parameters (defaults to healpix at nside 2048)
-            epsilon(float, optional): desired accuracy of the output map (exec. time only has a weak dependence on this)
-            nthreads(int, optional): number of threads used for non-uniform SHTs, defaults to os.cpu_count
-            alm(bool, optional): returns also unlensed alms if True
-            seed(int, optional): random generator seed for reproducible results, defaults to None
-            verbose(bool, optional): some timing info if set, defaults to zero
+        - If auto-spectrum 'AA' is absent, field 'A' is assumed zero
+        - If neither 'PP' nor 'OO' are present, output maps are unlensed
+        - All relevant cross-spectra must be provided for correlated fields
+    lmax : int, optional
+        Band-limit of unlensed alms. If None, inferred from length of input spectra.
+    mmax : int, optional
+        Maximum azimuthal mode number. If None, defaults to lmax.
+    geometry : tuple of (str, dict), optional
+        Pixelization: (geometry_name, parameters).
+        Default: ('healpix', {'nside': 2048})
+    epsilon : float, optional
+        Target numerical accuracy for lensing. Default: 1e-7.
+        Execution time has weak dependence on this.
+    nthreads : int, optional
+        Number of threads for SHTs. If 0, uses :func:`os.cpu_count()`. Default: 0.
+    alm : bool, optional
+        If True, also returns unlensed alms. Default: False.
+    seed : int, optional
+        Random number generator seed for reproducible results. Default: None (random).
+    verbose : int, optional
+        Print timing information if non-zero. Default: 0.
 
-        Returns:
+    Returns
+    -------
+    maps : dict
+        Dictionary of lensed maps:
 
-             Dictionary with lensed maps, which contains 'T' if 'TT' were present in the input cls and non-zero,
-             and 'QU  if 'EE' or 'BB' were present and non-zero.
+        - 'T' : Lensed temperature (if 'TT' was in cls and non-zero)
+        - 'QU' : Lensed Q and U Stokes parameters, shape (2, npix)
+          (if 'EE' or 'BB' were in cls and non-zero)
+    alms : tuple, optional (if alm=True)
+        Tuple of (alm_arrays, field_labels) where:
 
-            if alm is set to True, returns the unlensed alms, together with a string indicating the ordering
+        - alm_arrays : shape (nfields, nalm) with unlensed alms
+        - field_labels : string indicating field ordering (e.g., 'tebp')
+
+    Examples
+    --------
+    Generate lensed CMB with temperature and polarization:
+
+    >>> from lenspyx.lensing import synfast
+    >>> from lenspyx.utils import camb_clfile
+    >>> # Load power spectra
+    >>> cls = camb_clfile('cosmo_params.ini')
+    >>> # Generate lensed realization
+    >>> maps = synfast(cls, lmax=3000, geometry=('healpix', {'nside': 2048}),
+    ...                nthreads=8, seed=42)
+    >>> t_lensed = maps['T']
+    >>> q_lensed, u_lensed = maps['QU']
+
+    Generate and return unlensed alms:
+
+    >>> maps, (alms, labels) = synfast(cls, lmax=3000, alm=True, seed=42)
+    >>> # labels might be 'tebp' for T, E, B, phi
+    >>> if 't' in labels:
+    ...     alm_t = alms[labels.index('t')]
+
+    Generate unlensed maps (no lensing potential in cls):
+
+    >>> cls_unlensed = {'tt': cl_tt, 'ee': cl_ee, 'te': cl_te}
+    >>> maps_unlensed = synfast(cls_unlensed, lmax=2000)
+
+    Notes
+    -----
+    The function:
+
+    1. Generates correlated Gaussian random alms from the input :math:`C_\ell`
+    2. If lensing potentials (P or O) are present, computes deflection field
+    3. Applies exact (non-perturbative) lensing via interpolation
+    4. Returns lensed maps on the specified geometry
+
+    The lensing deflection is computed as:
+
+    .. math::
+
+        d_{\ell m} = \sqrt{\ell(\ell+1)} \phi_{\ell m}
+
+    See Also
+    --------
+    alm2lenmap : Lens pre-existing alms
+    lenspyx.utils.camb_clfile : Read CAMB power spectrum files
 
     """
     tim = timer('synfast', False)
