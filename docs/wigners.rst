@@ -19,39 +19,41 @@ describing the rotation of spin-weighted spherical harmonics. They appear in:
 - Lensing reconstruction and delensing operations
 - General spin transformations on the sphere
 
-Key Functions
+API Reference
 -------------
+
+.. currentmodule:: lenspyx.wigners
 
 Forward Transforms
 ~~~~~~~~~~~~~~~~~~
 
-.. autofunction:: lenspyx.wigners.wignerpos
+.. autofunction:: wignerpos
 
-.. autofunction:: lenspyx.wigners.wigner4pos
+.. autofunction:: wigner4pos
 
 Adjoint Transforms
 ~~~~~~~~~~~~~~~~~~
 
-.. autofunction:: lenspyx.wigners.wignercoeff
+.. autofunction:: wignercoeff
 
 Convolutions
 ~~~~~~~~~~~~
 
-.. autofunction:: lenspyx.wigners.wignerc
+.. autofunction:: wignerc
 
 Wigner d-functions
 ~~~~~~~~~~~~~~~~~~
 
-.. autofunction:: lenspyx.wigners.wignerd
+.. autofunction:: wignerd
 
-.. autofunction:: lenspyx.wigners.wignerdl
+.. autofunction:: wignerdl
 
 Quadrature Utilities
 ~~~~~~~~~~~~~~~~~~~~
 
-.. autofunction:: lenspyx.wigners.get_thgwg
+.. autofunction:: get_thgwg
 
-.. autofunction:: lenspyx.wigners.get_xgwg
+.. autofunction:: get_xgwg
 
 Examples
 --------
@@ -122,11 +124,3 @@ Notes
 
 The implementation uses DUCC0's ``alm2leg`` and ``leg2alm`` functions, which achieve
 excellent performance through compiler optimization.
-
-Module Reference
-----------------
-
-.. automodule:: lenspyx.wigners
-    :members:
-    :undoc-members:
-    :show-inheritance:
