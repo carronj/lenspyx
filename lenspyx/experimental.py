@@ -13,7 +13,7 @@ Key Features
 The module wraps functions from ducc0 and capsht, providing:
 - :func:`synthesis_general` : Forward transform with automatic cap detection
 - :func:`adjoint_synthesis_general` : Adjoint transform with automatic cap detection
-- :class:`Pixelization` : Unified pixelization interface
+- :class:`Locations` : Unified interface for pixel locations
 
 Notes
 -----
@@ -307,12 +307,12 @@ def adjoint_synthesis_general(map: np.ndarray, spin: int, lmax: int, loc: np.nda
 
 
 
-class Pixelization(object):
-    """Unified interface for different pixelization schemes in spherical harmonic transforms.
+class Locations(object):
+    """Unified interface for locations (or pixelizations) in spherical harmonic transforms.
 
     This class provides a common API for working with both structured (iso-latitude rings)
     and unstructured (arbitrary locations) pixelizations. It automatically selects the
-    appropriate transform implementation based on the pixelization type.
+    appropriate transform implementation based on the location type.
 
     Parameters
     ----------
@@ -342,7 +342,7 @@ class Pixelization(object):
     geom : Geom or None
         Geometry object if using structured grid
     thtrange : tuple
-        (min_theta, max_theta) colatitude range of the pixelization
+        (min_theta, max_theta) colatitude range
     epsilon : float
         Transform accuracy parameter
 
@@ -351,21 +351,21 @@ class Pixelization(object):
     Using arbitrary locations:
 
     >>> import numpy as np
-    >>> from lenspyx.experimental import Pixelization
+    >>> from lenspyx.experimental import Locations
     >>> # Create random pixel locations in a polar cap
     >>> npix = 10000
     >>> loc = np.random.rand(npix, 2) * [np.pi/4, 2*np.pi]
-    >>> pix = Pixelization(loc=loc, epsilon=1e-7)
+    >>> locs = Locations(loc=loc, epsilon=1e-7)
     >>> # Synthesize a map
     >>> alm = np.random.randn(1, nalm) + 1j * np.random.randn(1, nalm)
-    >>> maps = pix.synthesis(alm, spin=0, lmax=100, mmax=100, nthreads=4)
+    >>> maps = locs.synthesis(alm, spin=0, lmax=100, mmax=100, nthreads=4)
 
     Using HEALPix geometry:
 
     >>> from lenspyx.remapping.utils_geom import Geom
     >>> geom = Geom.get_healpix_geometry(nside=512)
-    >>> pix = Pixelization(geom=geom)
-    >>> maps = pix.synthesis(alm, spin=0, lmax=1500, mmax=1500, nthreads=4)
+    >>> locs = Locations(geom=geom)
+    >>> maps = locs.synthesis(alm, spin=0, lmax=1500, mmax=1500, nthreads=4)
 
     See Also
     --------
@@ -429,8 +429,8 @@ class Pixelization(object):
 
         Examples
         --------
-        >>> pix = Pixelization(loc=my_locations)
-        >>> maps = pix.synthesis(alm, spin=2, lmax=2000, mmax=2000, nthreads=8)
+        >>> locs = Locations(loc=my_locations)
+        >>> maps = locs.synthesis(alm, spin=2, lmax=2000, mmax=2000, nthreads=8)
 
         """
         if m is None:
@@ -481,10 +481,10 @@ class Pixelization(object):
 
         Examples
         --------
-        >>> pix = Pixelization(loc=my_locations)
+        >>> locs = Locations(loc=my_locations)
         >>> alm_out = np.zeros((1, nalm), dtype=complex)
-        >>> alm_out = pix.adjoint_synthesis(alm_out, spin=0, lmax=2000, mmax=2000,
-        ...                                 nthreads=8, m=input_map)
+        >>> alm_out = locs.adjoint_synthesis(alm_out, spin=0, lmax=2000, mmax=2000,
+        ...                                  nthreads=8, m=input_map)
 
         """
         if self.loc is not None:

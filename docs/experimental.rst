@@ -13,12 +13,12 @@ Overview
 The module wraps functions from ducc0 and capsht, providing:
 
 - Automatic selection between general SHT and optimized capped SHT
-- Unified interface for different pixelization schemes (HEALPix, arbitrary locations)
+- Unified interface for different pixel location types (HEALPix, arbitrary locations)
 - Support for both synthesis (alm → map) and adjoint synthesis (map → alm)
 - Optimized implementations for data confined to spherical caps
 
 When data is confined to a spherical cap (less than half the sky), the capped transforms
-can provide significant speedups (factor of 2-5) compared to full-sky transforms.
+can provide significant speedups compared to full-sky transforms.
 
 .. note::
    This module requires capsht to be installed for the optimized capped transforms.
@@ -36,10 +36,10 @@ Synthesis Functions
 
 .. autofunction:: adjoint_synthesis_general
 
-Pixelization Class
-~~~~~~~~~~~~~~~~~~
+Locations Class
+~~~~~~~~~~~~~~~
 
-.. autoclass:: Pixelization
+.. autoclass:: Locations
    :members: synthesis, adjoint_synthesis, npix
    :undoc-members:
    :show-inheritance:
@@ -70,51 +70,51 @@ Using synthesis_general with automatic cap detection
     maps = synthesis_general(alm, spin=0, lmax=lmax, loc=loc, 
                             epsilon=1e-7, thtcap=theta_cap, verbose=True)
 
-Using Pixelization class with arbitrary locations
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Using Locations class with arbitrary locations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
     import numpy as np
-    from lenspyx.experimental import Pixelization
+    from lenspyx.experimental import Locations
     from lenspyx.utils_hp import Alm
-    
-    # Create pixelization from arbitrary locations
+
+    # Create Locations object from arbitrary pixel positions
     npix = 10000
     loc = np.random.rand(npix, 2) * [np.pi, 2*np.pi]
-    pix = Pixelization(loc=loc, epsilon=1e-7)
-    
+    locs = Locations(loc=loc, epsilon=1e-7)
+
     # Forward transform (alm → map)
     lmax = 1000
     nalm = Alm.getsize(lmax, lmax)
     alm = np.random.randn(1, nalm) + 1j * np.random.randn(1, nalm)
-    maps = pix.synthesis(alm, spin=0, lmax=lmax, mmax=lmax, nthreads=4)
-    
+    maps = locs.synthesis(alm, spin=0, lmax=lmax, mmax=lmax, nthreads=4)
+
     # Adjoint transform (map → alm)
     alm_out = np.zeros((1, nalm), dtype=complex)
-    alm_out = pix.adjoint_synthesis(alm_out, spin=0, lmax=lmax, 
-                                    mmax=lmax, nthreads=4, m=maps)
+    alm_out = locs.adjoint_synthesis(alm_out, spin=0, lmax=lmax,
+                                     mmax=lmax, nthreads=4, m=maps)
 
-Using Pixelization with HEALPix geometry
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Using Locations with HEALPix geometry
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
-    from lenspyx.experimental import Pixelization
+    from lenspyx.experimental import Locations
     from lenspyx.remapping.utils_geom import Geom
     from lenspyx.utils_hp import Alm
     import numpy as np
-    
+
     # Create HEALPix geometry
     nside = 512
     geom = Geom.get_healpix_geometry(nside)
-    pix = Pixelization(geom=geom)
-    
+    locs = Locations(geom=geom)
+
     # Synthesize on HEALPix grid
     lmax = 1500
     nalm = Alm.getsize(lmax, lmax)
     alm = np.random.randn(1, nalm) + 1j * np.random.randn(1, nalm)
-    maps = pix.synthesis(alm, spin=0, lmax=lmax, mmax=lmax, nthreads=8)
+    maps = locs.synthesis(alm, spin=0, lmax=lmax, mmax=lmax, nthreads=8)
 
 Polarization (spin-2) example
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -143,8 +143,7 @@ Notes
 -----
 
 - The capped transforms are most beneficial when data covers much less than ~50% of the sky
-- For full-sky data, the overhead of cap detection makes standard transforms faster
-- The ``Pixelization`` class provides a convenient unified interface regardless of geometry
+- The ``Locations`` class provides a convenient unified interface regardless of geometry type
 - Use ``verbose=True`` to see which transform implementation is selected
 
 References
