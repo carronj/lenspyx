@@ -110,45 +110,81 @@ verbose = False
 def wignerpos(cl: np.ndarray[float], theta: np.ndarray[float], s1: int, s2: int):
     r"""Produces Wigner small-d transform defined by
 
-        :math:`\sum_\ell \frac{2\ell + 1}{4\pi} C_\ell d^\ell_{s_1 s_2}(\theta)`
+    .. math::
 
-        Args:
-            cl: spectrum of Wigner small-d transform
-            theta: co-latitude in radians (in [0, pi])
-            s1: first spin
-            s2: second spin
+        \sum_\ell \frac{2\ell + 1}{4\pi} C_\ell d^\ell_{s_1 s_2}(\theta)
 
-        Returns:
-            real array of same size than theta
+    Parameters
+    ----------
+    cl : array_like
+        Spectrum of Wigner small-d transform (power spectrum :math:`C_\ell`)
+    theta : array_like
+        Co-latitude in radians (in [0, π])
+    s1 : int
+        First spin weight
+    s2 : int
+        Second spin weight
 
-        Note:
-            You can use *wigner4pos* instead if you also need the result for -s2 (e.g. for :math:`\xi_{\pm}`)
+    Returns
+    -------
+    array_like
+        Real array of same size as theta containing the correlation function
+
+    Notes
+    -----
+    You can use :func:`wigner4pos` instead if you also need the result for -s2
+    (e.g., for computing :math:`\xi_{\pm}` simultaneously).
+
+    See Also
+    --------
+    wigner4pos : Compute 4 correlation functions in one go
+    wignercoeff : Adjoint transform (correlation function to spectrum)
 
     """
     return wigner4pos(cl, None, theta, s1, s2)[0 if s2 >= 0 else 1]
 
 
 def wigner4pos(gl: np.ndarray[float], cl: np.ndarray[float] or None, theta: np.ndarray[float], s1: int, s2: int):
-    r"""Compute 4 Wigner correlation functions in one go
+    r"""Compute 4 Wigner correlation functions in one go.
 
-        Args:
-            gl: first spectrum
-            cl: second spectrum (can be set to None if irrelevant,  and is ignored if s2 is zero)
-            theta: co-latitude in radians
-            s1: int
-            s2: int
+    Parameters
+    ----------
+    gl : array_like
+        First spectrum (power spectrum :math:`g_\ell`)
+    cl : array_like or None
+        Second spectrum (power spectrum :math:`c_\ell`). Can be set to None if irrelevant,
+        and is ignored if s2 is zero.
+    theta : array_like
+        Co-latitude in radians (in [0, π])
+    s1 : int
+        First spin weight
+    s2 : int
+        Second spin weight
 
-        Returns:
+    Returns
+    -------
+    array_like
+        In the most general case, an array of shape (ncomp, ntheta) with:
 
-            In the most general case, an array of shape (ncomp, ntheta) with:
+        - Component 0: :math:`\sum_\ell g_\ell \frac{2\ell + 1}{4\pi} d^\ell_{s_1, |s_2|}(\theta)`
+        - Component 1: :math:`\sum_\ell g_\ell \frac{2\ell + 1}{4\pi} d^\ell_{s_1,-|s_2|}(\theta)`
+        - Component 2: :math:`\sum_\ell c_\ell \frac{2\ell + 1}{4\pi} d^\ell_{s_1, |s_2|}(\theta)` (if cl is not None)
+        - Component 3: :math:`\sum_\ell c_\ell \frac{2\ell + 1}{4\pi} d^\ell_{s_1,-|s_2|}(\theta)` (if cl is not None)
 
-            :math:`\sum_l g_l \frac{2l + 1}{4\pi} d^l_{s1, |s2|}(\theta)`
-            :math:`\sum_l g_l \frac{2l + 1}{4\pi} d^l_{s1,-|s2|}(\theta)`
-            :math:`\sum_l c_l \frac{2l + 1}{4\pi} d^l_{s1, |s2|}(\theta)`
-            :math:`\sum_l c_l \frac{2l + 1}{4\pi} d^l_{s1,-|s2|}(\theta)`
+        The number of components ncomp in the output is:
 
-            The number of components ncomp in the output is 4 if (s2 !=0 and cl is not None) else (2 if s2 else 1)
+        - 4 if (s2 ≠ 0 and cl is not None)
+        - 2 if (s2 ≠ 0 and cl is None)
+        - 1 if s2 = 0
 
+    Notes
+    -----
+    This function is more efficient than calling :func:`wignerpos` multiple times when
+    you need correlation functions for both +s2 and -s2 (e.g., ξ+ and ξ-).
+
+    See Also
+    --------
+    wignerpos : Compute single correlation function
 
     """
 
@@ -196,17 +232,41 @@ def wigner4pos(gl: np.ndarray[float], cl: np.ndarray[float] or None, theta: np.n
 
 
 def wignerd(l: int, s1: int, s2: int, theta: np.ndarray):
-    r"""Returns Wigner small-d functions
+    r"""Returns Wigner small-d functions for a specific multipole.
 
-        :math:`(2l + 1) / (4\pi) d^l_{s1, |s2|}(\theta)`
+    Computes the normalized Wigner d-functions:
 
-        and 
+    .. math::
 
-        :math:`(2l + 1) / (4\pi) d^l_{s1,-|s2|}(\theta)`
+        \frac{2\ell + 1}{4\pi} d^\ell_{s_1, |s_2|}(\theta)
 
-        for all \theta.
-        
-        (or one of these if s2 is zero)
+    and
+
+    .. math::
+
+        \frac{2\ell + 1}{4\pi} d^\ell_{s_1,-|s_2|}(\theta)
+
+    for all θ. If s2 is zero, only the first component is returned.
+
+    Parameters
+    ----------
+    l : int
+        Multipole moment
+    s1 : int
+        First spin weight
+    s2 : int
+        Second spin weight
+    theta : array_like
+        Co-latitude angles in radians
+
+    Returns
+    -------
+    array_like
+        Array of shape (2, ntheta) if s2 ≠ 0, or (1, ntheta) if s2 = 0
+
+    See Also
+    --------
+    wignerdl : Returns d^l_{s1,s2}(θ) without normalization for all ℓ
 
     """
     gl = np.zeros(l + 1)
@@ -215,17 +275,41 @@ def wignerd(l: int, s1: int, s2: int, theta: np.ndarray):
 
 
 def wignercoeff(xi: np.ndarray[float], theta: np.ndarray[float], s1: int, s2: int, lmax: int):
-    r"""Computes spectrum of Wigner small-d correlation function (adjoint to `wignerpos')
+    r"""Computes spectrum of Wigner small-d correlation function (adjoint to wignerpos).
 
-            :math:`2\pi \sum_\theta \xi(\theta) d^\ell_{s_1 s_2}(\theta)`
+    This is the adjoint transform that converts a correlation function to its
+    power spectrum:
 
-        Args:
-            xi: Wigner function (real array on point per co-latitude)
-            theta: co-latitude in radians (in [0, pi])
-            s1: first spin
-            s2: second spin
-            lmax: calculates spectrum up to lmax (inclusive)
+    .. math::
 
+        C_\ell = 2\pi \sum_\theta \xi(\theta) d^\ell_{s_1 s_2}(\theta)
+
+    Parameters
+    ----------
+    xi : array_like
+        Wigner correlation function (real array, one value per co-latitude)
+    theta : array_like
+        Co-latitude in radians (in [0, π])
+    s1 : int
+        First spin weight
+    s2 : int
+        Second spin weight
+    lmax : int
+        Maximum multipole (inclusive). Spectrum is calculated from 0 to lmax.
+
+    Returns
+    -------
+    array_like
+        Power spectrum :math:`C_\ell` from ℓ=0 to ℓ=lmax
+
+    Notes
+    -----
+    This function implements the adjoint operation to :func:`wignerpos`. It is used
+    to estimate power spectra from measured correlation functions.
+
+    See Also
+    --------
+    wignerpos : Forward transform (spectrum to correlation function)
 
     """
     if s1 < 0:
@@ -257,28 +341,52 @@ def wignercoeff(xi: np.ndarray[float], theta: np.ndarray[float], s1: int, s2: in
 
 def wignerc(cl1: np.ndarray[float or complex], cl2:np.ndarray[float or complex], s1: int, t1: int, s2: int, t2: int,
             lmax_out: int = -1):
-    r"""Convolution of two Wigner small-d correlation function
+    r"""Convolution of two Wigner small-d correlation functions.
 
-        Returns spectrum of
+    Computes the power spectrum of the product of two correlation functions:
 
-            :math:`\xi_{s_1 t_1}(\mu) \xi_{s_2 t_2}(\mu)`
+    .. math::
 
-        where
+        \xi_{s_1 t_1}(\mu) \times \xi_{s_2 t_2}(\mu)
 
-            :math:`\xi_{s_1 t_1}(\mu) = \sum_{\ell} C_{1,\ell} \frac{2\ell + 1}{4\pi} d^\ell_{s_1 t_1}`
-            :math:`\xi_{s_2 t_2}(\mu) = \sum_{\ell} C_{2,\ell} \frac{2\ell + 1}{4\pi} d^\ell_{s_2 t_2}`
+    where
 
-        Gauss-Legendre quadrature is used to solve this exactly.
+    .. math::
 
-        Args:
-            cl1: spectrum of first Wigner small-d function
-            cl2: spectrum of second Wigner small-d function
-            s1: first spin of first function
-            t1: second spin of first function
-            s2: first spin of second function
-            t2: second spin of second function
-            lmax_out(optional): Result is provided up to lmax. Defaults to len(cl1) + len(cl2) -2
+        \xi_{s_1 t_1}(\mu) = \sum_{\ell} C_{1,\ell} \frac{2\ell + 1}{4\pi} d^\ell_{s_1 t_1}(\mu)
 
+    .. math::
+
+        \xi_{s_2 t_2}(\mu) = \sum_{\ell} C_{2,\ell} \frac{2\ell + 1}{4\pi} d^\ell_{s_2 t_2}(\mu)
+
+    Gauss-Legendre quadrature is used to solve this exactly (up to numerical precision).
+
+    Parameters
+    ----------
+    cl1 : array_like
+        Spectrum of first Wigner small-d function (:math:`C_{1,\ell}`)
+    cl2 : array_like
+        Spectrum of second Wigner small-d function (:math:`C_{2,\ell}`)
+    s1 : int
+        First spin of first function
+    t1 : int
+        Second spin of first function
+    s2 : int
+        First spin of second function
+    t2 : int
+        Second spin of second function
+    lmax_out : int, optional
+        Maximum multipole of output spectrum. Defaults to len(cl1) + len(cl2) - 2.
+
+    Returns
+    -------
+    array_like
+        Power spectrum of the product correlation function, from ℓ=0 to ℓ=lmax_out
+
+    Notes
+    -----
+    This function is useful for computing non-Gaussian covariances and higher-order statistics.
+    The output has spins (s1+s2, t1+t2).
 
     """
     lmax1 = len(cl1) - 1
@@ -312,11 +420,40 @@ def wignerc(cl1: np.ndarray[float or complex], cl2:np.ndarray[float or complex],
 
 
 def wignerdl(s1: int, s2: int, theta: float, lmax: int):
-    r"""Returns the wigner function
-        
-         :math:`d^l_{s1s2}(\theta)`
-          
-        for all \\ell from 0 to lmax
+    r"""Returns the Wigner d-function for all multipoles.
+
+    Computes the Wigner d-function:
+
+    .. math::
+
+        d^\ell_{s_1 s_2}(\theta)
+
+    for all ℓ from 0 to lmax.
+
+    Parameters
+    ----------
+    s1 : int
+        First spin weight
+    s2 : int
+        Second spin weight
+    theta : float
+        Co-latitude angle in radians (scalar)
+    lmax : int
+        Maximum multipole moment
+
+    Returns
+    -------
+    array_like
+        Array of size lmax+1 containing :math:`d^\ell_{s_1 s_2}(\theta)` for ℓ=0 to lmax
+
+    Notes
+    -----
+    This returns the unnormalized Wigner d-function, without the (2ℓ+1)/(4π) factor.
+    For the normalized version, use :func:`wignerd`.
+
+    See Also
+    --------
+    wignerd : Normalized Wigner d-function for a specific ℓ
 
     """
     assert np.isscalar(theta), 'scalar theta input here'
@@ -324,15 +461,35 @@ def wignerdl(s1: int, s2: int, theta: float, lmax: int):
 
 
 def get_thgwg(npts: int):
-    """Gauss-Legendre integration points and weights from ducc0. Very fast.
+    """Gauss-Legendre integration points and weights from DUCC0.
 
-        Args:
-            number of points of quadrature rule
+    Provides quadrature points and weights for integration over the interval [0, π],
+    optimized for integrating functions on the sphere.
 
-        Returns:
-            tht: co-latitude points (array of size npts)
-            wg: quadrature weights (array of size npts)
+    Parameters
+    ----------
+    npts : int
+        Number of quadrature points
 
+    Returns
+    -------
+    tht : array_like
+        Co-latitude points in radians (array of size npts)
+    wg : array_like
+        Quadrature weights (array of size npts)
+
+    Notes
+    -----
+    This uses DUCC0's highly optimized Gauss-Legendre quadrature implementation.
+    For a band-limited function up to ℓ_max, use npts ≥ (ℓ_max + 2) / 2 for
+    exact integration.
+
+    Examples
+    --------
+    >>> from lenspyx.wigners import get_thgwg
+    >>> theta, weights = get_thgwg(100)
+    >>> # Integrate a function f(θ) over the sphere:
+    >>> integral = np.sum(f(theta) * weights)
 
     """
     tht = GL_thetas(npts)
@@ -341,11 +498,37 @@ def get_thgwg(npts: int):
 
 
 def get_xgwg(a: float, b: float, npts: int):
-    """Gauss-Legendre points and weights for GL integration over an interval [a, b]
+    """Gauss-Legendre points and weights for integration over an arbitrary interval.
 
-        Returns:
-            xg: points within (a,b)
-            wg: quadrature weights
+    Provides quadrature points and weights for integration over the interval [a, b].
+
+    Parameters
+    ----------
+    a : float
+        Lower bound of integration interval
+    b : float
+        Upper bound of integration interval
+    npts : int
+        Number of quadrature points
+
+    Returns
+    -------
+    xg : array_like
+        Quadrature points within (a, b) (array of size npts)
+    wg : array_like
+        Quadrature weights (array of size npts)
+
+    Notes
+    -----
+    This function transforms the standard Gauss-Legendre quadrature on [-1, 1]
+    to an arbitrary interval [a, b].
+
+    Examples
+    --------
+    >>> from lenspyx.wigners import get_xgwg
+    >>> x, weights = get_xgwg(0, 10, 50)
+    >>> # Integrate a function f(x) over [0, 10]:
+    >>> integral = np.sum(f(x) * weights)
 
     """
     tht = GL_thetas(npts)
