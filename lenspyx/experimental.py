@@ -26,15 +26,17 @@ def _epsapo(thtcap, epsilon, lmax, version=1, dl_7=None):
 
 def synthesis_general(alm: np.ndarray, spin: int, lmax: int, loc: np.ndarray, epsilon: float, 
                       thtcap:float=None, eps_apo:float=None, tht_min:float=None, tht_max:float=None, verbose:bool=False, **kwargs):
-    """Wrapper to capsht synthesis_general function, hiding the choice of eps_apo and SHT algorithm
+    """Wrapper to synthesis_general function, including a version tuned to spherical caps
     
+        See ducc0.sht.synthesis_general for most arguments, optional arguments and outputs
 
-        See ducc0.sht.synthesis_general for arguments, optional arguments and outputs
+        if thtcap is set, all points of interest are assumed to lie within a spherical cap, and a faster version is used
 
-        relevant keyword, *mode*, *map*, *mmax*
+        relevant keywords can include *mode*, *map*, *mmax*
     
     """
-    if tht_min is not None and tht_max is not None: # attempt at synthesis_general_band
+    if False and tht_min is not None and tht_max is not None: 
+        # Update synthesis_general_band first
         eps_apo = eps_apo or 1.2 * _epsapo(tht_max-tht_min, epsilon, lmax)
         thta_p = tht_min - 0.5 * eps_apo * (tht_max - tht_min)
         thtb_p = tht_max + 0.5 * eps_apo * (tht_max - tht_min)
@@ -68,7 +70,8 @@ def adjoint_synthesis_general(map: np.ndarray, spin: int, lmax: int, loc: np.nda
 
     
     """
-    if tht_min is not None and tht_max is not None: # attempt at synthesis_general_band
+    if False and tht_min is not None and tht_max is not None: 
+        # Update synthesis_general_band first
         eps_apo = eps_apo or 1.2 * _epsapo(tht_max-tht_min, epsilon, lmax)
         thta_p = tht_min - 0.5 * eps_apo * (tht_max - tht_min)
         thtb_p = tht_max + 0.5 * eps_apo * (tht_max - tht_min)
