@@ -35,9 +35,7 @@ Lens unlensed alms:
 
 References
 ----------
-.. [1] Lewis, A., 2005. "Lensed CMB simulation and parameter estimation."
-       Phys. Rev. D 71, 083008. https://arxiv.org/abs/astro-ph/0502469
-.. [2] Reinecke, M., Belkner, S., and Carron, J., 2023. "Improved cosmic microwave background
+.. [1] Reinecke, M., Belkner, S., and Carron, J., 2023. "Improved cosmic microwave background
        (de-)lensing using general spherical harmonic transforms."
        arXiv:2304.10431. https://arxiv.org/abs/2304.10431
 
@@ -163,11 +161,11 @@ def dlm2angles(dlms:np.ndarray, geometry:Geom, mmax=None, nthreads: int=0, calc_
 
     Notes
     -----
-    The deflection field is typically derived from the lensing potential via:
+    The deflection field is derived from the lensing potentials via:
 
     .. math::
 
-        d_{\ell m} = \sqrt{\ell(\ell+1)} \phi_{\ell m}
+        d_{\ell m} = \sqrt{\ell(\ell+1)} \left(\phi_{\ell m} + i \Omega_{\ell m}\right)
 
     See Also
     --------
@@ -260,9 +258,9 @@ def alm2lenmap(alm, dlms, geometry: tuple[str, dict]=('healpix', {'nside':2048})
 
     .. math::
 
-        X^{\text{lensed}}(\hat{n}) = X^{\text{unlensed}}(\hat{n} + \nabla\phi(\hat{n}))
+        X^{\text{lensed}}(\hat{n}) = X^{\text{unlensed}}(\hat{n} + \alpha(\hat{n}))
 
-    where :math:`\phi` is the lensing potential and :math:`X` is T, E, or B.
+    where :math:`\alpha` is the lensing deflection vector field and :math:`X` is T, Q, or U, or another field.
 
     For polarization, the Stokes parameters are rotated by the lensing-induced angle.
 
@@ -308,8 +306,7 @@ def alm2lenmap(alm, dlms, geometry: tuple[str, dict]=('healpix', {'nside':2048})
 def alm2lenmap_spin(gclm: np.ndarray or list, dlms:np.ndarray or list, spin:int, geometry: tuple[str, dict] = ('healpix', {'nside':2048}), epsilon: float=1e-7, verbose=0, nthreads: int=0):
     r"""Compute lensed spin-weighted map from gradient/curl modes and deflection field.
 
-    This function lenses arbitrary spin-s fields (not just CMB polarization). For standard
-    CMB lensing (T, Q, U), use :func:`alm2lenmap` instead.
+    This function remaps arbitrary spin-s fields. 
 
     Parameters
     ----------
@@ -353,7 +350,7 @@ def alm2lenmap_spin(gclm: np.ndarray or list, dlms:np.ndarray or list, spin:int,
         {}_s X^{\text{lensed}}(\hat{n}) = e^{is\gamma(\hat{n})} {}_s X^{\text{unlensed}}(\hat{n}')
 
     where :math:`\gamma` is the rotation angle induced by lensing and
-    :math:`\hat{n}' = \hat{n} + \nabla\phi(\hat{n})` is the deflected direction.
+    :math:`\hat{n}' = \hat{n} + \alpha(\hat{n})` is the deflected direction.
 
     If curl modes are zero (for either the deflection or the field alms), they can
     be omitted, resulting in slightly faster transforms.
@@ -365,14 +362,14 @@ def alm2lenmap_spin(gclm: np.ndarray or list, dlms:np.ndarray or list, spin:int,
     >>> # Lens polarization (spin-2)
     >>> e_lm = np.random.randn(nalm) + 1j * np.random.randn(nalm)
     >>> b_lm = np.zeros_like(e_lm)
-    >>> dlm = phi_lm * np.sqrt(np.arange(lmax+1) * np.arange(1, lmax+2))
+    >>> dlm =almxfl(phi_lm, np.sqrt(np.arange(lmax+1) * np.arange(1, lmax+2), None, False)
     >>> q_u_lensed = alm2lenmap_spin([e_lm, b_lm], dlm, spin=2, nthreads=8)
     >>> q_lensed = q_u_lensed[0]
     >>> u_lensed = q_u_lensed[1]
 
     See Also
     --------
-    alm2lenmap : Standard CMB lensing (T, Q, U)
+    alm2lenmap : same for spin-0 field
     dlm2angles : Get deflected angles and rotation
 
     """
@@ -501,7 +498,7 @@ def synfast(cls: dict, lmax=None, mmax=None, geometry=('healpix', {'nside': 2048
 
     .. math::
 
-        d_{\ell m} = \sqrt{\ell(\ell+1)} \phi_{\ell m}
+        d_{\ell m} = \sqrt{\ell(\ell+1)} \left(\phi_{\ell m} + i \Omega_{\ell m}\right)
 
     See Also
     --------

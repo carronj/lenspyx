@@ -18,7 +18,7 @@ operation remaps the CMB according to:
 
     X^{\text{lensed}}(\hat{n}) = X^{\text{unlensed}}(\hat{n} + \nabla\phi(\hat{n}))
 
-where :math:`\phi` is the lensing potential and :math:`X` represents T, E, or B modes.
+where :math:`\phi` is the lensing potential and :math:`X` represents T, Q, or U Stokes polarization modes.
 
 For polarization, the Stokes parameters Q and U are additionally rotated by the
 lensing-induced angle :math:`\gamma`.
@@ -73,7 +73,7 @@ Lens existing unlensed alms
 .. code-block:: python
 
     from lenspyx.lensing import alm2lenmap
-    from lenspyx.utils_hp import Alm
+    from lenspyx.utils_hp import Alm, almxfl
     import numpy as np
 
     lmax = 3000
@@ -88,7 +88,7 @@ Lens existing unlensed alms
     phi_lm = np.load('phi_lm.npy')
     L = np.arange(lmax + 1, dtype=float)
     deflection_factor = np.sqrt(L * (L + 1))
-    dlm = phi_lm * deflection_factor
+    dlm = almxfl(phi_lm, deflection_factor, None, False)
 
     # Compute lensed maps
     t_lens, q_lens, u_lens = alm2lenmap([alm_t, alm_e, alm_b], dlm,
@@ -128,6 +128,7 @@ Lens arbitrary spin-weighted fields
 .. code-block:: python
 
     from lenspyx.lensing import alm2lenmap_spin
+    from lenspyx.utils_hp import almxfl
     import numpy as np
 
     # For spin-2 field (e.g., polarization)
@@ -135,7 +136,7 @@ Lens arbitrary spin-weighted fields
     b_lm = np.load('b_mode_alms.npy')
 
     # Deflection field
-    dlm = phi_lm * np.sqrt(np.arange(lmax+1) * np.arange(1, lmax+2))
+    dlm = almxfl(phi_lm, np.sqrt(np.arange(lmax+1) * np.arange(1, lmax+2)), None, False)
 
     # Lens the spin-2 field
     qu_lensed = alm2lenmap_spin([e_lm, b_lm], dlm, spin=2,
@@ -160,27 +161,18 @@ Use different geometries
     maps_gl = synfast(cls, lmax=2000,
                      geometry=('gl', {'lmax': 2000}))
 
-    # Thin Gauss rings (for partial sky)
-    maps_thin = synfast(cls, lmax=2000,
-                       geometry=('thingauss', {'lmax': 2000, 'smax': 3}))
-
 Notes
 -----
 
 - The lensing implementation is exact (non-perturbative), using interpolation
-- Execution time scales approximately as :math:`O(N_{\text{pix}} \log N_{\text{pix}})`
-- The ``epsilon`` parameter controls numerical accuracy; typical value is 1e-7
+- The ``epsilon`` parameter controls numerical accuracy
 - For reproducible results, always set the ``seed`` parameter
-- Lensing potential power spectrum 'PP' should be for :math:`\phi`, not the deflection
-- The deflection field is :math:`d_{\ell m} = \sqrt{\ell(\ell+1)} \phi_{\ell m}`
+- The deflection field is :math:`d_{\ell m} = \sqrt{\ell(\ell+1)}\left(\phi_{\ell m} + i \Omega_{\ell m}\right)`
 
 References
 ----------
 
-.. [1] Lewis, A., 2005. "Lensed CMB simulation and parameter estimation."
-       Phys. Rev. D 71, 083008. https://arxiv.org/abs/astro-ph/0502469
-
-.. [2] Reinecke, M., Belkner, S., and Carron, J., 2023. "Improved cosmic microwave background
+.. [1] Reinecke, M., Belkner, S., and Carron, J., 2023. "Improved cosmic microwave background
        (de-)lensing using general spherical harmonic transforms."
        arXiv:2304.10431. https://arxiv.org/abs/2304.10431
 
