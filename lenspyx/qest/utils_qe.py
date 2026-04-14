@@ -50,10 +50,13 @@ class qeleg_multi:
         self.cls.append(np.copy(other_qe.cl))
         return self
 
-    def __call__(self, get_alm: callable, geometry: Geom, mmax=None, nthreads: int = 0):
+    def __call__(self, get_alm: callable, geometry: Geom, mmax=None, mmax_in=None, nthreads: int = 0):
         """Returns the spin-weighted real-space map of the estimator.
 
             We first build X_lm in the wanted _{si}X_lm _{so}Y_lm and then convert this alm2map_spin conventions.
+
+            mmax: output mmax
+            mmax_in: mmax of the alm inputs
 
         """
         if nthreads <= 0:
@@ -67,10 +70,10 @@ class qeleg_multi:
             assert si in [0, -2, 2], str(si) + ' input spin not implemented'
             alms = [get_alm('e'), get_alm('b')] if abs(si) == 2 else [-get_alm('t'), 0]
             sgn_g = (-1) ** si if si < 0 else 1
-            gclm[0] += almxfl(alm_copy(alms[0], None, lmax, mmax), sgn_g * cl, mmax, False)
+            gclm[0] += almxfl(alm_copy(alms[0], mmax_in, lmax, mmax), sgn_g * cl, mmax, False)
             if np.any(alms[1]) and ncomp > 1:
                 sgn_c = (-1) ** si if si < 0 else -1
-                gclm[1] += almxfl(alm_copy(alms[1], None, lmax, mmax), sgn_c * cl, mmax, False)
+                gclm[1] += almxfl(alm_copy(alms[1], mmax_in, lmax, mmax), sgn_c * cl, mmax, False)
         if self.spin_ou > 0:
             gclm[1] *= -1
         elif self.spin_ou == 0:
