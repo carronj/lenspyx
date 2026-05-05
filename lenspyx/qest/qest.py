@@ -14,7 +14,7 @@ from lenspyx.remapping.utils_geom import Geom
 from lenspyx.qest.ivfs import OpFilt
 
 
-def eval_qe(qe_key, lmax_ivf, cls_weight, get_alm, lmax_qlm, mmax=None, mmax_qlm=None, verbose=False, get_alm2=None, geometry: Geom or None=None):
+def eval_qe(qe_key, lmax_ivf, cls_weight, get_alm, lmax_qlm, mmax=None, mmax_qlm=None, verbose=False, get_alm2=None, geometry: Geom | None=None):
     """Evaluates a quadratic estimator gradient and curl terms.
 
 
@@ -32,7 +32,6 @@ def eval_qe(qe_key, lmax_ivf, cls_weight, get_alm, lmax_qlm, mmax=None, mmax_qlm
             glm and clm healpy arrays (gradient and curl terms of the QE estimate)
 
     """
-    assert mmax in [None, lmax_ivf], 'there is a bug with non-trivial mmmax, fix this first'
     qe_list = _get_qes(qe_key, lmax_ivf, cls_weight)
     if geometry is None:
         qe_spin = np.max([qe[0].spin_ou + qe[1].spin_ou for qe in uqe.qe_compress(qe_list)])
@@ -106,25 +105,25 @@ def _eval_qe(qe_list:list[uqe.qe], get_alm, lmax_qlm, geo:Geom, verbose=True, ge
             if len(conjugate) > 0:
                 for j in conjugate:
                     print("in-spins conjugate leg and out-spin", qes[j][1].spins_in, qes[j][1].spin_ou)
-        a = q[0](get_alm, geo, mmax=mmax)
+        a = q[0](get_alm, geo, mmax=mmax, mmax_in=mmax)
         if qe_spin:
-            dc += fac1 * a * q[1](get_alm2, geo, mmax=mmax)
+            dc += fac1 * a * q[1](get_alm2, geo, mmax=mmax, mmax_in=mmax)
             for j in conjugate:
-                dc += a.conj() * qes[j][1](get_alm2, geo, mmax=mmax)
+                dc += a.conj() * qes[j][1](get_alm2, geo, mmax=mmax, mmax_in=mmax)
         else: # We must consider the real part only
-            dc += fac1 * (a * q[1](get_alm2, geo, mmax=mmax)).real
+            dc += fac1 * (a * q[1](get_alm2, geo, mmax=mmax, mmax_in=mmax)).real
             for j in conjugate:
-                dc += (a.conj() * qes[j][1](get_alm2, geo, mmax=mmax)).real
+                dc += (a.conj() * qes[j][1](get_alm2, geo, mmax=mmax, mmax_in=mmax)).real
         if symmetrize: # same, swapping alm2 and alm1
-            a = q[0](get_alm2, geo, mmax=mmax)
+            a = q[0](get_alm2, geo, mmax=mmax, mmax_in=mmax)
             if qe_spin:
-                dc += fac1 * a * q[1](get_alm, geo, mmax=mmax)
+                dc += fac1 * a * q[1](get_alm, geo, mmax=mmax, mmax_in=mmax)
                 for j in conjugate:
-                    dc += a.conj() * qes[j][1](get_alm, geo, mmax=mmax)
+                    dc += a.conj() * qes[j][1](get_alm, geo, mmax=mmax, mmax_in=mmax)
             else:
-                dc += fac1 * (a * q[1](get_alm, geo, mmax=mmax)).real
+                dc += fac1 * (a * q[1](get_alm, geo, mmax=mmax, mmax_in=mmax)).real
                 for j in conjugate:
-                    dc += (a.conj() * qes[j][1](get_alm, geo, mmax=mmax)).real
+                    dc += (a.conj() * qes[j][1](get_alm, geo, mmax=mmax, mmax_in=mmax)).real
 
     gclm = geo.adjoint_synthesis(m=dr, spin=qe_spin, lmax=lmax_qlm, mmax=mmax_qlm, nthreads=nthreads)
     if symmetrize:
