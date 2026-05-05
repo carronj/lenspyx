@@ -6,10 +6,12 @@ from ducc0.misc import GL_thetas, GL_weights
 from ducc0.fft import good_size
 from ducc0.sht import synthesis, adjoint_synthesis, synthesis_deriv1, synthesis_general, adjoint_synthesis_general
 
-def st2mmax(spin, tht, lmax):
+def st2mmax(spin, tht, lmax, force_int=False):
     r"""Converts spin, tht and lmax to a maximum effective m, according to libsharp paper polar optimization formula Eqs. 7-8
 
-        For a given mmax, one needs then in principle 2 * mmax + 1 longitude points for exact FFT's
+        For a given mmax, one needs then in principle 2 * mmax + 1 longitude points for exact FFT
+
+        Returns and integer only if force_int is set
 
 
     """
@@ -17,6 +19,8 @@ def st2mmax(spin, tht, lmax):
     b = - 2 * spin * np.cos(tht)
     c = -(T + lmax * np.sin(tht)) ** 2 + spin ** 2
     mmax = 0.5 * (- b + np.sqrt(b * b - 4 * c))
+    if force_int:
+        return min(int(mmax) + 1, lmax)
     return mmax
 
 
