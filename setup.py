@@ -17,7 +17,7 @@ setup(
     author='Julien Carron',
     data_files=[('lenspyx/data/cls', ['lenspyx/data/cls/FFP10_wdipole_lensedCls.dat',
                                       'lenspyx/data/cls/FFP10_wdipole_gradlensedCls.dat',
-                                      'lenspyx/data/cls/FFP10_wdipole_tensCls.dat',
+                                      'lenspyx/data/cls/FFP10_wtensors_tensCls.dat',
                                       'lenspyx/data/cls/FFP10_wdipole_lenspotentialCls.dat'])],
     author_email='to.jcarron@gmail.com',
     description='lensed CMB sims pipe',
