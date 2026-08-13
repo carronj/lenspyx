@@ -119,7 +119,7 @@ def _get_response(qes:list[(ut.qeleg_multi, ut.qeleg_multi, callable)], source, 
                 f_bs[spin] = f_b
         cls2_ms, cls2_ps, cls1_ms, cls1_ps = {}, {}, {}, {}
         for s2 in f_as:
-            assert -s2 in f_as
+            assert -s2 in f_as, s2
             cls2_ms[s2] = np.zeros_like(f_as[s2])
             cls2_ps[s2] = np.zeros_like(f_as[s2])
         for t2 in f_bs:
