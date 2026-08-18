@@ -379,9 +379,12 @@ class Locations(object):
      
 
         if loc is not None:
+            assert loc.shape[-1] == 2
             thtmin = np.min(loc[:, 0])
             thtmax = np.max(loc[:, 0])
             npix = loc.shape[0]
+            assert np.min(loc[:, 1]) >= 0, 'input longitudes must be between 0 and 2pi'
+                
         else:
             thtmin = np.min(geom.theta)
             thtmax = np.max(geom.theta)
