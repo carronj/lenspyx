@@ -4,7 +4,7 @@ from lenspyx import utils_hp
 import ducc0
 from ducc0.misc import GL_thetas, GL_weights
 from ducc0.fft import good_size
-from ducc0.sht import synthesis, adjoint_synthesis, synthesis_deriv1, synthesis_general, adjoint_synthesis_general
+from ducc0.sht import synthesis, adjoint_synthesis, synthesis_deriv1, map2leg, leg2map
 
 def st2mmax(spin, tht, lmax, force_int=False):
     r"""Converts spin, tht and lmax to a maximum effective m, according to libsharp paper polar optimization formula Eqs. 7-8
@@ -148,6 +148,41 @@ class Geom:
             if verbose:
                 print('(split with overlap, %s additional pixels out of %s)'%(npix_tot-npix, npix))
         return geoms
+
+    def map2leg(self, ma:np.ndarray, vtm:np.ndarray, mmax:int, nthreads:int)->np.ndarray:
+        """Wrapper to ducc0 map2leg function.
+
+            Transforms a map (or several maps) on this geometry to Legendre coefficients dependent on theta and m.
+
+            Args:
+                ma: map pixel data, using this geometry's ring layout (nph, phi0, ofs)
+                vtm: output buffer for the Legendre coefficients, of shape (ncomp, ntheta, mmax+1) (allocated if None)
+                mmax: maximum m moment to compute
+                nthreads: number of threads to use (0: use all available hardware threads)
+
+            Returns:
+                array of Legendre coefficients, same object as vtm if this was provided
+
+        """
+        return map2leg(leg=vtm, nphi=self.nph, phi0=self.phi0, ringstart=self.ofs,
+                nthreads=nthreads, map=ma, mmax=mmax)
+
+    def leg2map(self, ma:np.ndarray, vtm:np.ndarray, nthreads:int)->np.ndarray:
+        """Wrapper to ducc0 leg2map function.
+
+            Transforms one or more sets of Legendre coefficients (theta and m dependent) to maps on this geometry.
+
+            Args:
+                ma: output buffer for the map pixel data, using this geometry's ring layout (nph, phi0, ofs) (allocated if None)
+                vtm: input Legendre coefficients, of shape (ncomp, ntheta, mmax+1)
+                nthreads: number of threads to use (0: use all available hardware threads)
+
+            Returns:
+                map pixel data, same object as ma if this was provided
+
+        """
+        return leg2map(leg=vtm, nphi=self.nph, phi0=self.phi0, ringstart=self.ofs,
+                nthreads=nthreads, map=ma)
     
     def apply_weights(self, m:np.ndarray, w:np.ndarray):
         """Applies a ring-dependent weighting to map or set of maps
