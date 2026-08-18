@@ -3,7 +3,7 @@ from numpy.random import default_rng
 rng = default_rng()
 
 
-def almxfl(alm:np.ndarray, fl:np.ndarray, mmax:int or None, inplace:bool):
+def almxfl(alm:np.ndarray, fl:np.ndarray, mmax:int|None, inplace:bool):
     """Multiply alm by a function of l.
 
     Parameters
@@ -41,7 +41,7 @@ def almxfl(alm:np.ndarray, fl:np.ndarray, mmax:int or None, inplace:bool):
         return ret
 
 
-def gauss_beam(fwhm:float, lmax:int):
+def gauss_beam(fwhm:float, lmax:int)->np.ndarray:
     """Gaussian beam
 
     Parameters
@@ -63,7 +63,7 @@ def gauss_beam(fwhm:float, lmax:int):
     return bl
 
 
-def synalm(cl:np.ndarray, lmax:int, mmax:int or None, rlm_dtype=np.float64, seed=None, rngen=None, alms_r:np.ndarray=None):
+def synalm(cl:np.ndarray, lmax:int, mmax:int|None, rlm_dtype=np.float64, seed=None, rngen=None, alms_r:np.ndarray=None)->np.ndarray[complex]:
     """Creates a Gaussian field alm from input cl array
 
     Parameters
@@ -104,7 +104,7 @@ def synalm(cl:np.ndarray, lmax:int, mmax:int or None, rlm_dtype=np.float64, seed
     return alm
 
 
-def synalms(cls: dict, lmax:int, mmax:int or None, seed=None, rlm_dtype:type=np.float64, rngen=None):
+def synalms(cls: dict, lmax:int, mmax:int|None, seed=None, rlm_dtype:type=np.float64, rngen=None)->np.ndarray[complex]:
     """Creates Gaussian field alms from input cl dictionary
 
     Parameters
@@ -203,7 +203,7 @@ def synalms(cls: dict, lmax:int, mmax:int or None, seed=None, rlm_dtype:type=np.
     return alms
 
 
-def alm2cl(alm:np.ndarray, blm:np.ndarray or None, lmax:int or None, mmax:int or None, lmaxout:int or None):
+def alm2cl(alm:np.ndarray, blm:np.ndarray|None, lmax:int|None, mmax:int|None, lmaxout:int|None)->np.ndarray[complex]:
     """Auto- or cross-power spectrum between two alm arrays
 
     Parameters
@@ -252,7 +252,7 @@ def alm2cl(alm:np.ndarray, blm:np.ndarray or None, lmax:int or None, mmax:int or
     return cl
 
 
-def alm_copy(alm:np.ndarray, mmaxin:int or None, lmaxout:int, mmaxout:int):
+def alm_copy(alm:np.ndarray, mmaxin:int|None, lmaxout:int, mmaxout:int)->np.ndarray[complex]:
     """Copies the healpy alm array, with the option to change its lmax
 
         Parameters
@@ -288,7 +288,7 @@ class Alm:
 
     """
     @staticmethod
-    def getsize(lmax:int, mmax:int):
+    def getsize(lmax:int, mmax:int)->int:
         """Number of entries in alm array with lmax and mmax parameters
 
         Parameters
@@ -307,7 +307,7 @@ class Alm:
         return ((mmax+1) * (mmax+2)) // 2 + (mmax+1) * (lmax-mmax)
 
     @staticmethod
-    def getidx(lmax:int, l:int or np.ndarray, m:int or np.ndarray):
+    def getidx(lmax:int, l:int|np.ndarray, m:int|np.ndarray)->int|np.ndarray:
         """Returns index corresponding to (l,m) in an array describing alm up to lmax.
 
         In HEALPix C++ and healpy, :math:`a_{lm}` coefficients are stored ordered by
@@ -333,7 +333,7 @@ class Alm:
         return m * (2 * lmax + 1 - m) // 2 + l
 
     @staticmethod
-    def getlmax(s:int, mmax:int or None):
+    def getlmax(s:int, mmax:int|None)->int:
         """Returns the lmax corresponding to a given healpy array size.
 
         Parameters
