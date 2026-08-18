@@ -148,6 +148,19 @@ class Geom:
             if verbose:
                 print('(split with overlap, %s additional pixels out of %s)'%(npix_tot-npix, npix))
         return geoms
+    
+    def apply_weights(self, m:np.ndarray, w:np.ndarray):
+        """Applies a ring-dependent weighting to map or set of maps
+        
+            Note
+            ----
+                The operation is inplace
+        
+        """
+        assert w.shape == (self.theta.size,), (w.shape, self.theta.size)
+        for ofs, nph, tw in zip(self.ofs, self.nph, w):
+            m[..., ofs:ofs+nph] *= tw
+
 
     def synthesis(self, gclm: np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int, map:np.ndarray=None, **kwargs):
         """Wrapper to ducc forward SHT
@@ -182,7 +195,7 @@ class Geom:
             for of, w, npi in zip(self.ofs, self.weight, self.nph):
                 m[:, of:of + npi] *= w
         if alm is not None:
-            assert alm.shape[-1] == utils_hp.Alm.getsize(lmax, mmax)
+            assert alm.shape[-1] >= utils_hp.Alm.getsize(lmax, mmax)
         return adjoint_synthesis(map=m, theta=self.theta, lmax=lmax, mmax=mmax, nphi=self.nph, spin=spin, phi0=self.phi0,
                                  nthreads=nthreads, ringstart=self.ofs, alm=alm,  **kwargs)
 
