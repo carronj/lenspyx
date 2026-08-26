@@ -80,6 +80,23 @@ class Geom:
             return self
         return Geom(self.theta[asort], self.phi0[asort], self.nph[asort], self.ofs[asort], self.weight[asort])
 
+    def get_ring_fromindex(self, idx:int, m:np.ndarray)->np.ndarray:
+        """Return values of isolatitude ring of input map (or stack of maps)
+
+
+        """
+        return m[..., self.ofs[idx]:self.ofs[idx]+self.nph[idx]]
+
+    def get_ring_fromtheta(self, theta:float, m:np.ndarray)->np.ndarray:
+        """Return values of isolatitude ring of input map (or stack of maps) closest to the input co-latitude
+
+
+        """
+        idx = int(np.argmin(np.abs(self.theta - theta)))
+        return self.get_ring_fromindex(idx, m)
+
+
+
     def restrict(self, tht_min:float, tht_max:float, northsouth_sym:bool, update_ringstart=False):
         """Returns a geometry with restricted co-latitude range
 
