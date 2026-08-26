@@ -214,7 +214,7 @@ class Geom:
             m[..., ofs:ofs+nph] *= tw
 
 
-    def synthesis(self, gclm: np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int, map:np.ndarray=None, **kwargs):
+    def synthesis(self, gclm: np.ndarray, spin:int, lmax:int, mmax:int, nthreads:int, map:np.ndarray|None=None, **kwargs):
         """Wrapper to ducc forward SHT
 
             Return a map or a pair of map for spin non-zero, with the same type as gclm
