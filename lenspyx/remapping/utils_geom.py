@@ -25,7 +25,7 @@ def st2mmax(spin, tht, lmax, force_int=False):
 
 
 class Geom:
-    def __init__(self, theta:np.ndarray[float], phi0:np.ndarray[float], nphi:np.ndarray[np.uint64], ringstart:np.ndarray[np.uint64], w:np.ndarray[float]):
+    def __init__(self, theta:np.ndarray, phi0:np.ndarray, nphi:np.ndarray, ringstart:np.ndarray, w:np.ndarray):
         """Iso-latitude pixelisation of the sphere
 
                 Args:
@@ -273,17 +273,17 @@ class Geom:
         return self.adjoint_synthesis(m.copy(), 0, lmax, mmax, nthreads, **kwargs).squeeze()
 
     @staticmethod
-    def rings2pix(geom:Geom, rings:np.ndarray[int]):
-        return np.concatenate([geom.ofs[ir] + np.arange(geom.nph[ir], dtype=np.uint64) for ir in rings])
+    def rings2pix(geom:Geom, rings:np.ndarray):
+        return np.concatenate([int(geom.ofs[ir]) + np.arange(int(geom.nph[ir]), dtype=int) for ir in rings])
 
     @staticmethod
     def phis(geom:Geom, ir):
         assert ir < geom.theta.size
-        nph = geom.nph[ir]
+        nph = int(geom.nph[ir])
         return (geom.phi0[ir] + np.arange(nph) * (2 * np.pi / nph)) % (2. * np.pi)
 
     @staticmethod
-    def rings2phi(geom:Geom, rings:np.ndarray[int]):
+    def rings2phi(geom:Geom, rings:np.ndarray):
         return np.concatenate([Geom.phis(geom, ir) for ir in rings])
 
     @staticmethod
@@ -389,7 +389,7 @@ class Geom:
 
 
     @staticmethod
-    def get_gl_geometry(lmax:int, good_size_real=True, nphi:int or None =None):
+    def get_gl_geometry(lmax:int, good_size_real=True, nphi:int | None = None):
         """Gauss-Legendre pixelization
 
             Args:
