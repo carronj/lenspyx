@@ -103,6 +103,21 @@ import numpy as np
 from ducc0.sht import alm2leg, leg2alm
 from ducc0.misc import GL_thetas, GL_weights
 
+
+def _ducc_index_dtype():
+    """Integer type ducc0 accepts for mval and mstart: int64 up to ducc0 0.41, uint64 (size_t) from 0.42."""
+    for dtype in (np.int64, np.uint64):
+        try:
+            alm2leg(alm=np.zeros((1, 1), dtype=complex), spin=0, lmax=0, mval=np.zeros(1, dtype=dtype),
+                    mstart=np.zeros(1, dtype=dtype), theta=np.array([1.]))
+            return dtype
+        except RuntimeError:
+            pass
+    raise RuntimeError("ducc0 accepts neither int64 nor uint64 for mval and mstart")
+
+
+_MDTYPE = _ducc_index_dtype()
+
 GL_cache = {}
 verbose = False
 
@@ -215,8 +230,8 @@ def wigner4pos(gl: np.ndarray[float], cl: np.ndarray[float] or None, theta: np.n
     gclm[0, :len(gl)] = prefac * gl[:len(gl)]
     if s2 and standard:
         gclm[1, :len(cl)] = prefac * cl[:len(cl)]
-    leg = alm2leg(alm=gclm, spin=abs(s2), lmax=lmax, mval=np.array([abs(s1)], dtype=int),
-                  mstart=np.array([0]), theta=theta, mode=mode).squeeze()
+    leg = alm2leg(alm=gclm, spin=abs(s2), lmax=lmax, mval=np.array([abs(s1)], dtype=_MDTYPE),
+                  mstart=np.array([0], dtype=_MDTYPE), theta=theta, mode=mode).squeeze()
     wig = np.zeros((nout, theta.size), float)
     if s2:
         s_sgn = (1 if s2 % 2 == 0 else -1)
@@ -319,8 +334,8 @@ def wignercoeff(xi: np.ndarray[float], theta: np.ndarray[float], s1: int, s2: in
         # always want a spin 0 on the SHT side
         t_xi = xi if (s1 + s2) % 2 == 0 else -xi
         return wignercoeff(t_xi, theta, s2, s1, lmax)
-    mval = np.array([abs(s1)], dtype=int)
-    mstart = np.array([0], dtype=int)
+    mval = np.array([abs(s1)], dtype=_MDTYPE)
+    mstart = np.array([0], dtype=_MDTYPE)
     fac = (2 * np.pi * np.sqrt(4 * np.pi)) / np.sqrt(np.arange(1, 2 * lmax + 3, 2))
     xis = xi.astype(complex)
     lmin = max(abs(s2), abs(s1))
